@@ -20,6 +20,7 @@ import {effectiveLoadout,DEFAULT_LOADOUT,cosmetic} from './cosmetics';
 import {EMPTY_METRICS} from './matchMetrics';
 import {MatchRewards} from './ChallengePanel';
 import {ProfileScreen} from './ProfileScreen';
+import {type Backup} from './backup';
 import {SavedGames} from './SavedGames';
 import {BotClient} from './botClient';
 import {usePwa} from './pwa';
@@ -113,6 +114,11 @@ function App(){
  };
  const leave=()=>{if(storageError&&!window.confirm('Saving failed. Leave anyway?'))return false;setMatchId(null);setSavedAt(null);setMenu('home');setGame(null);setSetup(null);setSelection(null);setBotError('');setActivity([]);setVisualQueue([]);setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};return true;};
  const deleteSave=(id:string)=>{try{setLibrary(removeMatch(localStorage,id));setStorageError('');}catch(e){setStorageError(e instanceof Error?e.message:'Could not delete saved game');}};
+ const restoreLocal=(b:Backup)=>{
+   const p=b.preferences;setLibrary(b.library);setProfile(b.profile);setProfileError('');setStorageError('');
+   setCount(p.count);setHumans(p.humans);setDifficulty(p.difficulty);setPace(p.pace);setFollow(p.follow);setSize(p.count<=4?'standard':'extended');
+   if(!b.profile){try{setProfile(writeProfile(localStorage,createProfile(crypto.randomUUID(),Date.now())));}catch(e){setProfileError(e instanceof Error?e.message:'Profile unavailable');}}
+ };
  const latest=latestUnfinished(library);
  const current=view?.players.find(p=>p.id===playerId);
  const myHand=view?.players.find(p=>p.id===showHand);
@@ -222,7 +228,7 @@ function App(){
   {profileError&&<p className="storage-warning" role="alert">⚠️ {profileError}</p>}
   {!view&&menu==='home'&&<HomeMenu onProfile={()=>setMenu('profile')} profileLabel={profile&&progress?avatarIcon(profile.avatar,progress.level)+' '+profile.name+' · Lv. '+progress.level+' · '+cosmetic(loadout.title).name:undefined} onContinue={latest?()=>resume(latest):undefined} onSaves={()=>setMenu('saves')} onPlay={()=>setMenu('setup')} onGuide={()=>setMenu('guide')} onSettings={()=>setSoundOpen(v=>!v)} onExpansions={()=>setMenu('expansions')}/>}
   {!view&&menu==='profile'&&(profile?<ProfileScreen key={profile.id} profile={profile} results={library.results} onSave={updateProfile} onBack={()=>setMenu('home')}/>:<section className="panel"><button onClick={()=>setMenu('home')}>← Main menu</button><p>Local profile unavailable. You can still play.</p></section>)}
-  {!view&&menu==='saves'&&<SavedGames library={library} onResume={resume} onDelete={deleteSave} onBack={()=>setMenu('home')}/>}
+  {!view&&menu==='saves'&&<SavedGames onRestore={restoreLocal} library={library} onResume={resume} onDelete={deleteSave} onBack={()=>setMenu('home')}/>}
   {!view&&menu==='home'&&<section className="setup-bar install-bar"><div><strong>{pwa.installed?'📱 Installed':pwa.offline?'🛜 Offline':pwa.ready?'✓ Offline ready':'📱 Play anywhere'}</strong><p className="muted">{pwa.error?'Offline setup failed. Reload when connected.':pwa.installed?'Open Orvane from your home screen.':pwa.canInstall?'Install for quick access.':'On iPhone: Safari → Share → Add to Home Screen.'}</p></div>{pwa.canInstall&&!pwa.installed&&<button onClick={()=>{void pwa.install().catch(()=>{});}}>Install</button>}</section>}
   {!view&&menu==='guide'&&<section className="panel"><button onClick={()=>setMenu('home')}>← Main menu</button><h2>📖 How to play</h2><Guide/></section>}
   {!view&&menu==='expansions'&&<><button onClick={()=>setMenu('home')}>← Main menu</button><ExpansionRoadmap/></>}
