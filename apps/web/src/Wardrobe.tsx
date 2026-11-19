@@ -1,11 +1,12 @@
 import {useState} from 'react';
-import {COLLECTIONS,COSMETICS,CATEGORIES,CATEGORY_NAMES,unlocked,effectiveLoadout,cosmetic,type Category,type Loadout,type Progress,type Cosmetic} from './cosmetics';
+import {COLLECTIONS,COSMETICS,CATEGORIES,CATEGORY_NAMES,unlocked,effectiveLoadout,cosmetic,type Category,type StoredLoadout,type Progress,type Cosmetic} from './cosmetics';
+import {BuildingArt,RoadArt,RobberArt,effectColor} from './PieceArt';
 function Preview({item}:{item:Cosmetic}){
  return <div className="cosmetic-preview" data-preview={item.id}>
- {item.category==='dice'?<span className="preview-die">⚄</span>:item.category==='cardBack'?<span className="preview-back">{COLLECTIONS.find(c=>c.id===item.collection)?.icon??item.icon}</span>:item.category==='board'?<span className="preview-board"><i>🌲</i><i>🌾</i><i>⛰️</i></span>:<span className="preview-title" style={{color:item.color}}>{item.icon}</span>}
+ {item.category==='dice'?<span className="preview-die">⚄</span>:item.category==='cardBack'?<span className="preview-back">{COLLECTIONS.find(c=>c.id===item.collection)?.icon??item.icon}</span>:item.category==='board'?<span className="preview-board"><i>🌲</i><i>🌾</i><i>⛰️</i></span>:(item.category==='settlement'||item.category==='city'||item.category==='road'||item.category==='robber')?<svg viewBox="0 0 64 54" width="64" height="54" aria-hidden="true">{item.category==='road'?<RoadArt a={{x:10,y:40}} b={{x:54,y:14}} color="#e05b4f" styleId={item.id}/>:item.category==='robber'?<RobberArt p={{x:32,y:27}} styleId={item.id}/>:<BuildingArt p={{x:32,y:32}} city={item.category==='city'} color="#e05b4f" styleId={item.id}/>}</svg>:<span className="preview-title" style={{color:item.category==='effects'?effectColor(item.id):item.color}}>{item.icon}</span>}
  </div>;
 }
-export function Wardrobe({loadout,progress,onEquip}:{loadout:Loadout|undefined;progress:Progress;onEquip:(id:string)=>void}){
+export function Wardrobe({loadout,progress,onEquip}:{loadout:StoredLoadout|undefined;progress:Progress;onEquip:(id:string)=>void}){
  const [filter,setFilter]=useState<Category|'all'>('all'),[error,setError]=useState('');
  const active=effectiveLoadout(loadout,progress);
  const count=COSMETICS.filter(c=>unlocked(c,progress)).length;

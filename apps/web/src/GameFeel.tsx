@@ -1,3 +1,4 @@
+import {effectPalette} from './PieceArt';
 import type {CSSProperties} from 'react';
 import {RESOURCES} from '@orvane/engine';
 import {resourceEmoji} from './resources';
@@ -18,6 +19,6 @@ export function TransferStage({event,name,other,duration}:{event:Extract<VisualE
 export function SpendStage({event,duration}:{event:Extract<VisualEvent,{kind:'spend'}>;duration:number}){
  return <div className="spend-stage">{RESOURCES.filter(k=>(event.resources[k]??0)>0).map(k=><span key={k} style={{animationDuration:duration+'ms'}}>{resourceEmoji[k]} −{event.resources[k]}</span>)}<b>{event.build==='city'?'🏰':event.build==='settlement'?'🏠':'🛤️'}</b></div>;
 }
-export function Confetti({duration}:{duration:number}){
- return <div className="confetti" aria-hidden="true">{Array.from({length:24},(_,i)=><i key={i} style={{'--x':((i*47)%100)+'%','--drift':((i*37)%100-50)+'px','--spin':(i%2?360:-360)+'deg',background:['#e4bf70','#89bca4','#ef9b78','#8baacb'][i%4],animationDuration:duration+'ms',animationDelay:(i%5)*40+'ms'} as CSSProperties}/>)}</div>;
+export function Confetti({duration,effectId='classic-effects'}:{duration:number;effectId?:string}){
+ return <div className="confetti" aria-hidden="true">{Array.from({length:24},(_,i)=><i key={i} style={{'--x':((i*47)%100)+'%','--drift':((i*37)%100-50)+'px','--spin':(i%2?360:-360)+'deg',background:effectPalette(effectId)[i%4],animationDuration:duration+'ms',animationDelay:(i%5)*40+'ms'} as CSSProperties}/>)}</div>;
 }
