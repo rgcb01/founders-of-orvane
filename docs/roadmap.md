@@ -11,6 +11,8 @@
 | 0.7 | Fair local bots, simulation harness, difficulty |
 | 0.7.1 | Mobile-first match UI, action prompts, AI balance and usability |
 | 0.8 | Local save/resume, versioned saves, PWA/offline support |
+| 0.8.1 | Local profile, XP, ranks, achievements and avatar rewards |
+| 0.8.2–0.8.x | More cosmetic collections, personalization and challenges |
 | 0.9 | Turbo and performance, stronger AI, end-to-end testing, base-game polish |
 | 1.0 | Complete local base game (human + bots and pass-and-play) |
 | 2.0 | Sailing expansion |
@@ -39,7 +41,7 @@ Heuristic policy with own hand/public board, aggregate holdings and public score
 
 ## Optional online module (not on the critical path)
 
-Online play is deferred and may be developed independently if desired. It is not a release gate for 1.0 or expansions. Keep GitHub Pages as the primary frontend, with local play, AI and saves usable without a backend. A future opt-in authoritative service (candidate: Cloudflare Workers + Durable Objects) may provide private rooms, invite links, mixed human/bot seats, per-seat private state, server-generated randomness, idempotent actions, reconnection, persistent games and bot substitution. Public matchmaking, accounts, rankings and chat are later optional features. Do not introduce a required service URL, credentials, account, or paid dependency into the local build. Preserve shared engine and serialization boundaries for eventual online support.
+Online play is deferred and may be developed independently if desired. It is not a release gate for 1.0 or expansions. Keep GitHub Pages as the primary frontend, with local play, AI and saves usable without a backend. A future opt-in authoritative service (candidate: Cloudflare Workers + Durable Objects) may provide private rooms, invite links, mixed human/bot seats, per-seat private state, server-generated randomness, idempotent actions, reconnection, persistent games and bot substitution. Public matchmaking, rankings and chat are later optional features. Email/password accounts, recovery and cloud progression/save sync are deferred as a separate optional module; see [local progression](progression.md). Do not introduce a required service URL, credentials, account, or paid dependency into the local build. Preserve shared engine and serialization boundaries for eventual online support.
 
 ## Mobile and audio (v0.7.1)
 Mobile match controls remain accessible in a fixed safe-area-aware dock. Lobby settings collapse during play. Original synthesized Web Audio effects use a single master gain, gesture activation and persistent audio preferences; bot effects are optional and muted by default in turbo. No downloads or audio assets required. Expert has slightly more deterministic placement and negotiation and prioritizes a city when it can close out the game; deeper AI calibration remains for v0.9.
@@ -61,3 +63,6 @@ Home screen separates setup from play; planned expansion roadmap is non-playable
 
 ## Persistence and offline (v0.8.0)
 Versioned local-storage library stores setup/game state, board seed, preferences and history. Autosave after committed transitions; resume restores without replay and pauses bots. Invalid/incompatible libraries are preserved rather than overwritten. Completed solo outcomes are recorded once and persist after deleting a save. Build-generated scoped service worker precaches the shell and hashed assets; browser controls PWA installation. No account/server. Cross-device sync, export/import and real-device offline testing remain pending.
+
+## Local progression (v0.8.1)
+Local profile UUID, derived XP ledger, rank thresholds, one-time achievements, equipable avatar cosmetics. No password/authentication, cloud sync or online service required. Further cosmetic categories are pending. See [design and online boundary](progression.md).
