@@ -55,3 +55,6 @@ Camera follows offscreen public actions without forcing zoom-in; manual pan canc
 
 ## Game feel (v0.7.5)
 Presentation adds paid construction costs before placement, directional public trade transfers in the board event stage, hidden-card theft, CSS dice tumble, human victory confetti, independent optional music volume and haptics on compatible browsers. Original synthesized ambient loop is off by default; background tabs stop scheduled music. Dice animation is cosmetic, not a physical dice simulation. Trade proposals remain static until accepted. Local engine unchanged.
+
+## Interface redesign (v0.7.6)
+Home screen separates setup from play; planned expansion roadmap is non-playable. Compact player HUD, resource card hand, board-adjacent build choices, trade preview and sidebar tabs prioritize the map. Mandatory discard/robber/free-road and trade prompts override panel navigation. Contextual rules guide is available without leaving the match. Manual browser/iPhone validation remains pending.
