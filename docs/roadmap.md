@@ -28,3 +28,6 @@ Development cards: 25/34 cards, separate randomized deck, no same-turn non-VP us
 
 ## Victory and action windows
 The longest trail does not reuse edges and stops at opposing buildings. Awards preserve incumbent ties; otherwise a unique qualifying leader earns the bonus. Victory is evaluated for the active player when mandatory effects resolve. Paired play follows the 2025 5–6 player rules: third seat acts after primary, without dice or domestic trade. Each action window has its own card-use limit; the production round increments after both windows. Random roll-off determines first placement. Variable maps remain custom seeded layouts rather than physical fixed setup.
+
+## Local bots
+Heuristic policy with own hand/public board, aggregate holdings and public scores only. The local projection masks opponents and deck order; this is not a security boundary. Difficulty affects setup noise and negotiation; hard/expert are currently similar heuristic policies, not Monte Carlo search. Browser schedules one action at a time with a short turbo delay; Web Workers and richer personalities are future optimizations. Automated matches report winner, rounds and trade/build counts.

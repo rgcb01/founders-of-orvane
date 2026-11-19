@@ -110,3 +110,5 @@ export * from './trade';
 export * from './development';
 
 export * from './victory';
+
+export * from './bot';
