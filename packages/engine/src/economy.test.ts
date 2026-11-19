@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {generateBoard,createSetup,applySetup,activePlayer,legalSettlements,legalRoads,startGame,applyGame,legalBuilds,produce,RESOURCES,COSTS,rollDice,type GameState,type Board,type BuildKind,type PlayerCount} from './index';
+import {generateBoard,createSetup,applySetup,activePlayer,legalSettlements,legalRoads,startGame,applyGame,legalBuilds,produce,RESOURCES,COSTS,rollDice,emptyResources,robberVictims,type GameState,type Board,type BuildKind,type PlayerCount} from './index';
 
 function fixture(count:PlayerCount=6){
  const board=generateBoard('economy-'+count,count<=4?'standard':'extended');
@@ -30,7 +30,20 @@ describe('economy',()=>{
      let {board,state}=fixture(count);const cap=count<=4?19:24;
      conserve(state,cap);
      for(let i=0;i<100;i++){
-       state=applyGame(board,state,{kind:'roll',playerId:state.active,dice:[i%6+1,i%6+1]});
+       state=applyGame(board,state,{kind:'roll',playerId:state.active,dice:[i%6+1,Math.floor(i/6)%6+1]});
+       if(state.phase==='discard'){
+         for(const p of state.players){
+           let left=state.development.discards[p.id]??0;
+           if(!left)continue;
+           const resources=emptyResources();
+           for(const k of RESOURCES){resources[k]=Math.min(left,p.resources[k]);left-=resources[k];}
+           state=applyGame(board,state,{kind:'discard',playerId:p.id,resources});
+         }
+       }
+       if(state.phase==='robber'){
+         const tile=board.tiles.find(t=>t.id!==state.development.robber)!;
+         state=applyGame(board,state,{kind:'moveRobber',playerId:state.active,tileId:tile.id,victim:robberVictims(board,state,tile.id)[0]??null,random:.5});
+       }
        conserve(state,cap);
        state=applyGame(board,state,{kind:'end',playerId:state.active});
        expect(state.active).toBe((i+1)%count);
