@@ -1,3 +1,4 @@
+import {createDevelopment,beginSeven,applyDevelopment,type Development,type DevelopmentAction} from './development';
 import {applyTrade,type TradeAction,type Offer} from './trade';
 import type {Board} from './index';
 import {emptyResources,type Player,type Resource,type Resources,type SetupState,type Settlement,type Road} from './setup';
@@ -12,14 +13,14 @@ export const COSTS:Record<BuildKind,Resources>={
 };
 export interface GameState {
  players:Player[];settlements:Building[];roads:Road[];bank:Resources;
- active:number;turn:number;phase:'roll'|'action';dice:[number,number]|null;
- lastProduction:Resources[];shortages:Resource[];offer:Offer|null;
+ active:number;turn:number;phase:'roll'|'action'|'discard'|'robber'|'freeRoad';dice:[number,number]|null;
+ lastProduction:Resources[];shortages:Resource[];offer:Offer|null;development:Development;
 }
-export type GameAction=TradeAction
+export type GameAction=TradeAction|DevelopmentAction
  | {kind:'roll';playerId:number;dice:[number,number]}
  | {kind:'build';playerId:number;build:BuildKind;id:string}
  | {kind:'end';playerId:number};
-export function startGame(board:Board,setup:SetupState):GameState {
+export function startGame(board:Board,setup:SetupState,random:()=>number=Math.random):GameState {
  if(setup.phase!=='complete')throw new Error('Setup is incomplete');
  const capacity=board.size==='standard'?19:24;
  const bank=emptyResources();
@@ -27,7 +28,7 @@ export function startGame(board:Board,setup:SetupState):GameState {
    bank[k]=capacity-setup.players.reduce((sum,p)=>sum+p.resources[k],0);
    if(bank[k]<0)throw new Error('Starting resources exceed bank');
  }
- return {players:setup.players.map(p=>({...p,resources:{...p.resources}})),settlements:setup.settlements.map(s=>({...s,kind:'settlement'})),roads:setup.roads.map(r=>({...r})),bank,active:setup.players[0].id,turn:1,phase:'roll',dice:null,lastProduction:setup.players.map(()=>emptyResources()),shortages:[],offer:null};
+ return {players:setup.players.map(p=>({...p,resources:{...p.resources}})),settlements:setup.settlements.map(s=>({...s,kind:'settlement'})),roads:setup.roads.map(r=>({...r})),bank,active:setup.players[0].id,turn:1,phase:'roll',dice:null,lastProduction:setup.players.map(()=>emptyResources()),shortages:[],offer:null,development:createDevelopment(board,setup.players.map(p=>p.id),random)};
 }
 export function affordable(resources:Resources,kind:BuildKind):boolean {
  return RESOURCES.every(k=>resources[k]>=COSTS[kind][k]);
@@ -63,7 +64,7 @@ export function produce(board:Board,state:GameState,total:number):Pick<GameState
  const players=state.players.map(p=>({...p,resources:{...p.resources}}));
  const shortages:Resource[]=[];
  for(const t of board.tiles){
-   if(t.number!==total||t.terrain==='desert')continue;
+   if(t.number!==total||t.terrain==='desert'||t.id===state.development.robber)continue;
    const resource=t.terrain;
    for(const s of state.settlements){
      if(!t.vertices.includes(s.vertexId))continue;
@@ -87,19 +88,20 @@ export function produce(board:Board,state:GameState,total:number):Pick<GameState
  return {players,bank,lastProduction,shortages};
 }
 export function applyGame(board:Board,state:GameState,action:GameAction):GameState {
+ if(action.kind==='discard'||action.kind==='moveRobber'||action.kind==='buyCard'||action.kind==='playCard'||action.kind==='freeRoad')return applyDevelopment(board,state,action);
  if(action.kind!=='roll'&&action.kind!=='build'&&action.kind!=='end')return applyTrade(board,state,action);
  if(state.offer)throw new Error('Resolve pending offer first');
  if(action.playerId!==state.active)throw new Error('Not the active player');
  if(action.kind==='roll'){
    if(state.phase!=='roll'||action.dice.length!==2||action.dice.some(n=>!Number.isInteger(n)||n<1||n>6))throw new Error('Illegal roll');
    const total=action.dice[0]+action.dice[1];
-   // Seven produces nothing until robber/discard actions are implemented.
-   return {...state,...produce(board,state,total),phase:'action',dice:[...action.dice]};
+   const rolled:GameState={...state,...produce(board,state,total),phase:'action',dice:[...action.dice]};
+   return total===7?beginSeven(rolled):rolled;
  }
  if(state.phase!=='action')throw new Error('Roll before acting');
  if(action.kind==='end'){
    const i=state.players.findIndex(p=>p.id===state.active);
-   return {...state,active:state.players[(i+1)%state.players.length].id,turn:state.turn+1,phase:'roll',dice:null,lastProduction:state.players.map(()=>emptyResources()),shortages:[]};
+   return {...state,active:state.players[(i+1)%state.players.length].id,turn:state.turn+1,phase:'roll',dice:null,lastProduction:state.players.map(()=>emptyResources()),shortages:[],development:{...state.development,played:false}};
  }
  if(!legalBuilds(board,state,action.build).includes(action.id))throw new Error('Illegal construction');
  const bank={...state.bank};
