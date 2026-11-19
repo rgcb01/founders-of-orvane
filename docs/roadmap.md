@@ -77,3 +77,5 @@ Deterministic per-board/seat personalities (Builder, Merchant, Expansionist, War
 
 ## Performance and polish (v0.9.2)
 Bot decisions use a reusable module Web Worker with masked state, request IDs, timeout, cancellation and main-thread rule validation; compatibility fallback remains available. Turbo removes artificial wait and bypasses visual queues while preserving normal/relaxed settings and checkpoints. Portable versioned JSON backups explicitly replace local profile/library/preferences after validation and confirmation; best-effort rollback on storage failure, no cloud or encryption. Full future-turn search and real iOS testing remain pending.
+
+Browser smoke tests run against production preview in Chromium desktop and WebKit iPhone viewport: real Worker, offline cache, save/resume and portable backup transfer. This is browser emulation, not physical iPhone verification.

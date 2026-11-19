@@ -8,6 +8,7 @@ export function parseBackup(raw:string):Backup{
  if(raw.length>MAX_BACKUP_BYTES)throw fail();
  let b:Backup;try{b=JSON.parse(raw);}catch{throw fail();}
  if(!b||b.format!=='orvane-backup'||b.schema!==1||!Number.isSafeInteger(b.exportedAt)||b.exportedAt<0||b.exportedAt>8640000000000000||!(b.profile===null||validateProfile(b.profile))||!isPreferences(b.preferences))throw fail();
+ if(!b.library||typeof b.library!=='object')throw fail();
  let library:Library;try{library=readLibrary({getItem:()=>JSON.stringify(b.library),setItem:()=>{throw fail();}});}catch{throw fail();}
  if(new Set(library.matches.map(m=>m.id)).size!==library.matches.length||new Set(library.results.map(r=>r.id)).size!==library.results.length||library.results.some(r=>r.endedAt>8640000000000000))throw fail();
  return {...b,library};
