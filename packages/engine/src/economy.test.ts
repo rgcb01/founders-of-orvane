@@ -30,7 +30,7 @@ describe('economy',()=>{
      let {board,state}=fixture(count);const cap=count<=4?19:24;
      conserve(state,cap);
      for(let i=0;i<100;i++){
-       state=applyGame(board,state,{kind:'roll',playerId:state.active,dice:[i%6+1,(i*5+2)%6+1]});
+       state=applyGame(board,state,{kind:'roll',playerId:state.active,dice:[i%6+1,i%6+1]});
        conserve(state,cap);
        state=applyGame(board,state,{kind:'end',playerId:state.active});
        expect(state.active).toBe((i+1)%count);
@@ -44,6 +44,7 @@ describe('economy',()=>{
    expect(()=>applyGame(board,state,{kind:'roll',playerId:0,dice:[0,6]})).toThrow();
    const rolled=applyGame(board,state,{kind:'roll',playerId:0,dice:[3,4]});
    expect(rolled.players).toEqual(state.players);
+   expect(rolled.phase).toBe('robber');
    expect(()=>applyGame(board,rolled,{kind:'roll',playerId:0,dice:[1,1]})).toThrow();
    expect(rollDice(()=>0)).toEqual([1,1]);
    expect(rollDice(()=>.999)).toEqual([6,6]);

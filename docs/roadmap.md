@@ -19,7 +19,9 @@
 The engine is pure TypeScript and cannot depend on DOM or UI. A single seeded generator owns map inventory and topology; actions in future versions must validate against the engine, never the view. The initial renderer is SVG for low setup cost, accessibility and touch interaction; evaluate PixiJS when profiling shows a need. No server is needed for the first playable solo build. The extended island is a 30-hex base-game layout, not an archipelago expansion. Ports and initial placement are implemented; paid construction and trade follow the base rules. Turbo must preserve game probabilities. Original assets and branding; verify rights before publishing derivative material.
 
 ## Economy preview limitations
-Seven yields no production until the robber milestone. Turns currently cycle one player at a time; official paired 5–6-player turns and victory are planned for v0.6. Trading is available from v0.4. The local interface hides inactive players' exact hands, but is not a security boundary.
+Seven now triggers discards and robber movement; a blocked hex does not produce. Turns currently cycle one player at a time; official paired 5–6-player turns and victory are planned for v0.6. Trading is available from v0.4. The local interface hides inactive players' exact hands, but is not a security boundary.
 
 ## Art direction
 Emoji terrain and resource symbols are the lightweight visual language for the web client. Rendering varies by platform; engine state never depends on emoji. Ports are seeded coastal placements (not a fixed physical board layout).
+
+Development cards: 25/34 cards, separate randomized deck, no same-turn non-VP use, one non-VP card per turn. Local hands are not a security boundary; public state projections will be needed for online play. Victory awards and paired turns are deferred to v0.6.
