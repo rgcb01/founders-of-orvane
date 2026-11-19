@@ -4,14 +4,16 @@ import {RESOURCES,COSTS,legalBuilds,rollDice,type GameState,type GameAction,type
 import {canBuy,canPlay,freeRoadSites,robberVictims,CARD_COST} from './development';
 import {tradeRate} from './trade';
 import {playerScore,longestRoad,awardHolder} from './victory';
+import {botPersonality,PERSONALITIES,type BotPersonality} from './personality';
+export {botPersonality,PERSONALITIES,type BotPersonality} from './personality';
 
 export type Difficulty='easy'|'normal'|'hard'|'expert';
-export interface BotOptions {difficulty:Difficulty;random?:()=>number;offers?:number}
+export interface BotOptions {difficulty:Difficulty;random?:()=>number;offers?:number;personality?:BotPersonality}
 export const BOT_POLICY={
  easy:{setupNoise:12,buildNoise:10,offerBudget:0,acceptGain:-.25,bankGain:.6,plan:false,lookahead:false},
  normal:{setupNoise:4,buildNoise:2,offerBudget:1,acceptGain:.25,bankGain:.2,plan:false,lookahead:false},
  hard:{setupNoise:.8,buildNoise:.5,offerBudget:2,acceptGain:.15,bankGain:.12,plan:true,lookahead:false},
- expert:{setupNoise:0,buildNoise:0,offerBudget:2,acceptGain:.05,bankGain:.05,plan:true,lookahead:true}
+ expert:{setupNoise:0,buildNoise:0,offerBudget:3,acceptGain:.05,bankGain:.05,plan:true,lookahead:true}
 } as const;
 const rich={forest:24,pasture:24,field:24,hill:24,mountain:24};
 const sum=(r:Resources)=>RESOURCES.reduce((n,k)=>n+r[k],0);
@@ -76,13 +78,13 @@ export function chooseSetupAction(board:Board,s:SetupState,options:BotOptions):S
  const own=s.settlements.filter(b=>b.playerId===playerId).map(b=>b.vertexId);
  const sites=s.phase==='settlement'?legalSettlements(board,s):legalRoads(board,s);
  if(!sites.length)throw new Error('No setup action');
- const policy=BOT_POLICY[options.difficulty];
+ const policy=BOT_POLICY[options.difficulty],style=PERSONALITIES[options.personality??botPersonality(board.seed,playerId)];
  const scoreSite=(x:string)=>{
    if(!policy.lookahead)return quality(board,x,own);
    const occupied=new Set([...s.settlements.map(b=>b.vertexId),x]),targets=vacant(board,occupied);
    const neighbors=board.edges.filter(e=>e.a===x||e.b===x).map(e=>e.a===x?e.b:e.a);
    const reach=targets.filter(v=>board.edges.some(e=>neighbors.some(n=>e.a===n&&e.b===v||e.b===n&&e.a===v)));
-   return strategicSite(board,x,own)+Math.max(0,...reach.map(v=>quality(board,v,[...own,x])))*.16;
+   return strategicSite(board,x,own)+Math.max(0,...reach.map(v=>quality(board,v,[...own,x])))*.22*style.road;
  };
  const id=options.difficulty==='easy'?sites[Math.floor(random()*sites.length)]:s.phase==='settlement'?best(sites,x=>scoreSite(x)+random()*policy.setupNoise)!:expansion(board,playerId,s.settlements,s.roads,sites)?.id??sites[0];
  return {kind:s.phase==='settlement'?'settlement':'road',id,playerId};
@@ -100,17 +102,22 @@ export function decisionPlayer(s:GameState):number|null{
  return s.active;
 }
 type Goal={cost:Resources;weight:number};
-function goals(board:Board,s:GameState,id:number,difficulty:Difficulty):Goal[]{
+function goals(board:Board,s:GameState,id:number,difficulty:Difficulty,personality:BotPersonality):Goal[]{
  // Hypothetical funds expose legal geometry without relying on future rolls.
  const probe={...s,active:id,offer:null,phase:'action' as const,players:s.players.map(p=>p.id===id?{...p,resources:rich}:p)};
- const list:Goal[]=[];const policy=BOT_POLICY[difficulty],score=playerScore(s,id,true).total,prod=income(board,s,id);
+ const list:Goal[]=[];const policy=BOT_POLICY[difficulty],score=playerScore(s,id,true).total,prod=income(board,s,id),style=PERSONALITIES[personality];
  const settled=legalBuilds(board,probe,'settlement'),cities=legalBuilds(board,probe,'city'),roads=legalBuilds(board,probe,'road');
  const path=expansion(board,id,s.settlements,s.roads,roads);
- if(settled.length)list.push({cost:COSTS.settlement,weight:policy.plan?14+Math.min(3,settled.length):12});
- if(cities.length)list.push({cost:COSTS.city,weight:policy.plan?13+(score>=8?5:0)+(prod.field+prod.mountain>10?2:0):11});
- if(path&&path.value>0&&!settled.length)list.push({cost:COSTS.road,weight:8});
- if(s.development.deck.length)list.push({cost:CARD_COST,weight:policy.plan?(score>=7?11:5):7});
- if(roads.length)list.push({cost:COSTS.road,weight:4});
+ if(settled.length)list.push({cost:COSTS.settlement,weight:policy.plan?(14+Math.min(3,settled.length))*style.settlement:12});
+ if(cities.length)list.push({cost:COSTS.city,weight:policy.plan?(13+(score>=8?5:0)+(prod.field+prod.mountain>10?2:0))*style.city:11});
+ if(path&&path.value>0&&!settled.length)list.push({cost:COSTS.road,weight:8*(policy.plan?style.road:1)});
+ if(s.development.deck.length)list.push({cost:CARD_COST,weight:policy.plan?(score>=7?11:5)*style.card:7});
+ if(policy.lookahead&&path&&path.value>0&&!settled.length){
+   // Combined road + settlement goal represents a reachable two-action investment.
+   const joined=Object.fromEntries(RESOURCES.map(k=>[k,COSTS.road[k]+COSTS.settlement[k]])) as Resources;
+   list.push({cost:joined,weight:16*style.settlement});
+ }
+ if(roads.length)list.push({cost:COSTS.road,weight:4*(policy.plan?style.road:1)});
  return list;
 }
 function handValue(hand:Resources,gs:Goal[]):number{
@@ -122,17 +129,27 @@ function simulateHand(hand:Resources,give:Resources,want:Resources):Resources{
 export function chooseBotAction(board:Board,raw:GameState,options:BotOptions):GameAction|null{
  const id=decisionPlayer(raw);if(id===null)return null;
  const s=botView(raw,id),random=options.random??Math.random,difficulty=options.difficulty;
- const policy=BOT_POLICY[difficulty],hand=s.players.find(p=>p.id===id)!.resources;
- let gs:Goal[]|undefined;const value=(h:Resources)=>handValue(h,gs??=goals(board,s,id,difficulty));
+ const policy=BOT_POLICY[difficulty],personality=options.personality??botPersonality(board.seed,id),style=PERSONALITIES[personality],hand=s.players.find(p=>p.id===id)!.resources;
+ let gs:Goal[]|undefined;const value=(h:Resources)=>handValue(h,gs??=goals(board,s,id,difficulty,personality));
  const gainFor=(h:Resources)=>value(h)-value(hand);
+ const threat=(other:number)=>{
+   const score=playerScore(s,other).total,held=sum(s.players[other].resources);
+   // Public score, total hand size and awards only; never inspect private resource types.
+   return score+(score>=7?Math.min(2,held/5):0)+(s.awards.longestRoad===other||s.awards.largestArmy===other?.25:0);
+ };
+ const demand=(other:number,k:Resource)=>{
+   const prod=income(board,s,other);
+   return 1/(1+prod[k]/6);
+ };
  if(s.offer){
    const o=s.offer,affordable=RESOURCES.every(k=>hand[k]>=o.want[k]);
    const gain=affordable?gainFor(simulateHand(hand,o.want,o.give)):-Infinity;
    const leader=playerScore(s,o.from).total>=8;
-   if(affordable&&gain>(leader&&policy.plan?2.5:policy.acceptGain))return {kind:'accept',playerId:id};
+   const risk=policy.lookahead?Math.max(0,threat(o.from)-7)*.65:0;
+   if(affordable&&gain>(leader&&policy.plan?2.5+risk:policy.acceptGain+risk))return {kind:'accept',playerId:id};
    if((options.offers??0)<policy.offerBudget&&sum(o.want)>1){
      const k=best(RESOURCES.filter(k=>o.want[k]>0&&hand[k]>0),k=>value(simulateHand(hand,bundle(k),o.give)));
-     if(k&&gainFor(simulateHand(hand,bundle(k),o.give))>.5)return {kind:'counter',playerId:id,give:bundle(k),want:o.give};
+     if(k&&gainFor(simulateHand(hand,bundle(k),o.give))>.5+risk)return {kind:'counter',playerId:id,give:bundle(k),want:o.give};
    }
    return {kind:'reject',playerId:id};
  }
@@ -145,8 +162,8 @@ export function chooseBotAction(board:Board,raw:GameState,options:BotOptions):Ga
    return {kind:'discard',playerId:id,resources};
  }
  if(s.phase==='robber'){
-   const t=best(board.tiles.filter(t=>t.id!==s.development.robber),t=>s.settlements.filter(b=>t.vertices.includes(b.vertexId)).reduce((n,b)=>n+(b.playerId===id?-3:1+playerScore(s,b.playerId).total*(policy.plan?.45:.15))*pips(t.number)*(b.kind==='city'?2:1),0)+robberVictims(board,s,t.id).length*.4+random()*(difficulty==='easy'?9:policy.lookahead?0:.2))!;
-   const victim=best(robberVictims(board,s,t.id),p=>playerScore(s,p).total+sum(s.players.find(x=>x.id===p)!.resources)*.08)??null;
+   const t=best(board.tiles.filter(t=>t.id!==s.development.robber),t=>s.settlements.filter(b=>t.vertices.includes(b.vertexId)).reduce((n,b)=>n+(b.playerId===id?-3:1+(policy.lookahead?threat(b.playerId):playerScore(s,b.playerId).total)*(policy.plan?.45:.15))*pips(t.number)*(b.kind==='city'?2:1),0)+robberVictims(board,s,t.id).length*.4+random()*(difficulty==='easy'?9:policy.lookahead?0:.2))!;
+   const victim=best(robberVictims(board,s,t.id),p=>(policy.lookahead?threat(p):playerScore(s,p).total)+sum(s.players.find(x=>x.id===p)!.resources)*.08)??null;
    return {kind:'moveRobber',playerId:id,tileId:t.id,victim,random:random()};
  }
  if(s.phase==='freeRoad'){
@@ -176,11 +193,11 @@ export function chooseBotAction(board:Board,raw:GameState,options:BotOptions):Ga
  const own=s.settlements.filter(b=>b.playerId===id).map(b=>b.vertexId);
  const sites=legalBuilds(board,s,'settlement'),cities=legalBuilds(board,s,'city'),roads=legalBuilds(board,s,'road');
  const score=playerScore(s,id,true).total;
- const site=best(sites,x=>(policy.plan?strategicSite(board,x,own):quality(board,x,own))+random()*policy.buildNoise);
+ const site=best(sites,x=>(policy.plan?strategicSite(board,x,own):quality(board,x,own))+random()*policy.buildNoise+(policy.lookahead?board.edges.filter(e=>e.a===x||e.b===x).reduce((n,e)=>n+(s.roads.some(r=>r.edgeId===e.id&&r.playerId!==id)?1:0),0)*.65:0));
  const city=best(cities,x=>quality(board,x));
  if(site&&city&&policy.plan){
    const sIncome=siteTiles(board,site).reduce((n,t)=>n+pips(t.number),0),cIncome=siteTiles(board,city).reduce((n,t)=>n+pips(t.number),0);
-   if(cIncome>=sIncome+(score>=8?0:2))return {kind:'build',playerId:id,build:'city',id:city};
+   if(cIncome*style.city>=sIncome*style.settlement+(score>=8?0:2))return {kind:'build',playerId:id,build:'city',id:city};
  }
  if(site)return {kind:'build',playerId:id,build:'settlement',id:site};
  if(city)return {kind:'build',playerId:id,build:'city',id:city};
@@ -193,20 +210,32 @@ export function chooseBotAction(board:Board,raw:GameState,options:BotOptions):Ga
  if(path&&path.value>0&&s.settlements.filter(b=>b.playerId===id&&b.kind==='settlement').length<5)return {kind:'build',playerId:id,build:'road',id:path.id};
  // Negotiate only when a mutually useful one-card exchange can improve our plan;
  // choose a partner by public hand size and public score, not hidden card types.
- if(!s.paired&&(options.offers??0)<2&&difficulty!=='easy'){
-   const pairs=RESOURCES.flatMap(give=>RESOURCES.filter(want=>want!==give&&hand[give]>0).map(want=>({give,want,gain:gainFor(simulateHand(hand,bundle(give),bundle(want)))})));
-   const pair=best(pairs,p=>p.gain);
+ if(!s.paired&&(options.offers??0)<policy.offerBudget){
+   const pairs=RESOURCES.flatMap(give=>RESOURCES.filter(want=>want!==give&&hand[give]>0).flatMap(want=>{
+     const amounts=policy.lookahead&&hand[give]>=2?[1,2]:[1];
+     return amounts.map(n=>({give,want,n,gain:gainFor(simulateHand(hand,bundle(give,n),bundle(want)))}));
+   }));
    const partners=s.players.filter(p=>p.id!==id&&sum(p.resources)>0&&playerScore(s,p.id).total<9);
-   const partner=best(partners,p=>sum(p.resources)-playerScore(s,p.id).total*.6+random()*3);
-   if(pair&&pair.gain>(policy.lookahead?.45:difficulty==='hard'?.75:1.2)&&partner)return {kind:'offer',playerId:id,to:partner.id,give:bundle(pair.give),want:bundle(pair.want)};
+   const candidates=pairs.flatMap(pair=>partners.map(partner=>({pair,partner,utility:pair.gain+(policy.lookahead?(demand(partner.id,pair.give)-demand(partner.id,pair.want))*.6-Math.max(0,threat(partner.id)-7)*.5:0)})));
+   const choice=best(candidates,x=>x.utility+random()*(policy.lookahead?.02:.08));
+   if(choice&&choice.pair.gain>(policy.lookahead?.45:difficulty==='hard'?.75:1.2)*(policy.plan?style.trade:1))return {kind:'offer',playerId:id,to:choice.partner.id,give:bundle(choice.pair.give,choice.pair.n),want:bundle(choice.pair.want)};
+
  }
  const exchanges=RESOURCES.flatMap(give=>RESOURCES.filter(want=>want!==give&&s.bank[want]>0&&hand[give]>=tradeRate(board,s,id,give)).map(want=>({give,want,gain:gainFor(simulateHand(hand,bundle(give,tradeRate(board,s,id,give)),bundle(want)))})));
  const exchange=best(exchanges,x=>x.gain);
+ if(policy.lookahead&&exchanges.length){
+   const rates=Object.fromEntries(RESOURCES.map(k=>[k,tradeRate(board,s,id,k)])) as Resources;
+   const plans=exchanges.map(first=>{const h=simulateHand(hand,bundle(first.give,rates[first.give]),bundle(first.want));const bank={...s.bank,[first.give]:s.bank[first.give]+rates[first.give],[first.want]:s.bank[first.want]-1};let next=0;
+     for(const give of RESOURCES)for(const want of RESOURCES)if(give!==want&&h[give]>=rates[give]&&bank[want]>0)next=Math.max(next,value(simulateHand(h,bundle(give,rates[give]),bundle(want)))-value(h));
+     return {first,utility:first.gain+next*.8};});
+   const plan=best(plans,x=>x.utility);
+   if(plan&&plan.first.gain>=-.25&&plan.utility>Math.max(policy.bankGain,exchange?.gain??0)+.15)return {kind:'bankTrade',playerId:id,give:plan.first.give,want:plan.first.want};
+ }
  if(exchange&&exchange.gain>policy.bankGain)return {kind:'bankTrade',playerId:id,give:exchange.give,want:exchange.want};
  if(canBuy(s)&&(!policy.plan||score>=7||sum(hand)>7)&&(score>=6||!path||path.value<=0||sum(hand)>=7||!roads.length))return {kind:'buyCard',playerId:id};
  if(roadAward&&potential>(s.awards.roadLengths[id]??0)&&s.awards.longestRoad!==id&&sum(hand)>=5)return {kind:'build',playerId:id,build:'road',id:roadAward};
  if(canBuy(s)){
-   const buildGoals=(gs??=goals(board,s,id,difficulty)).filter(g=>g.weight>=11&&g.cost!==CARD_COST);
+   const buildGoals=(gs??=goals(board,s,id,difficulty,personality)).filter(g=>g.weight>=11&&g.cost!==CARD_COST);
    const after=simulateHand(hand,CARD_COST,emptyResources());
    if(!policy.plan||score>=7||sum(hand)>7||!buildGoals.some(g=>deficit(hand,g.cost)<=1&&deficit(after,g.cost)>deficit(hand,g.cost)))return {kind:'buyCard',playerId:id};
  }
