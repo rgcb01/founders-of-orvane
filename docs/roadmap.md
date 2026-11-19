@@ -46,3 +46,6 @@ Mobile match controls remain accessible in a fixed safe-area-aware dock. Lobby s
 
 ## UX review — v0.7.2
 Keep the local game milestone at 0.7.x for iterative playtesting. Default relaxed bot pacing (1.4s between actions, 2.2s in action phase), normal and optional turbo. Pause/step affects bot scheduling only, never engine rules. A visible recent-event feed reports public actions and solo-player production without showing opponent hands. Larger contextual map targets, legal-site rings and clear confirmation text. Next UX passes should focus on onboarding, trade/cards and full mobile browser testing before 0.8.
+
+## Animated UX (v0.7.3)
+State transitions derive a serial presentation queue; bot actions wait for the queue, and human action controls unlock after it. SVG overlays mark production, construction and robber motion. Public trades have a visual exchange stage; hidden cards and theft details remain private. Reduced-motion preference disables moving map overlays, turbo skips presentation, and hidden tabs suspend progression. Future: actual DOM-to-board resource flight paths, camera focus and richer card/award effects. Engine rules are unchanged.
