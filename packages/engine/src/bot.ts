@@ -58,7 +58,7 @@ export function chooseSetupAction(board:Board,s:SetupState,options:BotOptions):S
  const own=s.settlements.filter(b=>b.playerId===playerId).map(b=>b.vertexId);
  const sites=s.phase==='settlement'?legalSettlements(board,s):legalRoads(board,s);
  if(!sites.length)throw new Error('No setup action');
- const id=options.difficulty==='easy'?sites[Math.floor(random()*sites.length)]:s.phase==='settlement'?best(sites,x=>quality(board,x,own)+random()*(options.difficulty==='normal'?4:.5))!:expansion(board,playerId,s.settlements,s.roads,sites)?.id??sites[0];
+ const id=options.difficulty==='easy'?sites[Math.floor(random()*sites.length)]:s.phase==='settlement'?best(sites,x=>quality(board,x,own)+random()*(options.difficulty==='normal'?4:options.difficulty==='expert'?0:.5))!:expansion(board,playerId,s.settlements,s.roads,sites)?.id??sites[0];
  return {kind:s.phase==='settlement'?'settlement':'road',id,playerId};
 }
 // A policy sees its own hand, public card counts, board, bank, and public awards.
@@ -147,7 +147,8 @@ export function chooseBotAction(board:Board,raw:GameState,options:BotOptions):Ga
  const own=s.settlements.filter(b=>b.playerId===id).map(b=>b.vertexId);
  const sites=legalBuilds(board,s,'settlement'),cities=legalBuilds(board,s,'city'),roads=legalBuilds(board,s,'road');
  const score=playerScore(s,id,true).total;
- if(sites.length)return {kind:'build',playerId:id,build:'settlement',id:best(sites,x=>quality(board,x,own)+random()*(difficulty==='easy'?10:1))!};
+ if(difficulty==='expert'&&cities.length&&sites.length&&score>=9)return {kind:'build',playerId:id,build:'city',id:best(cities,x=>quality(board,x))!};
+ if(sites.length)return {kind:'build',playerId:id,build:'settlement',id:best(sites,x=>quality(board,x,own)+random()*(difficulty==='easy'?10:difficulty==='expert'?0:1))!};
  if(cities.length)return {kind:'build',playerId:id,build:'city',id:best(cities,x=>quality(board,x))!};
  const path=expansion(board,id,s.settlements,s.roads,roads);
  const roadAward=best(roads,e=>longestRoad(board,{settlements:s.settlements,roads:[...s.roads,{edgeId:e,playerId:id}]},id));
@@ -162,7 +163,7 @@ export function chooseBotAction(board:Board,raw:GameState,options:BotOptions):Ga
    const pair=best(pairs,p=>p.gain);
    const partners=s.players.filter(p=>p.id!==id&&sum(p.resources)>0&&playerScore(s,p.id).total<9);
    const partner=best(partners,p=>sum(p.resources)-playerScore(s,p.id).total*.6+random()*3);
-   if(pair&&pair.gain>.8&&partner)return {kind:'offer',playerId:id,to:partner.id,give:bundle(pair.give),want:bundle(pair.want)};
+   if(pair&&pair.gain>(difficulty==='expert'?.55:.8)&&partner)return {kind:'offer',playerId:id,to:partner.id,give:bundle(pair.give),want:bundle(pair.want)};
  }
  const exchanges=RESOURCES.flatMap(give=>RESOURCES.filter(want=>want!==give&&s.bank[want]>0&&hand[give]>=tradeRate(board,s,id,give)).map(want=>({give,want,gain:value(simulateHand(hand,bundle(give,tradeRate(board,s,id,give)),bundle(want)))-base})));
  const exchange=best(exchanges,x=>x.gain);
