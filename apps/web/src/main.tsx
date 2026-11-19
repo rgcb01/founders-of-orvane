@@ -13,7 +13,7 @@ import {BoardEffects,EventStage} from './VisualEffects';
 import {cameraTarget,focusPoints} from './camera';
 import {IncomeFlights} from './IncomeFlights';
 import type {Cue} from './soundEvents';
-import {HomeMenu,Guide,ExpansionRoadmap,PlayerStrip,ResourceHand,BuildMenu,requiredPanel,type Panel} from './GameUI';
+import {HomeMenu,Guide,ExpansionRoadmap,PlayerStrip,ResourceHand,BuildMenu,requiredPanel,visiblePanel,type Panel} from './GameUI';
 
 const terrain:Record<Terrain,{name:string;icon:string;color:string;resource:string}>={
  forest:{name:'Forest',icon:'🌲',color:'#4c7957',resource:'Lumber'},
@@ -71,8 +71,8 @@ function App(){
  const current=view?.players.find(p=>p.id===playerId);
  const myHand=view?.players.find(p=>p.id===showHand);
  const forcedPanel=requiredPanel(game,humanDecision);
- const activePanel=forcedPanel??panel;
- const openPanel=(p:Panel)=>{setPanel(p);requestAnimationFrame(()=>document.getElementById('action-panel')?.scrollIntoView({block:'nearest',behavior:reduced?'instant':'smooth'}));};
+ const activePanel=visiblePanel(game,humanDecision,panel);
+ const openPanel=(p:Panel)=>{setPanel(p);requestAnimationFrame(()=>document.getElementById('action-panel')?.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'}));};
  useEffect(()=>{
    const old=previous.current;previous.current={game,setup};
    if(!game&&!setup)setVisualQueue([]);
@@ -185,7 +185,7 @@ function App(){
   </section>
   {game&&humanDecision&&(game.offer||game.phase==='discard'||game.phase==='robber'||game.phase==='freeRoad')&&<section className="setup-bar action-prompt" role="status"><strong>{game.offer?'🤝 Trade offer for '+view?.players.find(p=>p.id===decision)?.name:game.phase==='discard'?'🥷 '+view?.players.find(p=>p.id===decision)?.name+': discard resources':game.phase==='robber'?'🥷 Choose a hex and move the robber':'🛤️ Choose a free road'}</strong><button onClick={()=>openPanel(game.offer?'trade':'cards')}>Open action ↓</button></section>}
   {view&&game?.phase!=='finished'&&<section className="setup-bar pace-bar"><div><strong>{botBusy?(paused?'⏸ Bots paused':'🤖 '+view.players.find(p=>p.id===decision)?.name?.replace('🤖 ','')+' is playing'):'⏱ Match pace'}</strong><p className="muted">{paused?'Use Next action to watch one move at a time.':'Watch each action or speed up whenever you want.'}</p></div><div className="sizes"><label className="pace-control">Pace <select aria-label="Bot pace" value={pace} onChange={e=>setPace(e.target.value as Pace)}>{(Object.keys(PACES) as Pace[]).map(p=><option key={p} value={p}>{PACES[p].label}</option>)}</select></label><button aria-pressed={paused} onClick={()=>{setPaused(v=>!v);setStepRequested(false);}}>{paused?'▶ Resume bots':'⏸ Pause bots'}</button>{visual&&<button onClick={()=>setVisualQueue(q=>q.slice(1))}>Skip animation →</button>}{paused&&<button disabled={!botBusy||stepRequested||!!visual} onClick={()=>setStepRequested(true)}>Next action →</button>}</div></section>}
-  {game?.winner!==null&&game?.winner!==undefined&&<section className="winner-banner" role="status"><h2>🏆 {game.players.find(p=>p.id===game.winner)?.name} wins!</h2><p>{playerScore(game,game.winner,true).total} victory points · {game.round} rounds</p><button onClick={()=>{setMenu('setup');setGame(null);setSetup(null);setSelection(null);}}>New game</button></section>}
+  {game?.winner!==null&&game?.winner!==undefined&&!visual&&<section className="winner-banner" role="status"><h2>🏆 {game.players.find(p=>p.id===game.winner)?.name} wins!</h2><p>{playerScore(game,game.winner,true).total} victory points · {game.round} rounds</p><button onClick={()=>{setMenu('setup');setGame(null);setSetup(null);setSelection(null);}}>New game</button></section>}
   {view&&<PlayerStrip view={view} game={game} active={visual?.playerId??playerId} humans={humans} showHand={showHand}/> }
   <div className="layout">
    <section className="board-panel" id="board" aria-label="Interactive island map">
@@ -213,7 +213,7 @@ function App(){
     {view&&myHand&&<ResourceHand resources={myHand.resources} queue={visualQueue} solo={humans===1} desktop/>}
    </section>
    <aside id="action-panel" className="game-sidebar">
-    {view&&<div className="panel-nav" aria-label="Match panels">{(['info','cards','trade'] as Panel[]).map(p=><button key={p} aria-pressed={activePanel===p} disabled={!!forcedPanel&&forcedPanel!==p||p==='cards'&&(!game||!humanDecision||!!game.offer)||p==='trade'&&(!game||!humanDecision||game.phase!=='action')} onClick={()=>setPanel(p)}>{p==='info'?'🗺️ Info':p==='cards'?'🃏 Cards':'⚓ Trade'}</button>)}</div>}
+    {view&&<div className="panel-nav" aria-label="Match panels">{(['info','cards','trade'] as Panel[]).map(p=><button key={p} aria-pressed={activePanel===p} disabled={!!forcedPanel&&forcedPanel!==p||p==='cards'&&(!game||!humanDecision||!!game.offer||game.phase==='finished')||p==='trade'&&(!game||!humanDecision||game.phase!=='action')} onClick={()=>setPanel(p)}>{p==='info'?'🗺️ Info':p==='cards'?'🃏 Cards':'⚓ Trade'}</button>)}</div>}
     {activePanel==='cards'&&game&&humanDecision&&!game.offer&&<DevelopmentPanel key={game.active+":"+game.turn} board={board} game={game} humanActive={humanActive} selectedTile={activeTile?.id} onSelectTile={id=>select('tile',id)} selectedEdge={activeEdge?.id} onChange={s=>{setGame(s);setSelection(null);}}/>}
     {activePanel==='trade'&&game&&humanDecision&&(game.phase==='action')&&<TradePanel key={game.active+":"+game.turn} board={board} game={game} humanActive={humanActive} onChange={s=>{setGame(s);setSelection(null);}}/>}
     {(!view||activePanel==='info'||!humanDecision)&&<div className="info-stack">{view&&activity.length>0&&<section className="match-feed" aria-label="Recent match events"><strong>📜 What happened</strong><p className="latest-event" aria-live="polite">{activity[0]}</p>{activity.slice(1,3).map((a,i)=><p className="muted" key={i}>{a}</p>)}</section>}{game&&game.dice&&<details className="panel production-details"><summary>🌾 Production this roll</summary><section className="setup-bar"><div><strong>Production this roll</strong><p className="muted">{game.players.map((p,i)=>p.name+': +'+Object.values(game.lastProduction[i]).reduce((a,b)=>a+b,0)).join(' · ')}{game.shortages.length?' · Bank shortage: '+game.shortages.map(k=>terrain[k].resource).join(', '):''}</p></div></section></details>}{game&&<section className="panel"><h2>Resource bank</h2><dl>{RESOURCES.map(k=><div className="bank-row" key={k}><dt>{resourceEmoji[k]} {terrain[k].resource}</dt><dd>{game.bank[k]}</dd></div>)}</dl></section>}<section className="panel cartographer"><h2>Cartographer</h2><p className="muted">Seed: {seed}</p><dl><dt>Hexes</dt><dd>{board.tiles.length}</dd><dt>Building sites</dt><dd>{board.vertices.length}</dd><dt>Road segments</dt><dd>{board.edges.length}</dd></dl></section>

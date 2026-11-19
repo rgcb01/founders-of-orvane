@@ -9,6 +9,13 @@ export function requiredPanel(game:GameState|null,humanDecision:boolean):Panel|n
  if(['discard','robber','freeRoad'].includes(game.phase))return 'cards';
  return null;
 }
+export function visiblePanel(game:GameState|null,humanDecision:boolean,selected:Panel):Panel{
+ const required=requiredPanel(game,humanDecision);if(required)return required;
+ if(!game||!humanDecision||game.phase==='finished')return 'info';
+ if(selected==='trade'&&game.phase!=='action')return 'info';
+ if(selected==='cards'&&game.offer)return 'info';
+ return selected;
+}
 export function ResourceHand({resources,queue,solo,desktop=false}:{resources:Resources;queue:VisualEvent[];solo:boolean;desktop?:boolean}){
  return <div className={'resource-hand hand-strip'+(desktop?' desktop-hand':'')} aria-label="Your resources">{RESOURCES.map(k=>{const count=Math.max(0,resources[k]-(solo?pendingIncome(queue,k):0));return <span className={'resource-card resource-'+k} key={k} data-income-target={k} aria-label={resourceName[k]+': '+count} title={resourceName[k]}><span className="resource-card-icon">{resourceEmoji[k]}</span><b>{count}</b><small>{resourceName[k]}</small></span>;})}</div>;
 }
