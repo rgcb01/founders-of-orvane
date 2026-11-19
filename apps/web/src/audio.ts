@@ -39,7 +39,7 @@ export function useGameAudio(){
      }
      const ctx=context.current;
      if(ctx.state==='running')setReady(true);
-     else {await ctx.resume();setReady(ctx.state==='running');}
+     else {await ctx.resume();setReady(true);}
    }catch{}
  }
  useEffect(()=>{
