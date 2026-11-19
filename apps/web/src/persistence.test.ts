@@ -1,3 +1,4 @@
+import {EMPTY_METRICS} from './matchMetrics';
 import {describe,it,expect} from 'vitest';
 import {generateBoard,createSetup,applySetup,activePlayer,legalSettlements,legalRoads,startGame,applyGame,emptyResources,type GameState,type PlayerCount} from '@orvane/engine';
 import {saveMatch,readLibrary,removeMatch,validateSave,latestUnfinished,soloStats,DEFAULT_PREFS,SAVE_KEY,type SavedMatch,type Store} from './persistence';
@@ -15,6 +16,20 @@ describe('local persistence',()=>{
   const seven=applyGame(board,rich,{kind:'roll',playerId:0,dice:[3,4]});expect(seven.phase).toBe('discard');saveMatch(store,{...match,game:seven});expect(readLibrary(store).matches[0].game).toEqual(seven);
   const rolled=applyGame(board,rich,{kind:'roll',playerId:0,dice:[1,1]});const offer=applyGame(board,rolled,{kind:'offer',playerId:0,to:1,give:{...emptyResources(),forest:1},want:{...emptyResources(),field:1}});
   saveMatch(store,{...match,game:offer});const restored=readLibrary(store).matches[0].game!;expect(restored.offer).toEqual(offer.offer);expect(applyGame(board,restored,{kind:'accept',playerId:1})).toEqual(applyGame(board,offer,{kind:'accept',playerId:1}));
+ });
+ it('counts actual production and accepted trades once across save/reload, then freezes the result',()=>{
+  const {board,match,game}=fixture(),store=storage();
+  const rich:GameState={...game,bank:{...game.bank,forest:game.bank.forest-8,field:game.bank.field-1},players:game.players.map(p=>p.id===0?{...p,resources:{...p.resources,forest:p.resources.forest+8}}:p.id===1?{...p,resources:{...p.resources,field:p.resources.field+1}}:p)};
+  const tracked={...match,metrics:EMPTY_METRICS};
+  saveMatch(store,{...tracked,game:rich});const rolled=applyGame(board,rich,{kind:'roll',playerId:0,dice:[1,1]});
+  saveMatch(store,{...tracked,game:rolled});const produced=Object.values(rolled.lastProduction[0]).reduce((a,b)=>a+b,0);
+  expect(readLibrary(store).matches[0].metrics?.produced).toBe(produced);
+  saveMatch(store,{...tracked,game:rolled});expect(readLibrary(store).matches[0].metrics?.produced).toBe(produced);
+  const offer=applyGame(board,rolled,{kind:'offer',playerId:0,to:1,give:{...emptyResources(),forest:1},want:{...emptyResources(),field:1}});
+  saveMatch(store,{...tracked,game:offer});const rejected=applyGame(board,offer,{kind:'reject',playerId:1});saveMatch(store,{...tracked,game:rejected});expect(readLibrary(store).matches[0].metrics?.trades).toBe(0);
+  const offer2=applyGame(board,rejected,{kind:'offer',playerId:0,to:1,give:{...emptyResources(),forest:1},want:{...emptyResources(),field:1}});saveMatch(store,{...tracked,game:offer2});
+  const accepted=applyGame(board,offer2,{kind:'accept',playerId:1});saveMatch(store,{...tracked,game:accepted});saveMatch(store,{...tracked,game:accepted});expect(readLibrary(store).matches[0].metrics?.trades).toBe(1);
+  const finished:GameState={...accepted,phase:'finished',winner:0};saveMatch(store,{...tracked,game:finished});saveMatch(store,{...tracked,game:finished});expect(readLibrary(store).results).toHaveLength(1);expect(readLibrary(store).results[0].metrics?.trades).toBe(1);
  });
  it('resumes a paired action without rolling again',()=>{
   const {board,match,game}=fixture(6),store=storage();const rolled=applyGame(board,game,{kind:'roll',playerId:0,dice:[1,1]});const paired=applyGame(board,rolled,{kind:'end',playerId:0});expect(paired.paired).toBe(true);saveMatch(store,{...match,game:paired});const restored=readLibrary(store).matches[0].game!;expect(restored.active).toBe(3);expect(applyGame(board,restored,{kind:'end',playerId:3})).toEqual(applyGame(board,paired,{kind:'end',playerId:3}));
