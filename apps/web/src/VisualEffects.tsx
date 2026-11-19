@@ -1,5 +1,6 @@
 import {tilePosition,type Board} from '@orvane/engine';
 import type {VisualEvent} from './visualEvents';
+import {CardArt} from './CardArt';
 import {resourceEmoji} from './resources';
 type Point={x:number;y:number};
 export function BoardEffects({event,board,points,r,duration,color}:{event:VisualEvent;board:Board;points:Map<string,Point>;r:number;duration:number;color:string}){
@@ -16,9 +17,9 @@ export function BoardEffects({event,board,points,r,duration,color}:{event:Visual
  return null;
 }
 export function EventStage({event,name,other,duration,color}:{event:VisualEvent;name:string;other:string;duration:number;color:string}){
- const symbols:Record<VisualEvent['kind'],string>={dice:'🎲',production:'🌾',road:'🛤️',settlement:'🏠',city:'🏰',robber:'🥷',trade:'🤝',offer:'🤝',card:'🃏',award:'🏅',victory:'🏆',turn:'🎲',discard:'🃏'};
+ const symbols:Record<VisualEvent['kind'],string>={dice:'🎲',production:'🌾',income:'🎒',road:'🛤️',settlement:'🏠',city:'🏰',robber:'🥷',trade:'🤝',offer:'🤝',card:'🃏',award:'🏅',victory:'🏆',turn:'🎲',discard:'🃏'};
  return <div className={'event-stage event-'+event.kind} style={{borderColor:color,animationDuration:duration+'ms'}} role="status" aria-label={name+' '+event.kind}>
   <span className="event-actor" style={{borderColor:color}}>{name}</span>
-  {event.kind==='dice'?<div className="animated-dice">{event.dice.map((n,i)=><span key={i} className="rolling-die" style={{animationDuration:Math.min(duration,600)+'ms'}}>{['⚀','⚁','⚂','⚃','⚄','⚅'][n-1]}</span>)}<b>{event.dice[0]+event.dice[1]}</b></div>:event.kind==='trade'||event.kind==='offer'?<div className="exchange-stage"><span>{name}</span><span className="exchange-flow">{event.give} →<br/>← {event.want}</span><span>{other}</span></div>:<div className="event-symbol" style={{animationDuration:duration+'ms'}}>{'symbol' in event?event.symbol:symbols[event.kind]}{event.kind==='production'&&<span className="event-count"> +{event.flights.reduce((n,f)=>n+f.count,0)}</span>}</div>}
+  {event.kind==='dice'?<div className="animated-dice">{event.dice.map((n,i)=><span key={i} className="rolling-die" style={{animationDuration:Math.min(duration,600)+'ms'}}>{['⚀','⚁','⚂','⚃','⚄','⚅'][n-1]}</span>)}<b>{event.dice[0]+event.dice[1]}</b></div>:event.kind==='card'?<div className="played-card" style={{animationDuration:duration+'ms'}}><CardArt kind={event.card}/></div>:event.kind==='trade'||event.kind==='offer'?<div className="exchange-stage"><span>{name}</span><span className="exchange-flow">{event.give} →<br/>← {event.want}</span><span>{other}</span></div>:<div className="event-symbol" style={{animationDuration:duration+'ms'}}>{'symbol' in event?event.symbol:symbols[event.kind]}{(event.kind==='production'||event.kind==='income')&&<span className="event-count"> +{event.flights.reduce((n,f)=>n+f.count,0)}</span>}</div>}
  </div>;
 }

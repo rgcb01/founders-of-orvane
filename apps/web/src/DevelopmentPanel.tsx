@@ -1,7 +1,7 @@
 import {useState} from 'react';
-import {applyGame,canBuy,canPlay,robberVictims,freeRoadSites,emptyResources,RESOURCES,type Board,type GameState,type GameAction,type Resource,type CardKind,type Resources} from '@orvane/engine';
+import {applyGame,canBuy,canPlay,robberVictims,freeRoadSites,emptyResources,RESOURCES,type Board,type GameState,type GameAction,type Resource,type Resources} from '@orvane/engine';
 import {resourceEmoji,resourceName} from './resources';
-const labels:Record<CardKind,string>={knight:'⚔️ Knight',roads:'🛤️ Road building',plenty:'🌾 Abundance',monopoly:'💰 Monopoly',victory:'🏆 Victory point'};
+import {CardArt} from './CardArt';
 export function DevelopmentPanel({board,game,onChange,selectedTile,selectedEdge,onSelectTile,humanActive}:{board:Board;game:GameState;onChange:(g:GameState)=>void;selectedTile?:string;selectedEdge?:string;onSelectTile:(id:string)=>void;humanActive:boolean}){
  const [discard,setDiscard]=useState<Resources>(emptyResources);
  const [victim,setVictim]=useState<number|null>(null);
@@ -25,6 +25,6 @@ export function DevelopmentPanel({board,game,onChange,selectedTile,selectedEdge,
  <p className="muted">{actor.name}'s cards (private hand in local play)</p>
  {d.hands[actor.id].length===0&&<p>No development cards.</p>}
  {d.hands[actor.id].some(c=>c.kind==='plenty'||c.kind==='monopoly')&&<div className="trade-line"><label>Resource<select value={first} onChange={e=>setFirst(e.target.value as Resource)}>{RESOURCES.map(k=><option key={k} value={k}>{resourceEmoji[k]} {resourceName[k]}</option>)}</select></label><label>Second<select value={second} onChange={e=>setSecond(e.target.value as Resource)}>{RESOURCES.map(k=><option key={k} value={k}>{resourceEmoji[k]} {resourceName[k]}</option>)}</select></label></div>}
- {d.hands[actor.id].map(c=><div className="card-item" key={c.id}><span>{labels[c.kind]}</span>{c.kind==='victory'?<small>+1 hidden VP</small>:<button disabled={!canPlay(game,c)} onClick={()=>send({kind:'playCard',playerId:game.active,cardId:c.id,resource:first,resources:Object.values(game.bank).reduce((a,b)=>a+b,0)===1?[first]:[first,second]})}>Play</button>}</div>)}
+ {d.hands[actor.id].map(c=><div className="card-item" key={c.id}><CardArt kind={c.kind}/>{c.kind==='victory'?<small>+1 hidden VP</small>:<button disabled={!canPlay(game,c)} onClick={()=>send({kind:'playCard',playerId:game.active,cardId:c.id,resource:first,resources:Object.values(game.bank).reduce((a,b)=>a+b,0)===1?[first]:[first,second]})}>Play</button>}</div>)}
  </>}{error&&<p role="alert" className="trade-error">{error}</p>}</section>;
 }

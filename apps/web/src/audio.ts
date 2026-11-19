@@ -4,6 +4,7 @@ import type {Cue} from './soundEvents';
 type Note=[frequency:number,start:number,duration:number,type?:OscillatorType,volume?:number];
 const tones:Record<Cue,Note[]>={
  select:[[520,0,.055,'sine',.12]],
+ production:[[523,0,.12,'sine'],[659,.12,.15,'sine'],[784,.24,.2,'sine']],
  dice:[[145,0,.055,'triangle'],[220,.065,.055,'triangle'],[175,.13,.055,'triangle'],[330,.20,.10,'triangle']],
  road:[[190,0,.10,'triangle'],[290,.09,.10,'triangle']],
  settlement:[[262,0,.14,'triangle'],[392,.09,.16,'sine'],[523,.18,.20,'sine']],
