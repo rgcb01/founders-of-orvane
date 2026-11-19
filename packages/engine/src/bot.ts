@@ -137,8 +137,9 @@ export function chooseBotAction(board:Board,raw:GameState,options:BotOptions):Ga
    // Public score, total hand size and awards only; never inspect private resource types.
    return score+(score>=7?Math.min(2,held/5):0)+(s.awards.longestRoad===other||s.awards.largestArmy===other?.25:0);
  };
+ const incomes=new Map<number,Resources>();
  const demand=(other:number,k:Resource)=>{
-   const prod=income(board,s,other);
+   let prod=incomes.get(other);if(!prod){prod=income(board,s,other);incomes.set(other,prod);}
    return 1/(1+prod[k]/6);
  };
  if(s.offer){
