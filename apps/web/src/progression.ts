@@ -1,8 +1,8 @@
-import {validLoadout,DEFAULT_LOADOUT,equip,type Loadout} from './cosmetics';
+import {validLoadout,DEFAULT_LOADOUT,equip,type StoredLoadout} from './cosmetics';
 import type {Difficulty} from '@orvane/engine';
 import type {Result,Store} from './persistence';
 export const PROFILE_KEY='orvane.profile.v1';
-export interface LocalProfile {schema:1;id:string;createdAt:number;updatedAt:number;name:string;avatar:string;loadout?:Loadout}
+export interface LocalProfile {schema:1;id:string;createdAt:number;updatedAt:number;name:string;avatar:string;loadout?:StoredLoadout}
 export const AVATARS=[
  {id:'founder',icon:'👤',name:'Founder',level:1},
  {id:'settler',icon:'🌱',name:'Settler',level:2},
