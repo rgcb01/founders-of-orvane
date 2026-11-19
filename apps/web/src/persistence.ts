@@ -1,4 +1,4 @@
-import {generateBoard,RESOURCES,type BoardSize,type PlayerCount,type Difficulty,type GameState,type SetupState} from '@orvane/engine';
+import {generateBoard,RESOURCES,type Board,type BoardSize,type PlayerCount,type Difficulty,type GameState,type SetupState} from '@orvane/engine';
 import type {Pace} from './matchUX';
 export const SAVE_KEY='orvane.library.v1',PREF_KEY='orvane.preferences.v1';
 export interface Preferences {count:PlayerCount;humans:number;difficulty:Difficulty;pace:Pace;follow:boolean}
@@ -11,6 +11,8 @@ const obj=(v:unknown):v is Record<string,any>=>v!==null&&typeof v==='object'&&!A
 const int=(v:unknown,min=0,max=Number.MAX_SAFE_INTEGER):v is number=>typeof v==='number'&&Number.isInteger(v)&&v>=min&&v<=max;
 const one=(v:unknown,choices:readonly unknown[])=>choices.includes(v);
 const res=(v:unknown)=>obj(v)&&RESOURCES.every(k=>int(v[k],0,24));
+const boardCache=new Map<string,Board>();
+function savedBoard(seed:string,size:BoardSize):Board{const key=size+':'+seed;const old=boardCache.get(key);if(old)return old;const board=generateBoard(seed,size);if(boardCache.size>=32)boardCache.delete(boardCache.keys().next().value!);boardCache.set(key,board);return board;}
 const empty=():Library=>({schema:1,matches:[],results:[]});
 export function isPreferences(v:unknown):v is Preferences{
  return obj(v)&&one(v.count,[3,4,5,6])&&int(v.humans,1,v.count)&&one(v.difficulty,['easy','normal','hard','expert'])&&one(v.pace,['relaxed','normal','turbo'])&&typeof v.follow==='boolean';
@@ -20,7 +22,7 @@ export function readPreferences(store:Store):Preferences{
 }
 export function validateSave(v:unknown):v is SavedMatch{
  if(!obj(v)||v.schema!==1||typeof v.id!=='string'||!v.id||!int(v.createdAt)||!int(v.updatedAt,v.createdAt)||typeof v.seed!=='string'||!v.seed||v.seed.length>80||!isPreferences(v.preferences)||v.size!==(v.preferences.count<=4?'standard':'extended')||!Array.isArray(v.activity)||!v.activity.every((x:unknown)=>typeof x==='string')||!obj(v.attempts)||!int(v.attempts.turn)||!int(v.attempts.count))return false;
- const count=v.preferences.count,board=generateBoard(v.seed,v.size),ids=Array.from({length:count},(_,i)=>i),seat=(x:unknown)=>one(x,ids);
+ const count=v.preferences.count,board=savedBoard(v.seed,v.size),ids=Array.from({length:count},(_,i)=>i),seat=(x:unknown)=>one(x,ids);
  const players=(p:unknown)=>Array.isArray(p)&&p.length===count&&p.every((x,i)=>obj(x)&&x.id===i&&typeof x.name==='string'&&typeof x.color==='string'&&res(x.resources));
  const pieces=(s:Record<string,any>,game:boolean)=>Array.isArray(s.settlements)&&Array.isArray(s.roads)&&s.settlements.every((b:unknown)=>obj(b)&&seat(b.playerId)&&board.vertices.some(x=>x.id===b.vertexId)&&(!game||one(b.kind,['settlement','city'])))&&s.roads.every((b:unknown)=>obj(b)&&seat(b.playerId)&&board.edges.some(x=>x.id===b.edgeId))&&new Set(s.settlements.map((b:any)=>b.vertexId)).size===s.settlements.length&&new Set(s.roads.map((b:any)=>b.edgeId)).size===s.roads.length;
  const s=v.setup;
@@ -46,7 +48,7 @@ export function saveMatch(store:Store,match:SavedMatch):Library{
  const library=readLibrary(store),matches=[match,...library.matches.filter(s=>s.id!==match.id)].sort((a,b)=>b.updatedAt-a.updatedAt);
  const results=[...library.results];
  if(match.game?.winner!==null&&match.game?.winner!==undefined&&!results.some(r=>r.id===match.id)){
-   const g=match.game;results.unshift({id:match.id,endedAt:match.updatedAt,players:g.players.length,humans:match.preferences.humans,winner:g.winner,winnerName:g.players.find(p=>p.id===g.winner)!.name,rounds:g.round});
+   const g=match.game,winner=g.winner!;results.unshift({id:match.id,endedAt:match.updatedAt,players:g.players.length,humans:match.preferences.humans,winner,winnerName:g.players.find(p=>p.id===winner)!.name,rounds:g.round});
  }
  const next:Library={schema:1,matches,results};store.setItem(SAVE_KEY,JSON.stringify(next));return next;
 }

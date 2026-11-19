@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import {useEffect,useState} from 'react';
 interface InstallPrompt extends Event {prompt:()=>Promise<void>;userChoice:Promise<{outcome:string}>}
 export function usePwa(){
