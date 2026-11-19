@@ -29,7 +29,7 @@ describe('local bots',()=>{
    const results=[3,4,5,6].flatMap(n=>[0,1].map(i=>simulate('match-'+n+'-'+i,n as PlayerCount,'hard')));
    console.log('Bot match results',JSON.stringify(results.map(({s,actions,builds,trades})=>({players:s.players.length,winner:s.winner,round:s.round,actions,builds,trades}))));
    expect(results.every(r=>r.actions<18000&&r.builds>0&&r.trades>0)).toBe(true);
-   expect(results.filter(r=>r.s.winner!==null).length).toBeGreaterThanOrEqual(6);
+   expect(results.every(r=>r.s.winner!==null)).toBe(true);
  },60000);
  it('all four difficulties produce legal initial and game actions',()=>{
    for(const d of ['easy','normal','hard','expert'] as Difficulty[]){const r=simulate('difficulty-'+d,3,d,12);expect(r.actions).toBeGreaterThan(0);}

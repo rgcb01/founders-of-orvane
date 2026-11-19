@@ -15,7 +15,7 @@ export function TradePanel({board,game,onChange,humanActive}:{board:Board;game:G
  const send=(action:TradeAction)=>{try{onChange(applyGame(board,game,action));setError('');setOfferGive(emptyResources());setOfferWant(emptyResources());}catch(e){setError(e instanceof Error?e.message:'Invalid trade');}};
  const submit=(e:FormEvent)=>{e.preventDefault();send(offer?{kind:'counter',playerId:offer.to,give:offerGive,want:offerWant}:{kind:'offer',playerId:game.active,to:target,give:offerGive,want:offerWant});};
  const disabled=game.phase!=='action';
- return <section className="panel trade-panel">
+ return <section className="panel trade-panel" id="trading-post">
  <h2>⚓ Trading post</h2>
  <p className="muted">Exchange with the bank or negotiate with another player. Local pass-and-play.</p>
  {!offer&&humanActive&&<div className="trade-box"><strong>🏦 Bank & harbors</strong><div className="trade-line">

@@ -11,3 +11,5 @@
 .winner-banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:#28453e;border:2px solid #d8bf83;border-radius:12px;padding:18px}.winner-banner h2{font-family:Georgia,serif;font-size:1.5rem;margin:0}.score-line{color:#ffe39b!important;font-weight:700}
 
 .lobby select{min-height:44px;background:#183a43;color:#f1e9d6;border:1px solid #537274;border-radius:8px;padding:6px;font:inherit}.lobby label{font-size:.8rem}.bot-status{color:#ffe39b;font-size:.85rem}.activity p{font-size:.78rem;line-height:1.4}
+
+.action-prompt{border-color:#ffe39b}.action-prompt a{color:#ffe39b;font-weight:700;padding:8px;white-space:nowrap}
