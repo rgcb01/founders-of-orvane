@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {generateBoard,createSetup,applySetup,activePlayer,legalSettlements,legalRoads,startGame,applyGame,RESOURCES} from '@orvane/engine';
+import {generateBoard,createSetup,applySetup,activePlayer,legalSettlements,legalRoads,startGame,applyGame,RESOURCES,COSTS} from '@orvane/engine';
 import {gameVisual,setupVisual,visualDuration,pendingIncome} from './visualEvents';
 function fixture(){
  const board=generateBoard('visual');let setup=createSetup(board,4);
@@ -43,6 +43,18 @@ describe('visual events',()=>{
   const {board,game}=fixture();const before={...game,development:{...game.development,hands:{...game.development.hands,0:[{id:99,kind:'knight' as const,boughtTurn:0}]}}};
   const next={...before,development:{...before.development,played:true,hands:{...before.development.hands,0:[]}}};
   expect(gameVisual(board,before,next)[0]).toEqual({kind:'card',playerId:0,card:'knight',symbol:'🃏'});
+ });
+ it('shows spend before a paid road but never for a free road',()=>{
+  const {board,game}=fixture();const id=board.edges.find(e=>!game.roads.some(r=>r.edgeId===e.id))!.id;
+  const roads=[...game.roads,{edgeId:id,playerId:0}];
+  const next={...game,roads,bank:Object.fromEntries(RESOURCES.map(k=>[k,game.bank[k]+COSTS.road[k]])) as typeof game.bank,players:game.players.map(p=>p.id===0?{...p,resources:Object.fromEntries(RESOURCES.map(k=>[k,p.resources[k]-COSTS.road[k]])) as typeof p.resources}:p)};
+  expect(gameVisual(board,game,next).map(e=>e.kind)).toEqual(['spend','road']);
+  expect(gameVisual(board,game,{...game,roads}).map(e=>e.kind)).toEqual(['road']);
+ });
+ it('animates a stolen card without showing its resource type',()=>{
+  const {board,game}=fixture();const tile=board.tiles.find(t=>t.id!==game.development.robber)!;
+  const next={...game,development:{...game.development,robber:tile.id},players:game.players.map(p=>({...p,resources:{...p.resources,forest:p.resources.forest+(p.id===0?1:p.id===1?-1:0)}}))};
+  expect(gameVisual(board,game,next).at(-1)).toEqual({kind:'steal',playerId:0,other:1,symbol:'🂠'});
  });
  it('has readable default durations and instant turbo',()=>{
   const event={kind:'dice' as const,playerId:0,dice:[1,2] as [number,number]};

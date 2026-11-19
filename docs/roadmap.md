@@ -52,3 +52,6 @@ State transitions derive a serial presentation queue; bot actions wait for the q
 
 ## Cinematic UX (v0.7.4)
 Camera follows offscreen public actions without forcing zoom-in; manual pan cancels motion and follow can be disabled. Solo income animates from the receiving building into visible hand slots, with delayed dock count. Card purchases stay face down; played action cards reveal their public type. Separate city silhouette and synchronized queued audio. Reduced motion skips moving effects. Real iPhone and browser end-to-end validation remains pending.
+
+## Game feel (v0.7.5)
+Presentation adds paid construction costs before placement, directional public trade transfers in the board event stage, hidden-card theft, CSS dice tumble, human victory confetti, independent optional music volume and haptics on compatible browsers. Original synthesized ambient loop is off by default; background tabs stop scheduled music. Dice animation is cosmetic, not a physical dice simulation. Trade proposals remain static until accepted. Local engine unchanged.

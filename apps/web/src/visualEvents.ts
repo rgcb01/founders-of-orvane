@@ -1,9 +1,11 @@
-import {RESOURCES,type Board,type GameState,type SetupState,type Resource,type CardKind} from '@orvane/engine';
+import {RESOURCES,COSTS,type Board,type GameState,type SetupState,type Resource,type CardKind} from '@orvane/engine';
 import type {Pace} from './matchUX';
 export type Flight={tileId:string;vertexId:string;playerId:number;resource:Resource;count:number};
 export type VisualEvent=
  | {kind:'dice';playerId:number;dice:[number,number]}
  | {kind:'production';playerId:number;tiles:string[];flights:Flight[]}
+ | {kind:'spend';playerId:number;id:string;build:'road'|'settlement'|'city';resources:Partial<Record<Resource,number>>}
+ | {kind:'steal';playerId:number;other:number;symbol:string}
  | {kind:'income';playerId:number;flights:Flight[]}
  | {kind:'card';playerId:number;card:CardKind|null;symbol:string}
  | {kind:'road'|'settlement'|'city';playerId:number;id:string}
@@ -13,7 +15,7 @@ export type VisualEvent=
 export function visualDuration(event:VisualEvent,pace:Pace,reduced=false):number{
  if(pace==='turbo')return 0;
  if(reduced)return pace==='relaxed'?450:200;
- const duration=event.kind==='income'?1000:event.kind==='production'?1400:event.kind==='dice'?950:event.kind==='robber'?1050:event.kind==='victory'?2200:event.kind==='turn'?650:900;
+ const duration=event.kind==='spend'?850:event.kind==='steal'?1000:event.kind==='income'?1000:event.kind==='production'?1400:event.kind==='dice'?950:event.kind==='robber'?1050:event.kind==='victory'?2200:event.kind==='turn'?650:900;
  return pace==='relaxed'?duration:Math.round(duration*.55);
 }
 export function setupVisual(before:SetupState|null,after:SetupState|null):VisualEvent[]{
@@ -45,12 +47,23 @@ export function gameVisual(board:Board,before:GameState|null,after:GameState|nul
    if(tiles.length)events.push({kind:'production',playerId:id,tiles:tiles.map(t=>t.id),flights});
    if(solo&&flights.some(f=>f.playerId===0))events.push({kind:'income',playerId:0,flights:flights.filter(f=>f.playerId===0)});
  }
- for(const r of after.roads)if(!before.roads.some(x=>x.edgeId===r.edgeId))events.push({kind:'road',playerId:r.playerId,id:r.edgeId});
+ const paid=(kind:'road'|'settlement'|'city',site:string,playerId:number)=>{
+   const cost=COSTS[kind],a=before.players.find(p=>p.id===playerId)!,b=after.players.find(p=>p.id===playerId)!;
+   if(RESOURCES.every(k=>a.resources[k]-b.resources[k]===cost[k])&&RESOURCES.every(k=>after.bank[k]-before.bank[k]===cost[k])){
+     events.push({kind:'spend',playerId,id:site,build:kind,resources:cost});
+   }
+ };
+ for(const r of after.roads)if(!before.roads.some(x=>x.edgeId===r.edgeId)){paid('road',r.edgeId,r.playerId);events.push({kind:'road',playerId:r.playerId,id:r.edgeId});}
  for(const b of after.settlements){
    const old=before.settlements.find(x=>x.vertexId===b.vertexId);
-   if(!old||old.kind!==b.kind)events.push({kind:b.kind,playerId:b.playerId,id:b.vertexId});
+   if(!old||old.kind!==b.kind){paid(b.kind,b.vertexId,b.playerId);events.push({kind:b.kind,playerId:b.playerId,id:b.vertexId});}
  }
- if(before.development.robber!==after.development.robber)events.push({kind:'robber',playerId:id,from:before.development.robber,to:after.development.robber});
+ if(before.development.robber!==after.development.robber){
+   events.push({kind:'robber',playerId:id,from:before.development.robber,to:after.development.robber});
+   const total=(r:Record<Resource,number>)=>RESOURCES.reduce((n,k)=>n+r[k],0);
+   const victim=before.players.find(p=>p.id!==id&&total(p.resources)-total(after.players.find(x=>x.id===p.id)!.resources)===1);
+   if(victim)events.push({kind:'steal',playerId:id,other:victim.id,symbol:'🂠'});
+ }
  if(after.offer&&after.offer!==before.offer)events.push({kind:'offer',playerId:after.offer.from,other:after.offer.to,give:bundle(after.offer.give),want:bundle(after.offer.want)});
  if(before.offer&&!after.offer&&after.players.some((p,i)=>RESOURCES.some(k=>p.resources[k]!==before.players[i].resources[k])))events.push({kind:'trade',playerId:before.offer.from,other:before.offer.to,give:bundle(before.offer.give),want:bundle(before.offer.want)});
  if(!events.length&&before.phase==='action'&&after.phase==='action'&&before.bank!==after.bank&&after.development.deck.length===before.development.deck.length&&!(!before.development.played&&after.development.played)){

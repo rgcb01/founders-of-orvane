@@ -1,5 +1,5 @@
 import type {GameState,SetupState} from '@orvane/engine';
-export type Cue='production'|'dice'|'road'|'settlement'|'city'|'trade'|'offer'|'card'|'robber'|'discard'|'turn'|'victory'|'defeat'|'award'|'start'|'select';
+export type Cue='spend'|'steal'|'production'|'dice'|'road'|'settlement'|'city'|'trade'|'offer'|'card'|'robber'|'discard'|'turn'|'victory'|'defeat'|'award'|'start'|'select';
 export function gameCue(before:GameState|null,after:GameState|null,humans:number):Cue|null{
  if(!after)return null;
  if(!before)return 'start';
