@@ -25,7 +25,7 @@ export function offlinePlugin():Plugin{return {
  const manifest={name:'Founders of Orvane',short_name:'Orvane',id:'./',start_url:'./',scope:'./',display:'standalone',background_color:'#102932',theme_color:'#102932',icons:icons.map((src,i)=>({src,sizes:i===0?'192x192':'512x512',type:'image/png',purpose:'any'}))};
  this.emitFile({type:'asset',fileName:'manifest.webmanifest',source:JSON.stringify(manifest)});
  const assets=[...new Set(['./','index.html',...Object.keys(bundle).filter(n=>!n.endsWith('.map')),...icons,'manifest.webmanifest'])];
- const version=Object.keys(bundle).filter(n=>n.startsWith('assets/')).sort().join('|')+'|0.8.4';
+ const version=Object.keys(bundle).filter(n=>n.startsWith('assets/')).sort().join('|')+'|0.9.0';
  const sw=`const ROOT=self.registration.scope;
 const PREFIX='orvane:'+ROOT+':';
 const CACHE=PREFIX+${JSON.stringify(version)};
