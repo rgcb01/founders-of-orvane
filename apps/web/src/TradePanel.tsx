@@ -23,11 +23,11 @@ export function TradePanel({board,game,onChange}:{board:Board;game:GameState;onC
  <span>⇄</span><label>Receive 1<select value={want} onChange={e=>setWant(e.target.value as Resource)}>{RESOURCES.map(k=><option key={k} value={k}>{resourceEmoji[k]} {resourceName[k]}</option>)}</select></label>
  <button disabled={disabled||give===want||actor.resources[give]<rate||game.bank[want]<1} onClick={()=>send({kind:'bankTrade',playerId:game.active,give,want})}>Exchange</button></div></div>}
  {offer&&<div className="trade-box" aria-live="polite"><strong>🤝 {game.players.find(p=>p.id===offer.from)?.name} → {responder?.name}</strong><p>Offers {describe(offer.give)} for {describe(offer.want)}</p><p className="muted">Pass the device to {responder?.name} to respond.</p><p>{responder&&describe(responder.resources)||'No resources'}</p><div className="sizes"><button disabled={!responder||RESOURCES.some(k=>responder.resources[k]<offer.want[k])} onClick={()=>send({kind:'accept',playerId:offer.to})}>Accept</button><button onClick={()=>send({kind:'reject',playerId:offer.to})}>Reject</button><button onClick={()=>send({kind:'cancel',playerId:game.active})}>Cancel</button></div></div>}
- <form className="offer-form" onSubmit={submit}><strong>{offer?'↪ Counteroffer':'🤝 Player offer'}</strong>
+ {game.paired?<p className="muted">Paired action: bank and harbor trade only.</p>:<form className="offer-form" onSubmit={submit}><strong>{offer?'↪ Counteroffer':'🤝 Player offer'}</strong>
  {!offer&&<label>Partner <select value={target} onChange={e=>setTarget(Number(e.target.value))}>{game.players.filter(p=>p.id!==game.active).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
  <div className="offer-grid"><span>Resource</span><span>Give</span><span>Want</span>
  {RESOURCES.map(k=><div className="offer-row" key={k}><span>{resourceEmoji[k]} {resourceName[k]}</span><input aria-label={'Give '+resourceName[k]} type="number" min={0} max={24} value={offerGive[k]} onChange={e=>setOfferGive({...offerGive,[k]:Number(e.target.value)})}/><input aria-label={'Want '+resourceName[k]} type="number" min={0} max={24} value={offerWant[k]} onChange={e=>setOfferWant({...offerWant,[k]:Number(e.target.value)})}/></div>)}</div>
  <button type="submit" disabled={disabled||!RESOURCES.some(k=>offerGive[k]>0)||!RESOURCES.some(k=>offerWant[k]>0)||RESOURCES.some(k=>offerGive[k]>0&&offerWant[k]>0)}>{offer?'Send counteroffer':'Send offer'}</button>
- </form>{error&&<p role="alert" className="trade-error">{error}</p>}
+ </form>}{error&&<p role="alert" className="trade-error">{error}</p>}
  </section>;
 }

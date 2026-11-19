@@ -55,6 +55,7 @@ export function applyTrade(board:Board,state:GameState,a:TradeAction):GameState{
  const actor=state.players.find(p=>p.id===a.playerId);
  if(!actor)throw new Error('Unknown trader');
  const pending=state.offer;
+ if(state.paired&&a.kind!=='bankTrade')throw new Error('Paired player may only trade with the supply');
  if(a.kind==='bankTrade'){
    if(a.playerId!==state.active||pending||a.give===a.want||!TRADE_RESOURCES.includes(a.give)||!TRADE_RESOURCES.includes(a.want))throw new Error('Invalid bank trade');
    const rate=tradeRate(board,state,a.playerId,a.give);

@@ -13,11 +13,12 @@ export interface SetupState {
 export type SetupAction={kind:'settlement'|'road';id:string;playerId:number};
 export const COLORS=['#e05b4f','#477fe4','#f1c44f','#45b782','#ad78dc','#f0a0be'];
 export function emptyResources():Resources{return {forest:0,pasture:0,field:0,hill:0,mountain:0};}
-export function createSetup(board:Board,count:PlayerCount):SetupState {
+export function createSetup(board:Board,count:PlayerCount,firstPlayer=0):SetupState {
  if(![3,4,5,6].includes(count))throw new Error('Invalid player count');
  if((count<=4)!==(board.size==='standard'))throw new Error('Board size does not match player count');
  const players=Array.from({length:count},(_,id)=>({id,name:'Player '+(id+1),color:COLORS[id],resources:emptyResources()}));
- const ids=players.map(p=>p.id);
+ if(!Number.isInteger(firstPlayer)||firstPlayer<0||firstPlayer>=count)throw new Error('Invalid first player');
+ const ids=Array.from({length:count},(_,i)=>(i+firstPlayer)%count);
  return {players,order:[...ids,...ids.slice().reverse()],step:0,phase:'settlement',pendingVertex:null,settlements:[],roads:[]};
 }
 export function activePlayer(state:SetupState):number|null{return state.phase==='complete'?null:state.order[state.step];}
@@ -54,4 +55,14 @@ export function applySetup(board:Board,state:SetupState,action:SetupAction):Setu
  if(!legalRoads(board,state).includes(action.id))throw new Error('Illegal road');
  const step=state.step+1;
  return {...state,step,phase:step===state.order.length?'complete':'settlement',pendingVertex:null,roads:[...state.roads,{edgeId:action.id,playerId:action.playerId}]};
+}
+
+export function chooseFirstPlayer(count:PlayerCount,random:()=>number=Math.random):number{
+ let candidates=Array.from({length:count},(_,i)=>i);
+ // Tied highest players reroll. Randomness is injected for reproducible tests.
+ while(candidates.length>1){
+   const rolls=candidates.map(id=>({id,total:2+Math.floor(random()*6)+Math.floor(random()*6)}));
+   const highest=Math.max(...rolls.map(r=>r.total));candidates=rolls.filter(r=>r.total===highest).map(r=>r.id);
+ }
+ return candidates[0];
 }

@@ -46,6 +46,7 @@ describe('economy',()=>{
        }
        conserve(state,cap);
        state=applyGame(board,state,{kind:'end',playerId:state.active});
+       if(count>=5){expect(state.active).toBe((i+3)%count);expect(state.paired).toBe(true);state=applyGame(board,state,{kind:'end',playerId:state.active});}
        expect(state.active).toBe((i+1)%count);
      }
    });
