@@ -203,7 +203,7 @@ export function chooseBotAction(board:Board,raw:GameState,options:BotOptions):Ga
  const exchanges=RESOURCES.flatMap(give=>RESOURCES.filter(want=>want!==give&&s.bank[want]>0&&hand[give]>=tradeRate(board,s,id,give)).map(want=>({give,want,gain:gainFor(simulateHand(hand,bundle(give,tradeRate(board,s,id,give)),bundle(want)))})));
  const exchange=best(exchanges,x=>x.gain);
  if(exchange&&exchange.gain>policy.bankGain)return {kind:'bankTrade',playerId:id,give:exchange.give,want:exchange.want};
- if(canBuy(s)&&(score>=6||!path||path.value<=0||sum(hand)>=7||!roads.length))return {kind:'buyCard',playerId:id};
+ if(canBuy(s)&&(!policy.plan||score>=7||sum(hand)>7)&&(score>=6||!path||path.value<=0||sum(hand)>=7||!roads.length))return {kind:'buyCard',playerId:id};
  if(roadAward&&potential>(s.awards.roadLengths[id]??0)&&s.awards.longestRoad!==id&&sum(hand)>=5)return {kind:'build',playerId:id,build:'road',id:roadAward};
  if(canBuy(s)){
    const buildGoals=(gs??=goals(board,s,id,difficulty)).filter(g=>g.weight>=11&&g.cost!==CARD_COST);

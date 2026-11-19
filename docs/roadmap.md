@@ -68,3 +68,6 @@ Versioned local-storage library stores setup/game state, board seed, preferences
 
 ## Local progression (v0.8.1)
 Local profile UUID, derived XP ledger, rank thresholds, one-time achievements, equipable avatar cosmetics. No password/authentication, cloud sync or online service required. Further cosmetic categories are pending. See [design and online boundary](progression.md).
+
+## AI balance (v0.9.0)
+Four explicit policies, weighted settlement/resource planning, expert opening lookahead, resource reservation for near-affordable buildings, adaptive trade thresholds and road-award evaluation using the actual incumbent tie rule. Cached board production geometry and lazy hand evaluation reduce redundant work. Frozen 0.8.4 policy under benchmarks enables reproducible comparison with rotating seats and independent dice/deck RNG. This remains heuristic AI, not Monte Carlo tree search; balance and browser/device performance need further calibration. Local progression and rules unchanged.
