@@ -49,3 +49,6 @@ Keep the local game milestone at 0.7.x for iterative playtesting. Default relaxe
 
 ## Animated UX (v0.7.3)
 State transitions derive a serial presentation queue; bot actions wait for the queue, and human action controls unlock after it. SVG overlays mark production, construction and robber motion. Public trades have a visual exchange stage; hidden cards and theft details remain private. Reduced-motion preference disables moving map overlays, turbo skips presentation, and hidden tabs suspend progression. Future: actual DOM-to-board resource flight paths, camera focus and richer card/award effects. Engine rules are unchanged.
+
+## Cinematic UX (v0.7.4)
+Camera follows offscreen public actions without forcing zoom-in; manual pan cancels motion and follow can be disabled. Solo income animates from the receiving building into visible hand slots, with delayed dock count. Card purchases stay face down; played action cards reveal their public type. Separate city silhouette and synchronized queued audio. Reduced motion skips moving effects. Real iPhone and browser end-to-end validation remains pending.

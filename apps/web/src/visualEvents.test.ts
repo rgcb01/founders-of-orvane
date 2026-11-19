@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import {generateBoard,createSetup,applySetup,activePlayer,legalSettlements,legalRoads,startGame,applyGame,RESOURCES} from '@orvane/engine';
-import {gameVisual,setupVisual,visualDuration} from './visualEvents';
+import {gameVisual,setupVisual,visualDuration,pendingIncome} from './visualEvents';
 function fixture(){
  const board=generateBoard('visual');let setup=createSetup(board,4);
  while(setup.phase!=='complete'){const playerId=activePlayer(setup)!;setup=applySetup(board,setup,{kind:'settlement',playerId,id:legalSettlements(board,setup)[0]});setup=applySetup(board,setup,{kind:'road',playerId,id:legalRoads(board,setup)[0]});}
@@ -28,7 +28,21 @@ describe('visual events',()=>{
   const offered={...game,offer:{from:0,to:1,give,want}};
   expect(gameVisual(board,game,offered)).toEqual([{kind:'offer',playerId:0,other:1,give:'🪵×1',want:'🌾×1'}]);
   const purchased={...game,development:{...game.development,deck:game.development.deck.slice(1)}};
-  expect(gameVisual(board,game,purchased)).toEqual([{kind:'card',playerId:0,symbol:'🃏'}]);
+  expect(gameVisual(board,game,purchased)).toEqual([{kind:'card',playerId:0,card:null,symbol:'🃏'}]);
+ });
+ it('queues solo income after production and delays displayed credits',()=>{
+  const {board,game}=fixture();const t=board.tiles.find(t=>t.number!==null&&game.settlements.some(b=>b.playerId===0&&t.vertices.includes(b.vertexId)))!;
+  const a=Math.min(6,t.number!-1),b=t.number!-a;
+  const next=applyGame(board,game,{kind:'roll',playerId:0,dice:[a,b]});
+  const queue=gameVisual(board,game,next,true);
+  expect(queue.map(e=>e.kind)).toEqual(['dice','production','income']);
+  for(const k of RESOURCES)expect(pendingIncome(queue,k)).toBe(next.lastProduction[0][k]);
+  expect(gameVisual(board,game,next,false).some(e=>e.kind==='income')).toBe(false);
+ });
+ it('reveals played action cards only',()=>{
+  const {board,game}=fixture();const before={...game,development:{...game.development,hands:{...game.development.hands,0:[{id:99,kind:'knight' as const,boughtTurn:0}]}}};
+  const next={...before,development:{...before.development,played:true,hands:{...before.development.hands,0:[]}}};
+  expect(gameVisual(board,before,next)[0]).toEqual({kind:'card',playerId:0,card:'knight',symbol:'🃏'});
  });
  it('has readable default durations and instant turbo',()=>{
   const event={kind:'dice' as const,playerId:0,dice:[1,2] as [number,number]};

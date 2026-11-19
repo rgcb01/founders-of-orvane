@@ -1,17 +1,19 @@
-import {RESOURCES,type Board,type GameState,type SetupState,type Resource} from '@orvane/engine';
+import {RESOURCES,type Board,type GameState,type SetupState,type Resource,type CardKind} from '@orvane/engine';
 import type {Pace} from './matchUX';
 export type Flight={tileId:string;vertexId:string;playerId:number;resource:Resource;count:number};
 export type VisualEvent=
  | {kind:'dice';playerId:number;dice:[number,number]}
  | {kind:'production';playerId:number;tiles:string[];flights:Flight[]}
+ | {kind:'income';playerId:number;flights:Flight[]}
+ | {kind:'card';playerId:number;card:CardKind|null;symbol:string}
  | {kind:'road'|'settlement'|'city';playerId:number;id:string}
  | {kind:'robber';playerId:number;from:string;to:string}
  | {kind:'trade'|'offer';playerId:number;other:number|null;give:string;want:string}
- | {kind:'card'|'award'|'victory'|'turn'|'discard';playerId:number;symbol:string};
+ | {kind:'award'|'victory'|'turn'|'discard';playerId:number;symbol:string};
 export function visualDuration(event:VisualEvent,pace:Pace,reduced=false):number{
  if(pace==='turbo')return 0;
  if(reduced)return pace==='relaxed'?450:200;
- const duration=event.kind==='production'?1400:event.kind==='dice'?950:event.kind==='robber'?1050:event.kind==='victory'?2200:event.kind==='turn'?650:900;
+ const duration=event.kind==='income'?1000:event.kind==='production'?1400:event.kind==='dice'?950:event.kind==='robber'?1050:event.kind==='victory'?2200:event.kind==='turn'?650:900;
  return pace==='relaxed'?duration:Math.round(duration*.55);
 }
 export function setupVisual(before:SetupState|null,after:SetupState|null):VisualEvent[]{
@@ -22,7 +24,7 @@ export function setupVisual(before:SetupState|null,after:SetupState|null):Visual
 }
 const emoji:Record<Resource,string>={forest:'🪵',pasture:'🐑',field:'🌾',hill:'🧱',mountain:'⛰️'};
 const bundle=(r:Record<Resource,number>)=>RESOURCES.filter(k=>r[k]>0).map(k=>emoji[k]+'×'+r[k]).join(' ');
-export function gameVisual(board:Board,before:GameState|null,after:GameState|null):VisualEvent[]{
+export function gameVisual(board:Board,before:GameState|null,after:GameState|null,solo=false):VisualEvent[]{
  if(!before||!after||before===after)return [];
  const events:VisualEvent[]=[];
  const id=before.active;
@@ -41,6 +43,7 @@ export function gameVisual(board:Board,before:GameState|null,after:GameState|nul
      }
    }
    if(tiles.length)events.push({kind:'production',playerId:id,tiles:tiles.map(t=>t.id),flights});
+   if(solo&&flights.some(f=>f.playerId===0))events.push({kind:'income',playerId:0,flights:flights.filter(f=>f.playerId===0)});
  }
  for(const r of after.roads)if(!before.roads.some(x=>x.edgeId===r.edgeId))events.push({kind:'road',playerId:r.playerId,id:r.edgeId});
  for(const b of after.settlements){
@@ -56,7 +59,8 @@ export function gameVisual(board:Board,before:GameState|null,after:GameState|nul
    const want=Object.fromEntries(RESOURCES.map(k=>[k,Math.max(0,next.resources[k]-old.resources[k])])) as Record<Resource,number>;
    if(bundle(give)&&bundle(want))events.push({kind:'trade',playerId:id,other:null,give:bundle(give),want:bundle(want)});
  }
- if(after.development.deck.length<before.development.deck.length||after.development.played&&!before.development.played)events.push({kind:'card',playerId:id,symbol:'🃏'});
+ if(after.development.deck.length<before.development.deck.length)events.push({kind:'card',playerId:id,card:null,symbol:'🃏'});
+ if(after.development.played&&!before.development.played){const played=before.development.hands[id].find(card=>!after.development.hands[id].some(c=>c.id===card.id));events.unshift({kind:'card',playerId:id,card:played?.kind==='victory'?null:played?.kind??null,symbol:'🃏'});}
  if(before.phase==='discard'&&before.development.discards!==after.development.discards){
    const who=Object.keys(before.development.discards).find(k=>!(Number(k) in after.development.discards));
    if(who!==undefined)events.push({kind:'discard',playerId:Number(who),symbol:'🃏'});
@@ -66,4 +70,8 @@ export function gameVisual(board:Board,before:GameState|null,after:GameState|nul
  if(after.winner!==null&&after.winner!==before.winner)events.push({kind:'victory',playerId:after.winner,symbol:'🏆'});
  else if(after.turn!==before.turn)events.push({kind:'turn',playerId:after.active,symbol:'🎲'});
  return events;
+}
+
+export function pendingIncome(queue:VisualEvent[],resource:Resource):number{
+ return queue.reduce((n,e)=>n+(e.kind==='income'?e.flights.filter(f=>f.resource===resource).reduce((m,f)=>m+f.count,0):0),0);
 }
