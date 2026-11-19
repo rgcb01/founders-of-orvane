@@ -12,7 +12,9 @@
 | 0.7.1 | Mobile-first match UI, action prompts, AI balance and usability |
 | 0.8 | Local save/resume, versioned saves, PWA/offline support |
 | 0.8.1 | Local profile, XP, ranks, achievements and avatar rewards |
-| 0.8.2–0.8.x | More cosmetic collections, personalization and challenges |
+| 0.8.2 | Themed collections, equipable dice, card backs, sea palettes and titles |
+| 0.8.3 | Piece customization and richer cosmetic presentation |
+| 0.8.4 | Challenges and advanced achievements |
 | 0.9 | Turbo and performance, stronger AI, end-to-end testing, base-game polish |
 | 1.0 | Complete local base game (human + bots and pass-and-play) |
 | 2.0 | Sailing expansion |
