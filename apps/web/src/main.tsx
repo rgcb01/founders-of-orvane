@@ -1,4 +1,4 @@
-import {StrictMode,useMemo,useRef,useState,useEffect,type KeyboardEvent,type PointerEvent} from 'react';
+import {StrictMode,useMemo,useRef,useState,useEffect,useLayoutEffect,type KeyboardEvent,type PointerEvent} from 'react';
 import {createRoot} from 'react-dom/client';
 import {generateBoard,tilePosition,vertexPosition,type BoardSize,type Terrain,createSetup,activePlayer,legalSettlements,legalRoads,applySetup,type PlayerCount,type SetupState,startGame,applyGame,legalBuilds,rollDice,RESOURCES,type GameState,type BuildKind,freeRoadSites,playerScore,chooseFirstPlayer,chooseSetupAction,chooseBotAction,decisionPlayer,type Difficulty} from '@orvane/engine';
 import './style.css';
@@ -13,6 +13,9 @@ import {BoardEffects,EventStage} from './VisualEffects';
 import {cameraTarget,focusPoints} from './camera';
 import {IncomeFlights} from './IncomeFlights';
 import type {Cue} from './soundEvents';
+import {readLibrary,saveMatch,removeMatch,readPreferences,latestUnfinished,PREF_KEY,SAVE_KEY,DEFAULT_PREFS,type Library,type SavedMatch,type Preferences} from './persistence';
+import {SavedGames} from './SavedGames';
+import {usePwa} from './pwa';
 import {HomeMenu,Guide,ExpansionRoadmap,PlayerStrip,ResourceHand,BuildMenu,requiredPanel,visiblePanel,type Panel} from './GameUI';
 
 const terrain:Record<Terrain,{name:string;icon:string;color:string;resource:string}>={
@@ -27,18 +30,25 @@ type Selection={kind:'tile'|'vertex'|'edge';id:string};
 const R=49;
 function App(){
  const audio=useGameAudio();
- const [follow,setFollow]=useState(true);
+ const pwa=usePwa();
+ const [prefs]=useState(()=>{try{return readPreferences(localStorage);}catch{return DEFAULT_PREFS;}});
+ const [library,setLibrary]=useState<Library>(()=>{try{return readLibrary(localStorage);}catch{return {schema:1,matches:[],results:[]};}});
+ const [storageError,setStorageError]=useState('');
+ const [matchId,setMatchId]=useState<string|null>(null);
+ const createdAt=useRef(0);
+ const [savedAt,setSavedAt]=useState<number|null>(null);
+ const [follow,setFollow]=useState(prefs.follow);
  const cameraFrame=useRef<number|null>(null);
  const heard=useRef<VisualEvent|null>(null);
- const [menu,setMenu]=useState<'home'|'setup'|'guide'|'expansions'>('home');
+ const [menu,setMenu]=useState<'home'|'setup'|'guide'|'expansions'|'saves'>('home');
  const [panel,setPanel]=useState<Panel>('info');
  const [guideOpen,setGuideOpen]=useState(false);
  const [soundOpen,setSoundOpen]=useState(false);
- const [size,setSize]=useState<BoardSize>('extended');
- const [count,setCount]=useState<PlayerCount>(6);
- const [humans,setHumans]=useState(1);
- const [difficulty,setDifficulty]=useState<Difficulty>('hard');
- const [pace,setPace]=useState<Pace>('relaxed');
+ const [size,setSize]=useState<BoardSize>(prefs.count<=4?'standard':'extended');
+ const [count,setCount]=useState<PlayerCount>(prefs.count);
+ const [humans,setHumans]=useState(prefs.humans);
+ const [difficulty,setDifficulty]=useState<Difficulty>(prefs.difficulty);
+ const [pace,setPace]=useState<Pace>(prefs.pace);
  const [visualQueue,setVisualQueue]=useState<VisualEvent[]>([]);
  const [reduced,setReduced]=useState(()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches);
  const [hidden,setHidden]=useState(()=>document.hidden);
@@ -68,6 +78,24 @@ function App(){
  const humanDecision=decision!==null&&decision<humans&&!visual;
  const humanActive=humanDecision&&decision===playerId&&!game?.offer;
  const showHand=humans===1?0:decision!==null&&decision<humans?decision:null;
+ const preferences:Preferences={count,humans,difficulty,pace,follow};
+ useEffect(()=>{const load=()=>{try{setLibrary(readLibrary(localStorage));setStorageError('');}catch(e){setStorageError(e instanceof Error?e.message:'Storage unavailable');}};load();const changed=(e:StorageEvent)=>{if(e.key===SAVE_KEY)load();};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);},[]);
+ useEffect(()=>{try{localStorage.setItem(PREF_KEY,JSON.stringify(preferences));}catch{}},[count,humans,difficulty,pace,follow]);
+ useLayoutEffect(()=>{
+   if(!matchId||!setup)return;
+   const now=Date.now();
+   try{const next=saveMatch(localStorage,{schema:1,id:matchId,createdAt:createdAt.current,updatedAt:now,seed,size,preferences,setup,game,activity,attempts:{...attempts.current}});setLibrary(next);setSavedAt(now);setStorageError('');}
+   catch(e){setStorageError(e instanceof Error?e.message:'Could not save match');}
+ },[matchId,setup,game,seed,size,count,humans,difficulty,pace,follow,activity]);
+ const resume=(m:SavedMatch)=>{
+   const p=m.preferences;createdAt.current=m.createdAt;setMatchId(m.id);setSavedAt(m.updatedAt);
+   setCount(p.count);setHumans(p.humans);setDifficulty(p.difficulty);setPace(p.pace);setFollow(p.follow);setSize(m.size);setSeed(m.seed);setDraft(m.seed);
+   previous.current={setup:m.setup,game:m.game};setSetup(m.setup);setGame(m.game);setActivity(m.activity);attempts.current={...m.attempts};
+   setVisualQueue([]);setSelection(null);setPan({x:0,y:0});setZoom(1);setBotError('');setPanel('info');setPaused(true);setStepRequested(false);setMenu('setup');
+ };
+ const leave=()=>{if(storageError&&!window.confirm('Saving failed. Leave anyway?'))return false;setMatchId(null);setSavedAt(null);setMenu('home');setGame(null);setSetup(null);setSelection(null);setBotError('');setActivity([]);setVisualQueue([]);setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};return true;};
+ const deleteSave=(id:string)=>{try{setLibrary(removeMatch(localStorage,id));setStorageError('');}catch(e){setStorageError(e instanceof Error?e.message:'Could not delete saved game');}};
+ const latest=latestUnfinished(library);
  const current=view?.players.find(p=>p.id===playerId);
  const myHand=view?.players.find(p=>p.id===showHand);
  const forcedPanel=requiredPanel(game,humanDecision);
@@ -166,9 +194,12 @@ function App(){
  }
  const viewW=bounds.w/zoom,viewH=bounds.h/zoom;
  return <main className={view?"in-match":""}>
-  <header><div><p className="eyebrow">ORVANE / FIELD NOTES</p><h1>Founders of Orvane</h1><p className="subtitle">Build. Trade. Explore. Prosper.</p></div><div className="header-actions"><span className="version">v0.7.6</span><button aria-label={audio.settings.enabled?"Mute sound":"Enable sound"} aria-pressed={audio.settings.enabled} onClick={audio.toggle}>{audio.settings.enabled?"🔊":"🔇"}</button>{view&&<button aria-expanded={guideOpen} aria-label="Game guide" onClick={()=>setGuideOpen(v=>!v)}>📖</button>}<button aria-expanded={soundOpen} onClick={()=>setSoundOpen(v=>!v)}>⚙️</button></div></header>
+  <header><div><p className="eyebrow">ORVANE / FIELD NOTES</p><h1>Founders of Orvane</h1><p className="subtitle">Build. Trade. Explore. Prosper.</p></div><div className="header-actions"><span className="version">v0.8.0</span><button aria-label={audio.settings.enabled?"Mute sound":"Enable sound"} aria-pressed={audio.settings.enabled} onClick={audio.toggle}>{audio.settings.enabled?"🔊":"🔇"}</button>{view&&<button aria-expanded={guideOpen} aria-label="Game guide" onClick={()=>setGuideOpen(v=>!v)}>📖</button>}<button aria-expanded={soundOpen} onClick={()=>setSoundOpen(v=>!v)}>⚙️</button></div></header>
   {soundOpen&&<section className="setup-bar sound-settings"><label>🔊 Effects volume <input aria-label="Effects volume" type="range" min={0} max={100} value={Math.round(audio.settings.volume*100)} onChange={e=>audio.setVolume(Number(e.target.value)/100)}/></label><label><input type="checkbox" checked={audio.settings.bots} onChange={audio.toggleBots}/> Bot sounds</label><label><input type="checkbox" checked={audio.settings.music} onChange={audio.toggleMusic}/> 🎵 Ambient music</label><label>Music volume <input aria-label="Music volume" type="range" min={0} max={100} value={Math.round(audio.settings.musicVolume*100)} onChange={e=>audio.setMusicVolume(Number(e.target.value)/100)}/></label>{typeof navigator.vibrate==='function'&&<label><input type="checkbox" checked={audio.settings.haptic} onChange={audio.toggleHaptic}/> Haptics</label>}<button onClick={()=>{void audio.unlock().then(()=>audio.play('trade'));}}>Test sound</button><span className="muted">{audio.ready?'Audio ready':'Tap to activate audio'}</span></section>}
-  {!view&&menu==='home'&&<HomeMenu onPlay={()=>setMenu('setup')} onGuide={()=>setMenu('guide')} onSettings={()=>setSoundOpen(v=>!v)} onExpansions={()=>setMenu('expansions')}/>}
+  {storageError&&<p className="storage-warning" role="alert">⚠️ {storageError} · Progress may not be saved.</p>}
+  {!view&&menu==='home'&&<HomeMenu onContinue={latest?()=>resume(latest):undefined} onSaves={()=>setMenu('saves')} onPlay={()=>setMenu('setup')} onGuide={()=>setMenu('guide')} onSettings={()=>setSoundOpen(v=>!v)} onExpansions={()=>setMenu('expansions')}/>}
+  {!view&&menu==='saves'&&<SavedGames library={library} onResume={resume} onDelete={deleteSave} onBack={()=>setMenu('home')}/>}
+  {!view&&menu==='home'&&<section className="setup-bar install-bar"><div><strong>{pwa.installed?'📱 Installed':pwa.offline?'🛜 Offline':pwa.ready?'✓ Offline ready':'📱 Play anywhere'}</strong><p className="muted">{pwa.error?'Offline setup failed. Reload when connected.':pwa.installed?'Open Orvane from your home screen.':pwa.canInstall?'Install for quick access.':'On iPhone: Safari → Share → Add to Home Screen.'}</p></div>{pwa.canInstall&&!pwa.installed&&<button onClick={()=>{void pwa.install().catch(()=>{});}}>Install</button>}</section>}
   {!view&&menu==='guide'&&<section className="panel"><button onClick={()=>setMenu('home')}>← Main menu</button><h2>📖 How to play</h2><Guide/></section>}
   {!view&&menu==='expansions'&&<><button onClick={()=>setMenu('home')}>← Main menu</button><ExpansionRoadmap/></>}
   {view&&guideOpen&&<section className="panel match-guide"><h2>📖 How to play</h2><Guide phase={game?.phase??setup?.phase}/></section>}
@@ -179,13 +210,14 @@ function App(){
     <form onSubmit={e=>{e.preventDefault();if(draft.trim())setBoard(size,draft.trim());}}><label htmlFor="seed">Map seed</label><input disabled={!!setup} id="seed" value={draft} onChange={e=>setDraft(e.target.value)} maxLength={80} required/><button disabled={!!setup} type="submit">Generate</button><button disabled={!!setup} type="button" onClick={()=>setBoard(size,crypto.randomUUID().slice(0,12))}>Random</button></form>
   </section>}
   {!setup&&<section className="setup-bar lobby"><div><strong>🤖 Local match</strong><p className="muted">{humans} human · {count-humans} bots</p></div><div className="sizes"><label>Humans <select disabled={!!setup} value={humans} onChange={e=>setHumans(Number(e.target.value))}>{Array.from({length:count},(_,i)=><option key={i} value={i+1}>{i+1}</option>)}</select></label><label>AI <select disabled={!!setup} value={difficulty} onChange={e=>setDifficulty(e.target.value as Difficulty)}>{(['easy','normal','hard','expert'] as Difficulty[]).map(d=><option key={d}>{d}</option>)}</select></label><label className="pace-control">Pace <select aria-label="Bot pace" value={pace} onChange={e=>setPace(e.target.value as Pace)}>{(Object.keys(PACES) as Pace[]).map(p=><option key={p} value={p}>{PACES[p].label}</option>)}</select></label></div></section>}
-  {botError&&<section className="setup-bar" role="alert"><span>Bot stopped: {botError}</span><button onClick={()=>setBotError('')}>Retry</button><button onClick={()=>{setGame(null);setSetup(null);setBotError('');}}>Reset</button></section>}
+  {view&&<p className="save-status" role="status">{storageError?'⚠️ Not saved':savedAt?'💾 Saved locally':'Saving…'}{pwa.offline?' · Offline':''}</p>}
+  {botError&&<section className="setup-bar" role="alert"><span>Bot stopped: {botError}</span><button onClick={()=>setBotError('')}>Retry</button><button onClick={leave}>Main menu</button></section>}
   <section className="setup-bar turn-bar" aria-live="polite" id="turn-actions">
-    {game?<><div><strong>{current?.name} · Round {game.round}{game.paired?' · Paired action':''}</strong><p className="muted">{game.phase==='finished'?'🏆 Game finished':game.phase==='roll'?'Roll the dice or play a card':game.phase==='discard'?'🥷 Discard required':game.phase==='robber'?'🥷 Move the robber':game.phase==='freeRoad'?'🛤️ Place free roads':(game.dice?game.dice.join(' + ')+' = '+game.dice.reduce((a,b)=>a+b,0)+' · ':'')+'Build, trade or end turn'}</p></div><div className="sizes"><button disabled={!humanActive||game.phase!=='roll'} onClick={()=>{setGame(applyGame(board,game,{kind:'roll',playerId:game.active,dice:rollDice()}));setSelection(null);}}>🎲 Roll dice</button><button disabled={!humanActive||game.phase!=='action'||!!game.offer} onClick={()=>{setGame(applyGame(board,game,{kind:'end',playerId:game.active}));setSelection(null);}}>⏭ End turn</button><button onClick={()=>{if(window.confirm('Leave and discard current game?')){setMenu('home');setGame(null);setSetup(null);setSelection(null);setBotError('');setActivity([]);setVisualQueue([]);setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};}}}>Main menu</button></div></>:setup?<><div><strong>{setup.phase==='complete'?'Initial placement complete':current?.name+' · '+(setup.phase==='settlement'?'Place a settlement':'Place its road')}</strong><p className="muted">{setup.phase==='complete'?'All players have two settlements and two roads. Begin the first turn.':'Round '+(setup.step<count?1:2)+' of 2 · Placement '+(setup.step+1)+' / '+setup.order.length}</p></div><div className="sizes">{setup.phase==='complete'?<button disabled={!!visual} onClick={()=>{setGame(startGame(board,setup));setSelection(null);}}>Begin game</button>:<button disabled={!selectionLegal} onClick={confirmPlacement}>Confirm placement</button>}<button onClick={()=>{if(window.confirm('Leave and discard current setup?')){setMenu('home');setSetup(null);setSelection(null);setBotError('');setActivity([]);setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};}}}>Main menu</button></div></>:<><div><strong>Local setup</strong><p className="muted">Choose human seats and AI difficulty, then place settlements and roads.</p></div><button onClick={()=>{setSelection(null);const s=createSetup(board,count,chooseFirstPlayer(count));setSetup({...s,players:s.players.map(p=>({...p,name:p.id>=humans?['🤖 Ada','🤖 Bruno','🤖 Cleo','🤖 Darius','🤖 Elara','🤖 Finn'][p.id]:humans===1?'You':p.name}))});setActivity([]);setPanel('info');setBotError('');setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};}}>Start setup</button></>}
+    {game?<><div><strong>{current?.name} · Round {game.round}{game.paired?' · Paired action':''}</strong><p className="muted">{game.phase==='finished'?'🏆 Game finished':game.phase==='roll'?'Roll the dice or play a card':game.phase==='discard'?'🥷 Discard required':game.phase==='robber'?'🥷 Move the robber':game.phase==='freeRoad'?'🛤️ Place free roads':(game.dice?game.dice.join(' + ')+' = '+game.dice.reduce((a,b)=>a+b,0)+' · ':'')+'Build, trade or end turn'}</p></div><div className="sizes"><button disabled={!humanActive||game.phase!=='roll'} onClick={()=>{setGame(applyGame(board,game,{kind:'roll',playerId:game.active,dice:rollDice()}));setSelection(null);}}>🎲 Roll dice</button><button disabled={!humanActive||game.phase!=='action'||!!game.offer} onClick={()=>{setGame(applyGame(board,game,{kind:'end',playerId:game.active}));setSelection(null);}}>⏭ End turn</button><button onClick={leave}>Save & exit</button></div></>:setup?<><div><strong>{setup.phase==='complete'?'Initial placement complete':current?.name+' · '+(setup.phase==='settlement'?'Place a settlement':'Place its road')}</strong><p className="muted">{setup.phase==='complete'?'All players have two settlements and two roads. Begin the first turn.':'Round '+(setup.step<count?1:2)+' of 2 · Placement '+(setup.step+1)+' / '+setup.order.length}</p></div><div className="sizes">{setup.phase==='complete'?<button disabled={!!visual} onClick={()=>{setGame(startGame(board,setup));setSelection(null);}}>Begin game</button>:<button disabled={!selectionLegal} onClick={confirmPlacement}>Confirm placement</button>}<button onClick={leave}>Save & exit</button></div></>:<><div><strong>Local setup</strong><p className="muted">Choose human seats and AI difficulty, then place settlements and roads.</p></div><button onClick={()=>{createdAt.current=Date.now();setMatchId(crypto.randomUUID());setSavedAt(null);setSelection(null);const s=createSetup(board,count,chooseFirstPlayer(count));setSetup({...s,players:s.players.map(p=>({...p,name:p.id>=humans?['🤖 Ada','🤖 Bruno','🤖 Cleo','🤖 Darius','🤖 Elara','🤖 Finn'][p.id]:humans===1?'You':p.name}))});setActivity([]);setPanel('info');setBotError('');setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};}}>Start setup</button></>}
   </section>
   {game&&humanDecision&&(game.offer||game.phase==='discard'||game.phase==='robber'||game.phase==='freeRoad')&&<section className="setup-bar action-prompt" role="status"><strong>{game.offer?'🤝 Trade offer for '+view?.players.find(p=>p.id===decision)?.name:game.phase==='discard'?'🥷 '+view?.players.find(p=>p.id===decision)?.name+': discard resources':game.phase==='robber'?'🥷 Choose a hex and move the robber':'🛤️ Choose a free road'}</strong><button onClick={()=>openPanel(game.offer?'trade':'cards')}>Open action ↓</button></section>}
   {view&&game?.phase!=='finished'&&<section className="setup-bar pace-bar"><div><strong>{botBusy?(paused?'⏸ Bots paused':'🤖 '+view.players.find(p=>p.id===decision)?.name?.replace('🤖 ','')+' is playing'):'⏱ Match pace'}</strong><p className="muted">{paused?'Use Next action to watch one move at a time.':'Watch each action or speed up whenever you want.'}</p></div><div className="sizes"><label className="pace-control">Pace <select aria-label="Bot pace" value={pace} onChange={e=>setPace(e.target.value as Pace)}>{(Object.keys(PACES) as Pace[]).map(p=><option key={p} value={p}>{PACES[p].label}</option>)}</select></label><button aria-pressed={paused} onClick={()=>{setPaused(v=>!v);setStepRequested(false);}}>{paused?'▶ Resume bots':'⏸ Pause bots'}</button>{visual&&<button onClick={()=>setVisualQueue(q=>q.slice(1))}>Skip animation →</button>}{paused&&<button disabled={!botBusy||stepRequested||!!visual} onClick={()=>setStepRequested(true)}>Next action →</button>}</div></section>}
-  {game?.winner!==null&&game?.winner!==undefined&&!visual&&<section className="winner-banner" role="status"><h2>🏆 {game.players.find(p=>p.id===game.winner)?.name} wins!</h2><p>{playerScore(game,game.winner,true).total} victory points · {game.round} rounds</p><button onClick={()=>{setMenu('setup');setGame(null);setSetup(null);setSelection(null);}}>New game</button></section>}
+  {game?.winner!==null&&game?.winner!==undefined&&!visual&&<section className="winner-banner" role="status"><h2>🏆 {game.players.find(p=>p.id===game.winner)?.name} wins!</h2><p>{playerScore(game,game.winner,true).total} victory points · {game.round} rounds</p><button onClick={()=>{if(leave())setMenu('setup');}}>New game</button></section>}
   {view&&<PlayerStrip view={view} game={game} active={visual?.playerId??playerId} humans={humans} showHand={showHand}/> }
   <div className="layout">
    <section className="board-panel" id="board" aria-label="Interactive island map">
@@ -224,7 +256,7 @@ function App(){
   {view&&<nav className="match-dock" aria-label="Match controls">{myHand?<ResourceHand resources={myHand.resources} queue={visualQueue} solo={humans===1}/>:<div className="hand-strip">🤖 Opponent turn</div>}<div className="dock-actions"><a href="#board">🗺️ Map</a>{game&&humanActive&&game.phase==="action"&&<a href="#construction">🏗️ Build</a>}{game&&humanDecision&&game.phase==="action"&&<button onClick={()=>openPanel('trade')}>⚓ Trade</button>}{game&&humanDecision&&!game.offer&&<button onClick={()=>openPanel('cards')}>🃏 Cards</button>}{!game&&humanDecision&&setup?.phase!=="complete"?<button disabled={!selectionLegal} onClick={confirmPlacement}>✓ Place</button>:game&&humanActive&&game.phase==="roll"?<button onClick={()=>{setGame(applyGame(board,game,{kind:"roll",playerId:game.active,dice:rollDice()}));setSelection(null);}}>🎲 Roll</button>:game&&humanActive&&game.phase==="action"?<button onClick={()=>{setGame(applyGame(board,game,{kind:"end",playerId:game.active}));setSelection(null);}}>⏭ End</button>:<a href="#turn-actions">Turn ↑</a>}</div></nav>}
   {visual?.kind==='income'&&duration>0&&!reduced&&<IncomeFlights event={visual} svg={svg} points={points} duration={duration}/>}
   </>}
-  <footer>Local base game · Humans and AI · First to 10 VP · Online optional.</footer>
+  <footer>Local base game · Autosave · Offline play · Online optional.</footer>
  </main>;
 }
 createRoot(document.getElementById('root')!).render(<StrictMode><App/></StrictMode>);
