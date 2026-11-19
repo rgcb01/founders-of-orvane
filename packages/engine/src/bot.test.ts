@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {generateBoard,seededRandom,createSetup,applySetup,startGame,applyGame,chooseSetupAction,chooseBotAction,decisionPlayer,RESOURCES,botView,type PlayerCount,type GameState,type Difficulty} from './index';
+import {generateBoard,seededRandom,createSetup,applySetup,startGame,applyGame,chooseSetupAction,chooseBotAction,decisionPlayer,RESOURCES,botView,botPersonality,PERSONALITIES,type PlayerCount,type GameState,type Difficulty} from './index';
 function simulate(seed:string,count:PlayerCount,difficulty:Difficulty,limit=450){
  const random=seededRandom(seed),board=generateBoard(seed,count<=4?'standard':'extended');
  let setup=createSetup(board,count);
@@ -23,7 +23,11 @@ describe('local bots',()=>{
    const actor=decisionPlayer(s)!;
    const modified:GameState={...s,players:s.players.map(p=>p.id===actor?p:{...p,resources:{forest:0,pasture:0,field:0,hill:0,mountain:Object.values(p.resources).reduce((a,b)=>a+b,0)}}),development:{...s.development,deck:s.development.deck.slice().reverse(),hands:Object.fromEntries(s.players.map(p=>[p.id,p.id===actor?s.development.hands[p.id]:[{id:999,kind:'victory' as const,boughtTurn:0}]]))}};
    expect(botView(s,actor)).toEqual(botView(modified,actor));
-   expect(chooseBotAction(board,s,{difficulty:'hard',random:seededRandom('same')})).toEqual(chooseBotAction(board,modified,{difficulty:'hard',random:seededRandom('same')}));
+   for(const difficulty of ['hard','expert'] as Difficulty[])expect(chooseBotAction(board,s,{difficulty,random:seededRandom('same')})).toEqual(chooseBotAction(board,modified,{difficulty,random:seededRandom('same')}));
+ });
+ it('assigns all four personalities reproducibly to consecutive seats',()=>{
+  const names=Array.from({length:4},(_,id)=>botPersonality('orvane',id));
+  expect(new Set(names).size).toBe(4);expect(names.every(n=>n in PERSONALITIES)).toBe(true);expect(Array.from({length:4},(_,id)=>botPersonality('orvane',id))).toEqual(names);
  });
  it('completes full games across 3–6 seats without illegal actions',()=>{
    const results=[3,4,5,6].flatMap(n=>[0,1].map(i=>simulate('match-'+n+'-'+i,n as PlayerCount,'hard')));
