@@ -23,6 +23,13 @@ describe('visual events',()=>{
   const next={...game,development:{...game.development,robber:tile.id}};
   expect(gameVisual(board,game,next)).toEqual([{kind:'robber',playerId:0,from:game.development.robber,to:tile.id}]);
  });
+ it('shows only public offered bundles and does not expose hidden card purchases',()=>{
+  const {board,game}=fixture();const give={forest:1,pasture:0,field:0,hill:0,mountain:0},want={forest:0,pasture:0,field:1,hill:0,mountain:0};
+  const offered={...game,offer:{from:0,to:1,give,want}};
+  expect(gameVisual(board,game,offered)).toEqual([{kind:'offer',playerId:0,other:1,give:'🪵×1',want:'🌾×1'}]);
+  const purchased={...game,development:{...game.development,deck:game.development.deck.slice(1)}};
+  expect(gameVisual(board,game,purchased)).toEqual([{kind:'card',playerId:0,symbol:'🃏'}]);
+ });
  it('has readable default durations and instant turbo',()=>{
   const event={kind:'dice' as const,playerId:0,dice:[1,2] as [number,number]};
   expect(visualDuration(event,'relaxed')).toBeGreaterThan(visualDuration(event,'normal'));expect(visualDuration(event,'turbo')).toBe(0);expect(visualDuration(event,'relaxed',true)).toBeLessThan(visualDuration(event,'relaxed'));
