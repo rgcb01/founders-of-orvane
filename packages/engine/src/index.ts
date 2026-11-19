@@ -99,3 +99,5 @@ export function generateBoard(seed:string,size:BoardSize='standard'):Board {
   productive.filter(t=>t.number===null).forEach((t,i)=>t.number=rest[i]);
   return {seed,size,tiles,vertices:[...vertices.values()],edges:[...edges.values()]};
 }
+
+export * from './setup';
