@@ -1,3 +1,4 @@
 import {defineConfig} from 'vite';
 import react from '@vitejs/plugin-react';
-export default defineConfig({plugins:[react()],base:'./'});
+import {offlinePlugin} from './src/offlinePlugin';
+export default defineConfig({plugins:[react(),offlinePlugin()],base:'./'});

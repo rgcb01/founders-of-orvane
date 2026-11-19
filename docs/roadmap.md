@@ -58,3 +58,6 @@ Presentation adds paid construction costs before placement, directional public t
 
 ## Interface redesign (v0.7.6)
 Home screen separates setup from play; planned expansion roadmap is non-playable. Compact player HUD, resource card hand, board-adjacent build choices, trade preview and sidebar tabs prioritize the map. Mandatory discard/robber/free-road and trade prompts override panel navigation. Contextual rules guide is available without leaving the match. Manual browser/iPhone validation remains pending.
+
+## Persistence and offline (v0.8.0)
+Versioned local-storage library stores setup/game state, board seed, preferences and history. Autosave after committed transitions; resume restores without replay and pauses bots. Invalid/incompatible libraries are preserved rather than overwritten. Completed solo outcomes are recorded once and persist after deleting a save. Build-generated scoped service worker precaches the shell and hashed assets; browser controls PWA installation. No account/server. Cross-device sync, export/import and real-device offline testing remain pending.
