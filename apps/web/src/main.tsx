@@ -1,6 +1,6 @@
-import {StrictMode,useMemo,useRef,useState,type KeyboardEvent,type PointerEvent} from 'react';
+import {StrictMode,useMemo,useRef,useState,useEffect,type KeyboardEvent,type PointerEvent} from 'react';
 import {createRoot} from 'react-dom/client';
-import {generateBoard,tilePosition,vertexPosition,type BoardSize,type Terrain,createSetup,activePlayer,legalSettlements,legalRoads,applySetup,type PlayerCount,type SetupState,startGame,applyGame,legalBuilds,rollDice,RESOURCES,COSTS,type GameState,type BuildKind,freeRoadSites,playerScore,VICTORY_TARGET,chooseFirstPlayer} from '@orvane/engine';
+import {generateBoard,tilePosition,vertexPosition,type BoardSize,type Terrain,createSetup,activePlayer,legalSettlements,legalRoads,applySetup,type PlayerCount,type SetupState,startGame,applyGame,legalBuilds,rollDice,RESOURCES,COSTS,type GameState,type BuildKind,freeRoadSites,playerScore,VICTORY_TARGET,chooseFirstPlayer,chooseSetupAction,chooseBotAction,decisionPlayer,type Difficulty} from '@orvane/engine';
 import './style.css';
 import {DevelopmentPanel} from './DevelopmentPanel';
 import {TradePanel} from './TradePanel';
@@ -19,6 +19,12 @@ const R=49;
 function App(){
  const [size,setSize]=useState<BoardSize>('extended');
  const [count,setCount]=useState<PlayerCount>(6);
+ const [humans,setHumans]=useState(1);
+ const [difficulty,setDifficulty]=useState<Difficulty>('hard');
+ const [turbo,setTurbo]=useState(true);
+ const [botError,setBotError]=useState('');
+ const [activity,setActivity]=useState<string[]>([]);
+ const attempts=useRef({turn:0,count:0});
  const [setup,setSetup]=useState<SetupState|null>(null);
  const [game,setGame]=useState<GameState|null>(null);
  const [build,setBuild]=useState<BuildKind>('road');
@@ -32,13 +38,40 @@ function App(){
  const board=useMemo(()=>generateBoard(seed,size),[seed,size]);
  const view=game??setup;
  const playerId=game?game.active:setup?activePlayer(setup):null;
+ const decision=game?decisionPlayer(game):setup?activePlayer(setup):null;
+ const botBusy=decision!==null&&decision>=humans&&!botError;
+ const humanActive=playerId!==null&&playerId<humans&&!botBusy;
+ const showHand=humans===1?0:decision!==null&&decision<humans?decision:null;
  const current=view?.players.find(p=>p.id===playerId);
- const legal=game?legalBuilds(board,game,build):[];
- const validVertices=new Set(game?(build==='road'?[]:legal):setup?legalSettlements(board,setup):[]);
- const validEdges=new Set(game?(game.phase==='freeRoad'?freeRoadSites(board,game):build==='road'?legal:[]):setup?legalRoads(board,setup):[]);
+ const legal=game&&humanActive?legalBuilds(board,game,build):[];
+ const validVertices=new Set(game?(build==='road'?[]:legal):setup&&!botBusy?legalSettlements(board,setup):[]);
+ const validEdges=new Set(game?(game.phase==='freeRoad'&&humanActive?freeRoadSites(board,game):build==='road'?legal:[]):setup&&!botBusy?legalRoads(board,setup):[]);
  const selectionLegal=!!selection&&(selection.kind==='vertex'?validVertices.has(selection.id):selection.kind==='edge'?validEdges.has(selection.id):false);
- const confirmBuild=()=>{if(!game||game.phase!=='action'||!selection||!selectionLegal||playerId===null)return;setGame(applyGame(board,game,{kind:'build',playerId,build,id:selection.id}));setSelection(null);};
- const confirmPlacement=()=>{if(!setup||!selection||!selectionLegal||playerId===null||selection.kind==='tile')return;setSetup(applySetup(board,setup,{kind:selection.kind==='vertex'?'settlement':'road',id:selection.id,playerId}));setSelection(null);};
+ const confirmBuild=()=>{if(!humanActive||!game||game.phase!=='action'||!selection||!selectionLegal||playerId===null)return;setGame(applyGame(board,game,{kind:'build',playerId,build,id:selection.id}));setSelection(null);};
+ const confirmPlacement=()=>{if(botBusy||!setup||!selection||!selectionLegal||playerId===null||selection.kind==='tile')return;setSetup(applySetup(board,setup,{kind:selection.kind==='vertex'?'settlement':'road',id:selection.id,playerId}));setSelection(null);};
+ useEffect(()=>{
+   if(!botBusy)return;
+   const timer=window.setTimeout(()=>{
+     try{
+       if(game){
+         if(attempts.current.turn!==game.turn)attempts.current={turn:game.turn,count:0};
+         const action=chooseBotAction(board,game,{difficulty,offers:attempts.current.count});
+         if(!action)return;
+         if(action.kind==='offer'||action.kind==='counter')attempts.current.count++;
+         const next=applyGame(board,game,action);
+         setGame(next);
+         const label=game.players.find(p=>p.id===action.playerId)?.name;
+         const detail=action.kind==='roll'?'🎲 '+action.dice.join('+'):action.kind==='build'?'🏗️ '+action.build:action.kind==='end'?'⏭ End turn':action.kind==='bankTrade'?'⚓ Exchange':action.kind==='offer'?'🤝 Offer':action.kind==='moveRobber'?'🥷 Robber':action.kind==='buyCard'?'🃏 Buy card':action.kind;
+         setActivity(old=>[label+' · '+detail,...old].slice(0,12));
+       }else if(setup){
+         const action=chooseSetupAction(board,setup,{difficulty});
+         if(action){setSetup(applySetup(board,setup,action));setActivity(old=>['🤖 '+setup.players[action.playerId].name+' · '+action.kind,...old].slice(0,12));}
+       }
+       setSelection(null);
+     }catch(error){setBotError(error instanceof Error?error.message:'Bot action failed');}
+   },turbo?35:420);
+   return ()=>window.clearTimeout(timer);
+ },[board,game,setup,botBusy,difficulty,turbo]);
  const points=useMemo(()=>new Map(board.vertices.map(v=>[v.id,vertexPosition(v,R)])),[board]);
  const bounds=useMemo(()=>{
    const p=[...points.values()],xs=p.map(v=>v.x),ys=p.map(v=>v.y);
@@ -47,7 +80,7 @@ function App(){
  const activeTile=selection?.kind==='tile'?board.tiles.find(t=>t.id===selection.id):undefined;
  const activeVertex=selection?.kind==='vertex'?board.vertices.find(t=>t.id===selection.id):undefined;
  const activeEdge=selection?.kind==='edge'?board.edges.find(t=>t.id===selection.id):undefined;
- const setBoard=(s:BoardSize,seed:string)=>{setSize(s);setGame(null);setSetup(null);setSeed(seed);setDraft(seed);setSelection(null);setPan({x:0,y:0});setZoom(1);};
+ const setBoard=(s:BoardSize,seed:string)=>{setSize(s);setGame(null);setSetup(null);setBotError('');setActivity([]);attempts.current={turn:0,count:0};setSeed(seed);setDraft(seed);setSelection(null);setPan({x:0,y:0});setZoom(1);};
  const select=(kind:Selection['kind'],id:string)=>setSelection({kind,id});
  const keySelect=(event:KeyboardEvent,kind:Selection['kind'],id:string)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select(kind,id);}};
  function start(e:PointerEvent<SVGSVGElement>){
@@ -70,16 +103,19 @@ function App(){
  }
  const viewW=bounds.w/zoom,viewH=bounds.h/zoom;
  return <main>
-  <header><div><p className="eyebrow">ORVANE / FIELD NOTES</p><h1>Founders of Orvane</h1><p className="subtitle">Build. Trade. Explore. Prosper.</p></div><span className="version">v0.6.0 · Victory & paired turns</span></header>
+  <header><div><p className="eyebrow">ORVANE / FIELD NOTES</p><h1>Founders of Orvane</h1><p className="subtitle">Build. Trade. Explore. Prosper.</p></div><span className="version">v0.7.0 · Local bots</span></header>
   <section className="toolbar" aria-label="Board settings">
-    <div className="sizes">{([3,4,5,6] as PlayerCount[]).map(n=><button key={n} disabled={!!setup} aria-pressed={count===n} onClick={()=>{setCount(n);setBoard(n<=4?'standard':'extended',seed);}}>{n} players</button>)}</div>
+    <div className="sizes">{([3,4,5,6] as PlayerCount[]).map(n=><button key={n} disabled={!!setup} aria-pressed={count===n} onClick={()=>{setCount(n);setHumans(h=>Math.min(h,n));setBoard(n<=4?'standard':'extended',seed);}}>{n} players</button>)}</div>
     <form onSubmit={e=>{e.preventDefault();if(draft.trim())setBoard(size,draft.trim());}}><label htmlFor="seed">Map seed</label><input disabled={!!setup} id="seed" value={draft} onChange={e=>setDraft(e.target.value)} maxLength={80} required/><button disabled={!!setup} type="submit">Generate</button><button disabled={!!setup} type="button" onClick={()=>setBoard(size,crypto.randomUUID().slice(0,12))}>Random</button></form>
   </section>
+  <section className="setup-bar lobby"><div><strong>🤖 Local match</strong><p className="muted">{humans} human · {count-humans} bots</p></div><div className="sizes"><label>Humans <select disabled={!!setup} value={humans} onChange={e=>setHumans(Number(e.target.value))}>{Array.from({length:count},(_,i)=><option key={i} value={i+1}>{i+1}</option>)}</select></label><label>AI <select disabled={!!setup} value={difficulty} onChange={e=>setDifficulty(e.target.value as Difficulty)}>{(['easy','normal','hard','expert'] as Difficulty[]).map(d=><option key={d}>{d}</option>)}</select></label><button aria-pressed={turbo} onClick={()=>setTurbo(t=>!t)}>⚡ Turbo {turbo?'on':'off'}</button></div></section>
+  {botError&&<section className="setup-bar" role="alert"><span>Bot stopped: {botError}</span><button onClick={()=>setBotError('')}>Retry</button><button onClick={()=>{setGame(null);setSetup(null);setBotError('');}}>Reset</button></section>}
   <section className="setup-bar" aria-live="polite">
-    {game?<><div><strong>{current?.name} · Round {game.round}{game.paired?' · Paired action':''}</strong><p className="muted">{game.phase==='finished'?'🏆 Game finished':game.phase==='roll'?'Roll the dice or play a card':game.phase==='discard'?'🥷 Discard required':game.phase==='robber'?'🥷 Move the robber':game.phase==='freeRoad'?'🛤️ Place free roads':(game.dice?game.dice.join(' + ')+' = '+game.dice.reduce((a,b)=>a+b,0)+' · ':'')+'Build, trade or end turn'}</p></div><div className="sizes"><button disabled={game.phase!=='roll'} onClick={()=>{setGame(applyGame(board,game,{kind:'roll',playerId:game.active,dice:rollDice()}));setSelection(null);}}>🎲 Roll dice</button><button disabled={game.phase!=='action'||!!game.offer} onClick={()=>{setGame(applyGame(board,game,{kind:'end',playerId:game.active}));setSelection(null);}}>⏭ End turn</button><button onClick={()=>{if(window.confirm('Discard current game?')){setGame(null);setSetup(null);setSelection(null);}}}>Reset game</button></div></>:setup?<><div><strong>{setup.phase==='complete'?'Initial placement complete':current?.name+' · '+(setup.phase==='settlement'?'Place a settlement':'Place its road')}</strong><p className="muted">{setup.phase==='complete'?'All players have two settlements and two roads. Begin the first turn.':'Round '+(setup.step<count?1:2)+' of 2 · Placement '+(setup.step+1)+' / '+setup.order.length}</p></div><div className="sizes">{setup.phase==='complete'?<button onClick={()=>{setGame(startGame(board,setup));setSelection(null);}}>Begin game</button>:<button disabled={!selectionLegal} onClick={confirmPlacement}>Confirm placement</button>}<button onClick={()=>{if(window.confirm('Discard current setup?')){setSetup(null);setSelection(null);}}}>Reset setup</button></div></>:<><div><strong>Local setup</strong><p className="muted">Pass the device between players. Place two settlements and roads each.</p></div><button onClick={()=>{setSelection(null);setSetup(createSetup(board,count,chooseFirstPlayer(count)));}}>Start setup</button></>}
+    {game?<><div><strong>{current?.name} · Round {game.round}{game.paired?' · Paired action':''}</strong><p className="muted">{game.phase==='finished'?'🏆 Game finished':game.phase==='roll'?'Roll the dice or play a card':game.phase==='discard'?'🥷 Discard required':game.phase==='robber'?'🥷 Move the robber':game.phase==='freeRoad'?'🛤️ Place free roads':(game.dice?game.dice.join(' + ')+' = '+game.dice.reduce((a,b)=>a+b,0)+' · ':'')+'Build, trade or end turn'}</p></div><div className="sizes"><button disabled={!humanActive||game.phase!=='roll'} onClick={()=>{setGame(applyGame(board,game,{kind:'roll',playerId:game.active,dice:rollDice()}));setSelection(null);}}>🎲 Roll dice</button><button disabled={!humanActive||game.phase!=='action'||!!game.offer} onClick={()=>{setGame(applyGame(board,game,{kind:'end',playerId:game.active}));setSelection(null);}}>⏭ End turn</button><button onClick={()=>{if(window.confirm('Discard current game?')){setGame(null);setSetup(null);setSelection(null);setBotError('');setActivity([]);attempts.current={turn:0,count:0};}}}>Reset game</button></div></>:setup?<><div><strong>{setup.phase==='complete'?'Initial placement complete':current?.name+' · '+(setup.phase==='settlement'?'Place a settlement':'Place its road')}</strong><p className="muted">{setup.phase==='complete'?'All players have two settlements and two roads. Begin the first turn.':'Round '+(setup.step<count?1:2)+' of 2 · Placement '+(setup.step+1)+' / '+setup.order.length}</p></div><div className="sizes">{setup.phase==='complete'?<button onClick={()=>{setGame(startGame(board,setup));setSelection(null);}}>Begin game</button>:<button disabled={!selectionLegal} onClick={confirmPlacement}>Confirm placement</button>}<button onClick={()=>{if(window.confirm('Discard current setup?')){setSetup(null);setSelection(null);}}}>Reset setup</button></div></>:<><div><strong>Local setup</strong><p className="muted">Choose human seats and AI difficulty, then place settlements and roads.</p></div><button onClick={()=>{setSelection(null);const s=createSetup(board,count,chooseFirstPlayer(count));setSetup({...s,players:s.players.map(p=>({...p,name:p.id>=humans?['🤖 Ada','🤖 Bruno','🤖 Cleo','🤖 Darius','🤖 Elara','🤖 Finn'][p.id]:humans===1?'You':p.name}))});setActivity([]);setBotError('');}}>Start setup</button></>}
   </section>
+  {botBusy&&<p className="bot-status" role="status">🤖 {view?.players.find(p=>p.id===decision)?.name?.replace('🤖 ','')} is thinking…</p>}
   {game?.winner!==null&&game?.winner!==undefined&&<section className="winner-banner" role="status"><h2>🏆 {game.players.find(p=>p.id===game.winner)?.name} wins!</h2><p>{playerScore(game,game.winner,true).total} victory points · {game.round} rounds</p><button onClick={()=>{setGame(null);setSetup(null);setSelection(null);}}>New game</button></section>}
-  {view&&<section className="player-strip" aria-label="Players">{view.players.map(p=><div key={p.id} className={'player '+(playerId===p.id?'active':'')}><span className="swatch" style={{background:p.color}}/><div><strong>{p.name}</strong>{game&&<p className="score-line">🏆 {playerScore(game,p.id,p.id===playerId||game.phase==='finished').total}/{VICTORY_TARGET} · 🛤️ {game.awards.roadLengths[p.id]} · ⚔️ {game.development.knights[p.id]}{game.awards.longestRoad===p.id?' · 🏅 Road':''}{game.awards.largestArmy===p.id?' · 🏅 Army':''}</p>}<p>{view.settlements.filter(s=>s.playerId===p.id).length} settlements · {view.roads.filter(s=>s.playerId===p.id).length} roads</p><p>{game&&p.id!==playerId?Object.values(p.resources).reduce((a,b)=>a+b,0)+' cards':Object.entries(p.resources).filter(([,n])=>n>0).map(([k,n])=>resourceEmoji[k as keyof typeof resourceEmoji]+' '+n).join(' · ')||'No resources'}</p></div></div>)}</section>}
+  {view&&<section className="player-strip" aria-label="Players">{view.players.map(p=><div key={p.id} className={'player '+(playerId===p.id?'active':'')}><span className="swatch" style={{background:p.color}}/><div><strong>{p.name}</strong>{game&&<p className="score-line">🏆 {playerScore(game,p.id,p.id===showHand||game.phase==='finished').total}/{VICTORY_TARGET} · 🛤️ {game.awards.roadLengths[p.id]} · ⚔️ {game.development.knights[p.id]}{game.awards.longestRoad===p.id?' · 🏅 Road':''}{game.awards.largestArmy===p.id?' · 🏅 Army':''}</p>}<p>{view.settlements.filter(s=>s.playerId===p.id).length} settlements · {view.roads.filter(s=>s.playerId===p.id).length} roads</p><p>{p.id!==showHand?Object.values(p.resources).reduce((a,b)=>a+b,0)+' cards':Object.entries(p.resources).filter(([,n])=>n>0).map(([k,n])=>resourceEmoji[k as keyof typeof resourceEmoji]+' '+n).join(' · ')||'No resources'}</p></div></div>)}</section>}
   {game&&<section className="setup-bar"><div><strong>Construction</strong><p className="muted">{RESOURCES.filter(k=>COSTS[build][k]>0).map(k=>resourceEmoji[k]+' '+terrain[k].resource+' ×'+COSTS[build][k]).join(' · ')} · {legal.length} available sites</p></div><div className="sizes">{(['road','settlement','city'] as BuildKind[]).map(k=><button key={k} aria-pressed={build===k} disabled={game.phase!=='action'||!!game.offer} onClick={()=>{setBuild(k);setSelection(null);}}>{({road:'🛤️',settlement:'🏠',city:'🏰'})[k]} {k}</button>)}<button disabled={!selectionLegal||game.phase!=='action'} onClick={confirmBuild}>Build selected</button></div></section>}
   {game&&game.dice&&<section className="setup-bar"><div><strong>Production this roll</strong><p className="muted">{game.players.map((p,i)=>p.name+': +'+Object.values(game.lastProduction[i]).reduce((a,b)=>a+b,0)).join(' · ')}{game.shortages.length?' · Bank shortage: '+game.shortages.map(k=>terrain[k].resource).join(', '):''}</p></div></section>}
   <div className="layout">
@@ -100,11 +136,11 @@ function App(){
     </svg>
     <p className="map-help">Drag to pan · + / − to zoom · select a hex, junction or road</p>
    </section>
-   <aside>{game&&<DevelopmentPanel key={game.active+":"+game.turn} board={board} game={game} selectedTile={activeTile?.id} onSelectTile={id=>select('tile',id)} selectedEdge={activeEdge?.id} onChange={s=>{setGame(s);setSelection(null);}}/>}{game&&<TradePanel key={game.active+":"+game.turn} board={board} game={game} onChange={s=>{setGame(s);setSelection(null);}}/>}{game&&<section className="panel"><h2>Resource bank</h2><dl>{RESOURCES.map(k=><div className="bank-row" key={k}><dt>{resourceEmoji[k]} {terrain[k].resource}</dt><dd>{game.bank[k]}</dd></div>)}</dl></section>}<section className="panel"><h2>Cartographer</h2><p className="muted">Seed: {seed}</p><dl><dt>Hexes</dt><dd>{board.tiles.length}</dd><dt>Building sites</dt><dd>{board.vertices.length}</dd><dt>Road segments</dt><dd>{board.edges.length}</dd></dl></section>
+   <aside>{activity.length>0&&<section className="panel activity"><h2>📜 Activity</h2>{activity.slice(0,5).map((a,i)=><p key={i}>{a}</p>)}</section>}{game&&decision!==null&&decision<humans&&!game.offer&&<DevelopmentPanel key={game.active+":"+game.turn} board={board} game={game} humanActive={humanActive} selectedTile={activeTile?.id} onSelectTile={id=>select('tile',id)} selectedEdge={activeEdge?.id} onChange={s=>{setGame(s);setSelection(null);}}/>}{game&&decision!==null&&decision<humans&&(game.phase==='action')&&<TradePanel key={game.active+":"+game.turn} board={board} game={game} humanActive={humanActive} onChange={s=>{setGame(s);setSelection(null);}}/>}{game&&<section className="panel"><h2>Resource bank</h2><dl>{RESOURCES.map(k=><div className="bank-row" key={k}><dt>{resourceEmoji[k]} {terrain[k].resource}</dt><dd>{game.bank[k]}</dd></div>)}</dl></section>}<section className="panel"><h2>Cartographer</h2><p className="muted">Seed: {seed}</p><dl><dt>Hexes</dt><dd>{board.tiles.length}</dd><dt>Building sites</dt><dd>{board.vertices.length}</dd><dt>Road segments</dt><dd>{board.edges.length}</dd></dl></section>
    <section className="panel" aria-live="polite"><h2>Selection</h2>{activeTile?<><strong>{terrain[activeTile.terrain].name}</strong><p>Resource: {terrain[activeTile.terrain].resource}</p><p>Production token: {activeTile.number??'None'}</p></>:activeVertex?<><strong>Building junction</strong><p>{activeVertex.id} · {activeVertex.tiles.length} adjacent hexes</p></>:activeEdge?<><strong>Road segment</strong><p>{activeEdge.tiles.length} adjacent hexes · {activeEdge.tiles.length===1?'Coast':'Inland'}</p></>:<p className="muted">Select a map feature to inspect it. Start local setup to place buildings and roads.</p>}</section>
    <section className="panel"><h2>Terrain</h2>{(Object.keys(terrain) as Terrain[]).map(t=><div key={t} className="legend"><span style={{background:terrain[t].color}} className="swatch"/><span>{terrain[t].name}</span><span>{board.tiles.filter(x=>x.terrain===t).length}</span></div>)}</section></aside>
   </div>
-  <footer>Local base game · First to 10 victory points · Bots and online multiplayer are pending.</footer>
+  <footer>Local base game · Humans and AI · First to 10 VP · Online multiplayer pending.</footer>
  </main>;
 }
 createRoot(document.getElementById('root')!).render(<StrictMode><App/></StrictMode>);
