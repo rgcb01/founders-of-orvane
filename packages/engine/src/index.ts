@@ -1,10 +1,11 @@
+import {generateHarbors,type Harbor} from './trade';
 export type Terrain = 'forest' | 'pasture' | 'field' | 'hill' | 'mountain' | 'desert';
 export type BoardSize = 'standard' | 'extended';
 export interface Axial { q: number; r: number }
 export interface Vertex { id: string; x: number; y: number; tiles: string[] }
 export interface Edge { id: string; a: string; b: string; tiles: string[] }
 export interface Tile extends Axial { id: string; terrain: Terrain; number: number | null; vertices: string[]; edges: string[] }
-export interface Board { seed: string; size: BoardSize; tiles: Tile[]; vertices: Vertex[]; edges: Edge[] }
+export interface Board { seed: string; size: BoardSize; tiles: Tile[]; vertices: Vertex[]; edges: Edge[]; harbors:Harbor[] }
 
 const corners = [[0,-2],[1,-1],[1,1],[0,2],[-1,1],[-1,-1]] as const;
 const directions = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]] as const;
@@ -97,9 +98,11 @@ export function generateBoard(seed:string,size:BoardSize='standard'):Board {
   redTiles.forEach((t,i)=>t.number=red[i]);
   const rest=shuffle(tokens.filter(n=>n!==6&&n!==8),random);
   productive.filter(t=>t.number===null).forEach((t,i)=>t.number=rest[i]);
-  return {seed,size,tiles,vertices:[...vertices.values()],edges:[...edges.values()]};
+  return {seed,size,tiles,vertices:[...vertices.values()],edges:[...edges.values()],harbors:generateHarbors([...edges.values()],[...vertices.values()],size==='extended',random)};
 }
 
 export * from './setup';
 
 export * from './economy';
+
+export * from './trade';

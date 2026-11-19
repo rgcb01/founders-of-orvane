@@ -1,3 +1,4 @@
+import {applyTrade,type TradeAction,type Offer} from './trade';
 import type {Board} from './index';
 import {emptyResources,type Player,type Resource,type Resources,type SetupState,type Settlement,type Road} from './setup';
 
@@ -12,9 +13,9 @@ export const COSTS:Record<BuildKind,Resources>={
 export interface GameState {
  players:Player[];settlements:Building[];roads:Road[];bank:Resources;
  active:number;turn:number;phase:'roll'|'action';dice:[number,number]|null;
- lastProduction:Resources[];shortages:Resource[];
+ lastProduction:Resources[];shortages:Resource[];offer:Offer|null;
 }
-export type GameAction=
+export type GameAction=TradeAction
  | {kind:'roll';playerId:number;dice:[number,number]}
  | {kind:'build';playerId:number;build:BuildKind;id:string}
  | {kind:'end';playerId:number};
@@ -26,13 +27,13 @@ export function startGame(board:Board,setup:SetupState):GameState {
    bank[k]=capacity-setup.players.reduce((sum,p)=>sum+p.resources[k],0);
    if(bank[k]<0)throw new Error('Starting resources exceed bank');
  }
- return {players:setup.players.map(p=>({...p,resources:{...p.resources}})),settlements:setup.settlements.map(s=>({...s,kind:'settlement'})),roads:setup.roads.map(r=>({...r})),bank,active:setup.players[0].id,turn:1,phase:'roll',dice:null,lastProduction:setup.players.map(()=>emptyResources()),shortages:[]};
+ return {players:setup.players.map(p=>({...p,resources:{...p.resources}})),settlements:setup.settlements.map(s=>({...s,kind:'settlement'})),roads:setup.roads.map(r=>({...r})),bank,active:setup.players[0].id,turn:1,phase:'roll',dice:null,lastProduction:setup.players.map(()=>emptyResources()),shortages:[],offer:null};
 }
 export function affordable(resources:Resources,kind:BuildKind):boolean {
  return RESOURCES.every(k=>resources[k]>=COSTS[kind][k]);
 }
 export function legalBuilds(board:Board,state:GameState,kind:BuildKind):string[]{
- if(state.phase!=='action')return [];
+ if(state.phase!=='action'||state.offer)return [];
  const player=state.players.find(p=>p.id===state.active)!;
  if(!affordable(player.resources,kind))return [];
  const mine=state.settlements.filter(s=>s.playerId===player.id);
@@ -86,6 +87,8 @@ export function produce(board:Board,state:GameState,total:number):Pick<GameState
  return {players,bank,lastProduction,shortages};
 }
 export function applyGame(board:Board,state:GameState,action:GameAction):GameState {
+ if(action.kind!=='roll'&&action.kind!=='build'&&action.kind!=='end')return applyTrade(board,state,action);
+ if(state.offer)throw new Error('Resolve pending offer first');
  if(action.playerId!==state.active)throw new Error('Not the active player');
  if(action.kind==='roll'){
    if(state.phase!=='roll'||action.dice.length!==2||action.dice.some(n=>!Number.isInteger(n)||n<1||n>6))throw new Error('Illegal roll');
