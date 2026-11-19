@@ -13,3 +13,6 @@ Treat local profile UUID and authentication subject as separate identities. Bind
 
 ## Collections (0.8.2)
 Seven themed collections (Classic, Viking, Imperial, Pirate, Winter, Dragon, Celestial), four slots each: dice, card backs, board sea palette, title. Four achievement rewards. Stable IDs and optional loadout preserve legacy profiles and future sync. Unlocks derive from existing XP/achievements, not purchases; equipped IDs are revalidated on render. Global presentation themes affect dice and the public board, not seat color or terrain readability. Pieces and music customization remain future work. No network dependency.
+
+## Cosmetic expansion (0.8.3)
+Six additional slots per collection: settlement, city, road, robber, ambient music and effects. 74 catalog items total. Existing four-slot loadouts migrate through default fallback. Player-owned pieces are customized for solo seat 0; other seats keep standard silhouettes and all pieces retain ownership colors. The robber has a blocked-production marker in all themes. Ambient motifs are original synthesized loops, off unless music is enabled. Effects alter accent colors only; no rule changes.

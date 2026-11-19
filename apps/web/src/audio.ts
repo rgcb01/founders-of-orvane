@@ -28,7 +28,7 @@ function load():{enabled:boolean;volume:number;bots:boolean;music:boolean;musicV
  try{const saved=JSON.parse(localStorage.getItem(key)??'null');if(saved&&typeof saved.enabled==='boolean'&&typeof saved.bots==='boolean'&&typeof saved.volume==='number'&&Number.isFinite(saved.volume))return {enabled:saved.enabled,bots:saved.bots,volume:Math.max(0,Math.min(1,saved.volume)),music:saved.music===true,musicVolume:typeof saved.musicVolume==='number'&&Number.isFinite(saved.musicVolume)?Math.max(0,Math.min(1,saved.musicVolume)):.25,haptic:saved.haptic===true};}catch{}
  return {enabled:true,volume:.45,bots:false,music:false,musicVolume:.25,haptic:false};
 }
-export function useGameAudio(){
+export function useGameAudio(musicId='classic-music'){
  const [settings,setSettings]=useState(load);
  const [ready,setReady]=useState(false);
  const context=useRef<AudioContext|null>(null),master=useRef<GainNode|null>(null),musicGain=useRef<GainNode|null>(null),last=useRef(-Infinity);
@@ -63,11 +63,11 @@ export function useGameAudio(){
  useEffect(()=>{
    if(!ready||!settings.enabled||!settings.music)return;
    let cancelBar:(()=>void)|undefined,index=0;
-   const playBar=()=>{const ctx=context.current,out=musicGain.current;if(!document.hidden&&ctx&&out&&ctx.state==='running'){cancelBar?.();cancelBar=scheduleAmbientBar(ctx,out,index++);}};
+   const playBar=()=>{const ctx=context.current,out=musicGain.current;if(!document.hidden&&ctx&&out&&ctx.state==='running'){cancelBar?.();cancelBar=scheduleAmbientBar(ctx,out,index++,musicId);}};
    const visibility=()=>{if(document.hidden){cancelBar?.();cancelBar=undefined;}else playBar();};
    playBar();const timer=window.setInterval(playBar,4480);document.addEventListener('visibilitychange',visibility);
    return()=>{window.clearInterval(timer);cancelBar?.();document.removeEventListener('visibilitychange',visibility);};
- },[ready,settings.enabled,settings.music]);
+ },[ready,settings.enabled,settings.music,musicId]);
  function play(cue:Cue,bot=false){
    const ctx=context.current,out=master.current,s=config.current;
    if(!s.enabled||!ctx||!out||ctx.state!=='running'||(bot&&!s.bots))return;
