@@ -101,3 +101,5 @@ export function generateBoard(seed:string,size:BoardSize='standard'):Board {
 }
 
 export * from './setup';
+
+export * from './economy';
