@@ -43,3 +43,6 @@ Online play is deferred and may be developed independently if desired. It is not
 
 ## Mobile and audio (v0.7.1)
 Mobile match controls remain accessible in a fixed safe-area-aware dock. Lobby settings collapse during play. Original synthesized Web Audio effects use a single master gain, gesture activation and persistent audio preferences; bot effects are optional and muted by default in turbo. No downloads or audio assets required. Expert has slightly more deterministic placement and negotiation and prioritizes a city when it can close out the game; deeper AI calibration remains for v0.9.
+
+## UX review — v0.7.2
+Keep the local game milestone at 0.7.x for iterative playtesting. Default relaxed bot pacing (1.4s between actions, 2.2s in action phase), normal and optional turbo. Pause/step affects bot scheduling only, never engine rules. A visible recent-event feed reports public actions and solo-player production without showing opponent hands. Larger contextual map targets, legal-site rings and clear confirmation text. Next UX passes should focus on onboarding, trade/cards and full mobile browser testing before 0.8.
