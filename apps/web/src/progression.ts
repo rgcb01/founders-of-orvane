@@ -1,7 +1,8 @@
+import {validLoadout,DEFAULT_LOADOUT,equip,type Loadout} from './cosmetics';
 import type {Difficulty} from '@orvane/engine';
 import type {Result,Store} from './persistence';
 export const PROFILE_KEY='orvane.profile.v1';
-export interface LocalProfile {schema:1;id:string;createdAt:number;updatedAt:number;name:string;avatar:string}
+export interface LocalProfile {schema:1;id:string;createdAt:number;updatedAt:number;name:string;avatar:string;loadout?:Loadout}
 export const AVATARS=[
  {id:'founder',icon:'👤',name:'Founder',level:1},
  {id:'settler',icon:'🌱',name:'Settler',level:2},
@@ -36,7 +37,7 @@ export function progression(results:readonly Result[],profileId:string){
 export function validateProfile(value:unknown):value is LocalProfile{
  if(!value||typeof value!=='object')return false;
  const p=value as Partial<LocalProfile>;
- return p.schema===1&&typeof p.id==='string'&&p.id.length>0&&typeof p.name==='string'&&p.name.trim().length>0&&p.name.length<=24&&typeof p.createdAt==='number'&&Number.isSafeInteger(p.createdAt)&&p.createdAt>=0&&typeof p.updatedAt==='number'&&Number.isSafeInteger(p.updatedAt)&&p.updatedAt>=p.createdAt&&AVATARS.some(a=>a.id===p.avatar);
+ return p.schema===1&&typeof p.id==='string'&&p.id.length>0&&typeof p.name==='string'&&p.name.trim().length>0&&p.name.length<=24&&typeof p.createdAt==='number'&&Number.isSafeInteger(p.createdAt)&&p.createdAt>=0&&typeof p.updatedAt==='number'&&Number.isSafeInteger(p.updatedAt)&&p.updatedAt>=p.createdAt&&AVATARS.some(a=>a.id===p.avatar)&&(p.loadout===undefined||validLoadout(p.loadout));
 }
 export function readProfile(store:Store):LocalProfile|null{
  const raw=store.getItem(PROFILE_KEY);if(raw===null)return null;
@@ -47,10 +48,12 @@ export function writeProfile(store:Store,profile:LocalProfile):LocalProfile{
  const old=readProfile(store);if(old&&old.id!==profile.id)throw new Error('Local profile identity changed; reload before editing.');
  store.setItem(PROFILE_KEY,JSON.stringify(profile));return profile;
 }
-export function createProfile(id:string,now:number):LocalProfile{return {schema:1,id,createdAt:now,updatedAt:now,name:'Founder',avatar:'founder'};}
+export function createProfile(id:string,now:number):LocalProfile{return {schema:1,id,createdAt:now,updatedAt:now,name:'Founder',avatar:'founder',loadout:{...DEFAULT_LOADOUT}};}
 export function avatarIcon(id:string,level:number){return AVATARS.find(a=>a.id===id&&a.level<=level)?.icon??'👤';}
 export function editProfile(profile:LocalProfile,changes:{name:string;avatar:string},results:readonly Result[],now:number):LocalProfile{
  const name=changes.name.trim();if(!name||name.length>24)throw new Error('Name must contain 1–24 characters.');
  const progress=progression(results,profile.id);if(!progress.avatars.some(a=>a.id===changes.avatar&&a.unlocked))throw new Error('Avatar is locked.');
  return {...profile,name,avatar:changes.avatar,updatedAt:Math.max(profile.updatedAt,now)};
 }
+
+export function equipProfile(profile:LocalProfile,id:string,results:readonly Result[],now:number):LocalProfile{return {...profile,loadout:equip(profile.loadout,id,progression(results,profile.id)),updatedAt:Math.max(now,profile.updatedAt)};}

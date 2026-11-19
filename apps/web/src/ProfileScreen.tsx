@@ -1,5 +1,6 @@
 import {useState} from 'react';
-import {avatarIcon,progression,editProfile,type LocalProfile} from './progression';
+import {avatarIcon,progression,editProfile,equipProfile,type LocalProfile} from './progression';
+import {Wardrobe} from './Wardrobe';
 import type {Result} from './persistence';
 export function ProfileScreen({profile,results,onSave,onBack}:{profile:LocalProfile;results:Result[];onSave:(p:LocalProfile)=>void;onBack:()=>void}){
  const p=progression(results,profile.id),[name,setName]=useState(profile.name),[avatar,setAvatar]=useState(profile.avatar),[error,setError]=useState('');
@@ -11,6 +12,7 @@ export function ProfileScreen({profile,results,onSave,onBack}:{profile:LocalProf
  <h2>🎨 Customize your avatar</h2><label className="profile-name">Display name <input maxLength={24} value={name} onChange={e=>setName(e.target.value)}/></label>
  <div className="cosmetic-grid">{p.avatars.map(a=><button key={a.id} disabled={!a.unlocked} aria-pressed={avatar===a.id} onClick={()=>setAvatar(a.id)}><span>{a.icon}</span><strong>{a.name}</strong><small>{a.unlocked?'Unlocked':'🔒 Level '+a.level}</small></button>)}</div>
  <button onClick={save}>Save profile</button>{error&&<p role="alert">{error}</p>}
+ <Wardrobe loadout={profile.loadout} progress={p} onEquip={id=>onSave(equipProfile(profile,id,results,Date.now()))}/>
  <h2>🏅 Achievements · {p.achievements.filter(a=>a.unlocked).length}/{p.achievements.length}</h2><div className="achievement-list">{p.achievements.map(a=><article key={a.id} className={a.unlocked?'earned':''}><span>{a.icon}</span><div><strong>{a.name}</strong><p>{a.description}</p></div><small>{a.unlocked?'✓':'🔒'} {a.xp} XP</small></article>)}</div>
  <p className="muted">100 XP per completed solo game; wins grant a difficulty bonus. Achievements grant XP once. Older matches without difficulty receive completion XP only. Profile and rewards are local and cosmetic; online accounts and sync are planned separately.</p></section>;
 }
