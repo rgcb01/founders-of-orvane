@@ -15,6 +15,9 @@ describe('sound event classification',()=>{
  it('prioritizes victory and distinguishes human defeat',()=>{
   const {state}=fixture();const won:GameState={...state,winner:0,phase:'finished'};expect(gameCue(state,won,1)).toBe('victory');expect(gameCue(state,{...won,winner:1},1)).toBe('defeat');
  });
+ it('prioritizes a newly earned award over building',()=>{
+  const {state}=fixture();const next={...state,roads:[...state.roads,{edgeId:'new',playerId:0}],awards:{...state.awards,longestRoad:0}};expect(gameCue(state,next,1)).toBe('award');
+ });
  it('recognizes setup placement and robber warning',()=>{
   const {board,state}=fixture();const s=createSetup(board,4);const p=applySetup(board,s,{kind:'settlement',playerId:0,id:legalSettlements(board,s)[0]});
   expect(setupCue(s,p)).toBe('settlement');expect(gameCue(state,applyGame(board,state,{kind:'roll',playerId:0,dice:[3,4]}),1)).toBe('robber');

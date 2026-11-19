@@ -7,6 +7,7 @@ export function gameCue(before:GameState|null,after:GameState|null,humans:number
  if(after.phase==='discard'&&before.phase!=='discard'||after.phase==='robber'&&before.phase!=='robber'||after.development.robber!==before.development.robber)return 'robber';
  if(after.offer&&after.offer!==before.offer)return 'offer';
  if(after.development.deck.length<before.development.deck.length)return 'card';
+ if((after.awards.longestRoad!==before.awards.longestRoad&&after.awards.longestRoad!==null)||(after.awards.largestArmy!==before.awards.largestArmy&&after.awards.largestArmy!==null))return 'award';
  if(after.roads.length>before.roads.length)return 'road';
  if(after.settlements.length>before.settlements.length)return 'settlement';
  if(after.settlements.some((b,i)=>b.kind!==before.settlements[i]?.kind))return 'city';

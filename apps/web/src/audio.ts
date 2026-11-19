@@ -27,9 +27,9 @@ function load():{enabled:boolean;volume:number;bots:boolean}{
 export function useGameAudio(){
  const [settings,setSettings]=useState(load);
  const [ready,setReady]=useState(false);
- const context=useRef<AudioContext|null>(null),master=useRef<GainNode|null>(null),last=useRef(0);
+ const context=useRef<AudioContext|null>(null),master=useRef<GainNode|null>(null),last=useRef(-Infinity);
  const config=useRef(settings);config.current=settings;
- function unlock(){
+ async function unlock(){
    if(!config.current.enabled)return;
    try{
      if(!context.current){
@@ -39,11 +39,11 @@ export function useGameAudio(){
      }
      const ctx=context.current;
      if(ctx.state==='running')setReady(true);
-     else void ctx.resume().then(()=>setReady(ctx.state==='running')).catch(()=>{});
+     else {await ctx.resume();setReady(ctx.state==='running');}
    }catch{}
  }
  useEffect(()=>{
-   const onGesture=()=>unlock();
+   const onGesture=()=>{void unlock();};
    window.addEventListener('pointerdown',onGesture);window.addEventListener('keydown',onGesture);
    return ()=>{window.removeEventListener('pointerdown',onGesture);window.removeEventListener('keydown',onGesture);};
  },[]);
@@ -67,7 +67,7 @@ export function useGameAudio(){
  function toggle(){
    const enabled=!config.current.enabled;
    config.current={...config.current,enabled};setSettings(config.current);
-   if(enabled)unlock();
+   if(enabled)void unlock();
  }
  return {settings,ready,unlock,play,toggle,setVolume:(volume:number)=>setSettings(s=>({...s,volume})),toggleBots:()=>setSettings(s=>({...s,bots:!s.bots}))};
 }
