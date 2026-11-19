@@ -1,4 +1,5 @@
-import {validLoadout,DEFAULT_LOADOUT,equip,type StoredLoadout} from './cosmetics';
+import {validLoadout,DEFAULT_LOADOUT,equip,COSMETICS,unlocked,type StoredLoadout} from './cosmetics';
+import {aggregateMetrics,challengeLedger,orderedResults,winStreak} from './challenges';
 import type {Difficulty} from '@orvane/engine';
 import type {Result,Store} from './persistence';
 export const PROFILE_KEY='orvane.profile.v1';
@@ -23,16 +24,30 @@ const ACHIEVEMENTS=[
  {id:'hard-win',icon:'⚔️',name:'Challenger',description:'Win against hard bots.',xp:200,earned:(rs:Result[])=>rs.some(r=>r.winner===0&&r.difficulty==='hard')},
  {id:'expert-win',icon:'🌟',name:'Master strategist',description:'Win against expert bots.',xp:350,earned:(rs:Result[])=>rs.some(r=>r.winner===0&&r.difficulty==='expert')},
  {id:'six-win',icon:'🏰',name:'Ruler of the island',description:'Win a six-player solo match.',xp:150,earned:(rs:Result[])=>rs.some(r=>r.winner===0&&r.players===6)},
+ {id:'dragon-slayer',icon:'🐉',name:'Dragon Slayer',description:'Win against five expert bots in a six-player match.',xp:500,earned:(rs:Result[])=>rs.some(r=>r.players===6&&r.winner===0&&r.difficulty==='expert')},
+ {id:'master-roads',icon:'🛤️',name:'Master of Roads',description:'Reach a continuous road length of 15.',xp:300,earned:(rs:Result[])=>rs.some(r=>(r.metrics?.longestRoad??0)>=15)},
+ {id:'trade-baron',icon:'⚓',name:'Trade Baron',description:'Complete 100 bank or player trades.',xp:300,earned:(rs:Result[])=>aggregateMetrics(rs).trades>=100},
+ {id:'urban-empire',icon:'🏰',name:'Urban Empire',description:'Build four cities in one match.',xp:250,earned:(rs:Result[])=>rs.some(r=>(r.metrics?.cities??0)>=4)},
+ {id:'warlord',icon:'⚔️',name:'Warlord',description:'Hold largest army in ten completed matches.',xp:300,earned:(rs:Result[])=>aggregateMetrics(rs).armies>=10},
+ {id:'harvest-king',icon:'🌾',name:'Harvest King',description:'Produce 1,000 resources.',xp:300,earned:(rs:Result[])=>aggregateMetrics(rs).produced>=1000},
+ {id:'unstoppable',icon:'👑',name:'Unstoppable',description:'Win five consecutive solo matches.',xp:500,earned:(rs:Result[])=>winStreak(rs)>=5},
 ] as const;
 export function rankFor(level:number){return level>=50?'Legend of Orvane':level>=40?'King':level>=30?'Lord':level>=20?'Merchant':level>=10?'Builder':'Settler';}
-export function progression(results:readonly Result[],profileId:string){
+export function soloResults(results:readonly Result[],profileId:string){
  const seen=new Set<string>();
  const solo=results.filter(r=>{if(r.humans!==1||(r.profileId&&r.profileId!==profileId)||seen.has(r.id))return false;seen.add(r.id);return true;});
- const achievements=ACHIEVEMENTS.map(({earned,...a})=>({...a,unlocked:earned(solo)}));
+ return orderedResults(solo);
+}
+export function progression(results:readonly Result[],profileId:string){
+ const solo=soloResults(results,profileId);
+ const achievements:{id:string;icon:string;name:string;description:string;xp:number;unlocked:boolean}[]=ACHIEVEMENTS.map(({earned,...a})=>({...a,unlocked:earned(solo)}));
  const matchExperience=solo.reduce((n,r)=>n+matchXP(r),0);
- const achievementExperience=achievements.reduce((n,a)=>n+(a.unlocked?a.xp:0),0);
- const xp=matchExperience+achievementExperience,level=1+Math.floor(xp/XP_PER_LEVEL);
- return {xp,matchExperience,achievementExperience,level,levelXP:xp%XP_PER_LEVEL,nextXP:XP_PER_LEVEL,rank:rankFor(level),played:solo.length,wins:solo.filter(r=>r.winner===0).length,losses:solo.filter(r=>r.winner!==0).length,achievements,avatars:AVATARS.map(a=>({...a,unlocked:level>=a.level}))};
+ const challengeExperience=challengeLedger(solo).reduce((n,c)=>n+(c.complete?c.goal.xp:0),0);
+ let achievementExperience=achievements.reduce((n,a)=>n+(a.unlocked?a.xp:0),0);
+ const complete=COSMETICS.every(c=>unlocked(c,{level:1+Math.floor((matchExperience+achievementExperience+challengeExperience)/XP_PER_LEVEL),achievements}));
+ achievements.push({id:'completionist',icon:'🌌',name:'Completionist',description:'Unlock every cosmetic in the catalog.',xp:500,unlocked:complete});if(complete)achievementExperience+=500;
+ const xp=matchExperience+achievementExperience+challengeExperience,level=1+Math.floor(xp/XP_PER_LEVEL);
+ return {xp,matchExperience,achievementExperience,challengeExperience,metrics:aggregateMetrics(solo),bestStreak:winStreak(solo),level,levelXP:xp%XP_PER_LEVEL,nextXP:XP_PER_LEVEL,rank:rankFor(level),played:solo.length,wins:solo.filter(r=>r.winner===0).length,losses:solo.filter(r=>r.winner!==0).length,achievements,avatars:AVATARS.map(a=>({...a,unlocked:level>=a.level}))};
 }
 export function validateProfile(value:unknown):value is LocalProfile{
  if(!value||typeof value!=='object')return false;
@@ -57,3 +72,12 @@ export function editProfile(profile:LocalProfile,changes:{name:string;avatar:str
 }
 
 export function equipProfile(profile:LocalProfile,id:string,results:readonly Result[],now:number):LocalProfile{return {...profile,loadout:equip(profile.loadout,id,progression(results,profile.id)),updatedAt:Math.max(now,profile.updatedAt)};}
+
+export function rewardSummary(results:readonly Result[],profileId:string,matchId:string){
+ const solo=soloResults(results,profileId),i=solo.findIndex(r=>r.id===matchId);if(i<0)return null;
+ const before=progression(solo.slice(0,i),profileId),after=progression(solo.slice(0,i+1),profileId);
+ const earned=after.achievements.filter(a=>a.unlocked&&!before.achievements.some(b=>b.id===a.id&&b.unlocked));
+ const rewards=COSMETICS.filter(c=>unlocked(c,after)&&!unlocked(c,before));
+ const avatars=after.avatars.filter(a=>a.unlocked&&!before.avatars.some(b=>b.id===a.id&&b.unlocked));
+ return {xp:after.xp-before.xp,matchXP:matchXP(solo[i]),achievementXP:after.achievementExperience-before.achievementExperience,challengeXP:after.challengeExperience-before.challengeExperience,fromLevel:before.level,toLevel:after.level,earned,rewards,avatars,metrics:solo[i].metrics};
+}

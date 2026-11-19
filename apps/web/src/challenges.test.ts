@@ -1,0 +1,14 @@
+import {describe,it,expect} from 'vitest';
+import {periodKey,currentChallenges,challengeLedger} from './challenges';
+import {progression,rewardSummary} from './progression';
+import {EMPTY_METRICS} from './matchMetrics';
+import type {Result} from './persistence';
+const monday=Date.UTC(2026,10,16,12),day=86400000;
+const result=(id:string,extra:Partial<Result>={}):Result=>({id,profileId:'p',endedAt:monday,players:6,humans:1,winner:0,winnerName:'Founder',rounds:30,difficulty:'hard',metrics:{...EMPTY_METRICS,produced:20,trades:5},...extra});
+describe('career challenges',()=>{
+ it('uses deterministic UTC days and Monday weeks',()=>{expect(periodKey(monday,'weekly')).toBe('2026-11-16');expect(periodKey(monday+6*day,'weekly')).toBe('2026-11-16');expect(periodKey(monday+7*day,'weekly')).toBe('2026-11-23');});
+ it('credits objectives once per period and preserves old XP after reset',()=>{const a=result('a'),b=result('b',{endedAt:monday+day}),c=result('c',{endedAt:monday+2*day});const rows=[a,b,c];const p=progression(rows,'p');expect(p.challengeExperience).toBe(800);expect(progression([a,b,c,c],'p').challengeExperience).toBe(800);expect(currentChallenges(rows,monday+7*day).every(g=>!g.complete)).toBe(true);expect(challengeLedger(rows).filter(g=>g.complete).length).toBe(9);});
+ it('does not credit untracked legacy or other profiles for recurring goals',()=>{expect(progression([result('legacy',{metrics:undefined}),result('other',{profileId:'q'})],'p').challengeExperience).toBe(0);});
+ it('unlocks advanced achievements using observed metrics and summaries are historical',()=>{const r=result('a',{difficulty:'expert',metrics:{...EMPTY_METRICS,produced:1000,trades:100,longestRoad:15,cities:4,largestArmy:true}});const rows=[r,result('b',{endedAt:monday+day})];const p=progression(rows,'p');expect(p.achievements.filter(a=>a.unlocked).map(a=>a.id)).toEqual(expect.arrayContaining(['dragon-slayer','master-roads','trade-baron','urban-empire','harvest-king']));const summary=rewardSummary(rows,'p','a')!;expect(summary.xp).toBe(progression([r],'p').xp);expect(summary.matchXP).toBe(450);expect(summary.earned.some(a=>a.id==='dragon-slayer')).toBe(true);expect(rewardSummary([r,r,...rows],'p','a')).toEqual(summary);});
+ it('counts consecutive wins in chronological order',()=>{const rows=Array.from({length:5},(_,i)=>result('w'+i,{endedAt:monday+i*day}));expect(progression([...rows].reverse(),'p').bestStreak).toBe(5);expect(progression(rows,'p').achievements.find(a=>a.id==='unstoppable')?.unlocked).toBe(true);expect(progression([...rows,result('loss',{endedAt:monday+2.5*day,winner:1})],'p').bestStreak).toBe(3);});
+});

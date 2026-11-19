@@ -14,7 +14,7 @@
 | 0.8.1 | Local profile, XP, ranks, achievements and avatar rewards |
 | 0.8.2 | Themed collections, equipable dice, card backs, sea palettes and titles |
 | 0.8.3 | Piece customization, robber, ambient themes and effects |
-| 0.8.4 | Challenges and advanced achievements |
+| 0.8.4 | Challenges, tracked career metrics, advanced achievements and match rewards |
 | 0.9 | Turbo and performance, stronger AI, end-to-end testing, base-game polish |
 | 1.0 | Complete local base game (human + bots and pass-and-play) |
 | 2.0 | Sailing expansion |
