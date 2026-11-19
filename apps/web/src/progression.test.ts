@@ -1,0 +1,11 @@
+import {describe,it,expect} from 'vitest';
+import {createProfile,readProfile,writeProfile,editProfile,progression,matchXP,rankFor,PROFILE_KEY,avatarIcon} from './progression';
+import type {Result,Store} from './persistence';
+const result=(id:string,extra:Partial<Result>={}):Result=>({id,endedAt:1,players:4,humans:1,winner:0,winnerName:'Founder',rounds:30,difficulty:'hard',...extra});
+const storage=():Store=>{const values=new Map<string,string>();return {getItem:k=>values.get(k)??null,setItem:(k,v)=>{values.set(k,v);}};};
+describe('local progression',()=>{
+ it('awards approved difficulty bonuses and completion XP even on loss',()=>{expect(['easy','normal','hard','expert'].map(d=>matchXP(result(d,{difficulty:d as Result['difficulty']})))).toEqual([150,200,300,450]);expect(matchXP(result('loss',{winner:1}))).toBe(100);expect(matchXP(result('legacy',{difficulty:undefined}))).toBe(100);expect(matchXP(result('local',{humans:2}))).toBe(0);});
+ it('deduplicates results, awards achievement XP once and excludes other profiles',()=>{const one=result('one',{profileId:'p'});const p=progression([one,one,result('other',{profileId:'q'}),result('pass',{humans:2})],'p');expect(p.played).toBe(1);expect(p.matchExperience).toBe(300);expect(p.achievementExperience).toBe(350);expect(p.xp).toBe(650);expect(p.achievements.filter(a=>a.unlocked).length).toBe(3);});
+ it('calculates levels and unlocks cosmetics without affecting game rules',()=>{const p=progression([result('a',{difficulty:'expert',players:6}),result('b')],'p');expect(p.level).toBeGreaterThan(1);expect(p.avatars.find(a=>a.id==='settler')?.unlocked).toBe(true);expect(rankFor(50)).toBe('Legend of Orvane');expect(avatarIcon('king',1)).toBe('👤');});
+ it('persists profile identity, rejects locked avatars and keeps corrupt data',()=>{const s=storage(),p=createProfile('p',1);writeProfile(s,p);expect(readProfile(s)).toEqual(p);expect(()=>editProfile(p,{name:'New',avatar:'king'},[],2)).toThrow();const next=editProfile(p,{name:' New ',avatar:'founder'},[],2);expect(writeProfile(s,next).name).toBe('New');expect(()=>writeProfile(s,createProfile('q',3))).toThrow();s.setItem(PROFILE_KEY,'{"schema":99}');expect(()=>writeProfile(s,p)).toThrow();expect(s.getItem(PROFILE_KEY)).toBe('{"schema":99}');});
+});
