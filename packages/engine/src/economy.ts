@@ -1,3 +1,4 @@
+import {evaluateVictory,type Awards} from './victory';
 import {createDevelopment,beginSeven,applyDevelopment,type Development,type DevelopmentAction} from './development';
 import {applyTrade,type TradeAction,type Offer} from './trade';
 import type {Board} from './index';
@@ -13,8 +14,8 @@ export const COSTS:Record<BuildKind,Resources>={
 };
 export interface GameState {
  players:Player[];settlements:Building[];roads:Road[];bank:Resources;
- active:number;turn:number;phase:'roll'|'action'|'discard'|'robber'|'freeRoad';dice:[number,number]|null;
- lastProduction:Resources[];shortages:Resource[];offer:Offer|null;development:Development;
+ active:number;primary:number;paired:boolean;turn:number;round:number;phase:'roll'|'action'|'discard'|'robber'|'freeRoad'|'finished';dice:[number,number]|null;
+ lastProduction:Resources[];shortages:Resource[];offer:Offer|null;development:Development;awards:Awards;winner:number|null;
 }
 export type GameAction=TradeAction|DevelopmentAction
  | {kind:'roll';playerId:number;dice:[number,number]}
@@ -28,7 +29,8 @@ export function startGame(board:Board,setup:SetupState,random:()=>number=Math.ra
    bank[k]=capacity-setup.players.reduce((sum,p)=>sum+p.resources[k],0);
    if(bank[k]<0)throw new Error('Starting resources exceed bank');
  }
- return {players:setup.players.map(p=>({...p,resources:{...p.resources}})),settlements:setup.settlements.map(s=>({...s,kind:'settlement'})),roads:setup.roads.map(r=>({...r})),bank,active:setup.players[0].id,turn:1,phase:'roll',dice:null,lastProduction:setup.players.map(()=>emptyResources()),shortages:[],offer:null,development:createDevelopment(board,setup.players.map(p=>p.id),random)};
+ const first=setup.order[0];
+ return evaluateVictory(board,{players:setup.players.map(p=>({...p,resources:{...p.resources}})),settlements:setup.settlements.map(s=>({...s,kind:'settlement'})),roads:setup.roads.map(r=>({...r})),bank,active:first,primary:first,paired:false,turn:1,round:1,phase:'roll',dice:null,lastProduction:setup.players.map(()=>emptyResources()),shortages:[],offer:null,development:createDevelopment(board,setup.players.map(p=>p.id),random),awards:{longestRoad:null,largestArmy:null,roadLengths:{}},winner:null});
 }
 export function affordable(resources:Resources,kind:BuildKind):boolean {
  return RESOURCES.every(k=>resources[k]>=COSTS[kind][k]);
@@ -88,6 +90,10 @@ export function produce(board:Board,state:GameState,total:number):Pick<GameState
  return {players,bank,lastProduction,shortages};
 }
 export function applyGame(board:Board,state:GameState,action:GameAction):GameState {
+ if(state.phase==='finished')throw new Error('Game is finished');
+ return evaluateVictory(board,applyAction(board,state,action));
+}
+function applyAction(board:Board,state:GameState,action:GameAction):GameState {
  if(action.kind==='discard'||action.kind==='moveRobber'||action.kind==='buyCard'||action.kind==='playCard'||action.kind==='freeRoad')return applyDevelopment(board,state,action);
  if(action.kind!=='roll'&&action.kind!=='build'&&action.kind!=='end')return applyTrade(board,state,action);
  if(state.offer)throw new Error('Resolve pending offer first');
@@ -100,8 +106,12 @@ export function applyGame(board:Board,state:GameState,action:GameAction):GameSta
  }
  if(state.phase!=='action')throw new Error('Roll before acting');
  if(action.kind==='end'){
-   const i=state.players.findIndex(p=>p.id===state.active);
-   return {...state,active:state.players[(i+1)%state.players.length].id,turn:state.turn+1,phase:'roll',dice:null,lastProduction:state.players.map(()=>emptyResources()),shortages:[],development:{...state.development,played:false}};
+   const i=state.players.findIndex(p=>p.id===state.primary),n=state.players.length;
+   if(n>=5&&!state.paired){
+     return {...state,active:state.players[(i+3)%n].id,paired:true,turn:state.turn+1,phase:'action',development:{...state.development,played:false}};
+   }
+   const primary=state.players[(i+1)%n].id;
+   return {...state,active:primary,primary,paired:false,turn:state.turn+1,round:state.round+1,phase:'roll',dice:null,lastProduction:state.players.map(()=>emptyResources()),shortages:[],development:{...state.development,played:false}};
  }
  if(!legalBuilds(board,state,action.build).includes(action.id))throw new Error('Illegal construction');
  const bank={...state.bank};

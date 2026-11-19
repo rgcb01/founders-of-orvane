@@ -108,3 +108,5 @@ export * from './economy';
 export * from './trade';
 
 export * from './development';
+
+export * from './victory';
