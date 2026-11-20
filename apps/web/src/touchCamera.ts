@@ -30,3 +30,21 @@ export function dragPan(bounds:Bounds,rect:Rect,zoom:number,startPan:Point,start
 }
 export function mid(a:Point,b:Point):Point{return {x:(a.x+b.x)/2,y:(a.y+b.y)/2};}
 export function distance(a:Point,b:Point):number{return Math.hypot(a.x-b.x,a.y-b.y);}
+
+/** Fuzzy targets let a finger land near legal junctions/roads without selecting a tile by accident. */
+export function nearestVertex(points:Map<string,Point>,legal:ReadonlySet<string>,at:Point,radius:number):string|null{
+ let id:string|null=null,best=radius;
+ for(const key of legal){const p=points.get(key);if(!p)continue;const d=distance(p,at);if(d<best){best=d;id=key;}}
+ return id;
+}
+export function segmentDistance(at:Point,a:Point,b:Point):number{
+ const dx=b.x-a.x,dy=b.y-a.y,denom=dx*dx+dy*dy;
+ const t=denom===0?0:Math.max(0,Math.min(1,((at.x-a.x)*dx+(at.y-a.y)*dy)/denom));
+ return distance(at,{x:a.x+t*dx,y:a.y+t*dy});
+}
+export function nearestEdge(edges:readonly {id:string;a:string;b:string}[],points:Map<string,Point>,legal:ReadonlySet<string>,at:Point,radius:number):string|null{
+ let id:string|null=null,best=radius;
+ for(const edge of edges){if(!legal.has(edge.id))continue;const a=points.get(edge.a),b=points.get(edge.b);if(!a||!b)continue;
+   const d=segmentDistance(at,a,b);if(d<best){best=d;id=edge.id;}}
+ return id;
+}

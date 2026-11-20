@@ -12,7 +12,7 @@ import {botDelay,matchEvent,setupEvent,PACES,type Pace} from './matchUX';
 import {gameVisual,setupVisual,visualDuration,type VisualEvent} from './visualEvents';
 import {BoardEffects,EventStage} from './VisualEffects';
 import {cameraTarget,focusPoints} from './camera';
-import {clampZoom,worldAt,panAroundWorld,dragPan,mid,distance,type Point} from './touchCamera';
+import {clampZoom,worldAt,panAroundWorld,dragPan,mid,distance,nearestVertex,nearestEdge,type Point} from './touchCamera';
 import {IncomeFlights} from './IncomeFlights';
 import type {Cue} from './soundEvents';
 import {readLibrary,saveMatch,removeMatch,readPreferences,latestUnfinished,PREF_KEY,SAVE_KEY,DEFAULT_PREFS,type Library,type SavedMatch,type Preferences} from './persistence';
@@ -375,7 +375,15 @@ function App(){
     {view&&coachOpen&&tutorial.enabled&&<TutorialCoach progress={tutorial} lesson={tutorLesson} tip={coachFocus===tutorLesson?.target&&tutorLesson?tutorialTip(tutorLesson):"Try the highlighted action. Your real moves advance the lesson."} onShow={showTutorTarget} onHide={()=>{setCoachOpen(false);setCoachFocus(null);}} onSkip={skipTutorial}/>}
      {view&&<div className="board-event-slot">{view&&visual&&duration>0&&<EventStage key={visualQueue.length+':'+visual.kind+':'+(game?.turn??setup?.step)} event={visual} effectId={loadout.effects} celebrate={visual.playerId<humans&&!reduced} name={view.players.find(p=>p.id===visual.playerId)?.name??'Player'} other={'other' in visual&&visual.other!==null?view.players.find(p=>p.id===visual.other)?.name??'Player':'🏦 Bank'} duration={duration} color={view.players.find(p=>p.id===visual.playerId)?.color??'#ffe39b'}/>}{(!visual||duration===0)&&<div className="event-idle"><span>{humanDecision?'👤':'🎲'}</span><strong>{view.players.find(p=>p.id===(decision??playerId))?.name??'Match'} </strong><span className="muted">{humanDecision?'Your action':paused?'Paused':'Watching the board'}</span></div>}</div>}
     {game&&humanActive&&game.phase==='action'&&<BuildMenu board={board} game={game} build={build} onSelect={k=>{setBuild(k);setSelection(null);}}/>}
-    <svg ref={svg} viewBox={[bounds.x+(bounds.w-viewW)/2+pan.x,bounds.y+(bounds.h-viewH)/2+pan.y,viewW,viewH].join(' ')} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onClickCapture={e=>{if(performance.now()-lastGestureEnd.current<320){e.preventDefault();e.stopPropagation();}}} aria-label="Hexagonal island; drag with one finger, pinch with two to zoom" className={roadMode?"road-mode":vertexMode?"vertex-mode":""}>
+    <svg ref={svg} viewBox={[bounds.x+(bounds.w-viewW)/2+pan.x,bounds.y+(bounds.h-viewH)/2+pan.y,viewW,viewH].join(' ')} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onClickCapture={e=>{
+         if(performance.now()-lastGestureEnd.current<320){e.preventDefault();e.stopPropagation();return;}
+         if(!e.detail||!window.matchMedia('(pointer:coarse)').matches||(!vertexMode&&!roadMode)||!svg.current)return;
+         const rect=svg.current.getBoundingClientRect(),scale=zoom*Math.min(rect.width/bounds.w,rect.height/bounds.h);
+         if(scale<=0)return;
+         const world=worldAt(bounds,rect,zoom,pan,{x:e.clientX,y:e.clientY}),radius=24/scale;
+         const id=vertexMode?nearestVertex(points,validVertices,world,radius):nearestEdge(board.edges,points,validEdges,world,radius);
+         if(id){e.preventDefault();e.stopPropagation();setSelection({kind:vertexMode?'vertex':'edge',id});}
+       }} aria-label="Hexagonal island; drag with one finger, pinch with two to zoom" className={roadMode?"road-mode":vertexMode?"vertex-mode":""}>
       <defs><pattern id="waves" width="36" height="28" patternUnits="userSpaceOnUse"><path d="M0 14 Q9 7 18 14 T36 14" fill="none" stroke="#9ec1c2" opacity=".12"/></pattern></defs>
       <rect x={-10000} y={-10000} width={20000} height={20000} fill="url(#waves)"/>
       {board.tiles.map(t=>{const p=tilePosition(t,R),meta=terrain[t.terrain];return <g key={t.id} role="button" tabIndex={0} aria-label={meta.name+' '+(t.number??'desert')} aria-pressed={activeTile?.id===t.id} onClick={()=>select('tile',t.id)} onKeyDown={e=>keySelect(e,'tile',t.id)} className="tile">
