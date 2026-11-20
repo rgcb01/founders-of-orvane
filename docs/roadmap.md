@@ -74,3 +74,8 @@ Four explicit policies, weighted settlement/resource planning, expert opening lo
 
 ## Advanced AI (v0.9.1)
 Deterministic per-board/seat personalities (Builder, Merchant, Expansionist, Warlord) alter advanced resource goals and trade tendencies; the same seat retains its style after resume. Expert adds a combined road/settlement resource goal, public threat/production-weighted trade partner choice, two-card offers and two-bank-exchange lookahead. The policy still uses masked opponent hands and never reads hidden deck order. Corrected offer limits for Normal/Expert. Benchmark: 200 seeded matches with seat rotation and independent dice/deck RNG, comparing v0.9.0 frozen expert to current expert on 4/6-player maps plus mixed tiers. Heuristic, not full future-turn search; performance on phones and statistical confidence need further validation.
+
+## Performance and polish (v0.9.2)
+Bot decisions use a reusable module Web Worker with masked state, request IDs, timeout, cancellation and main-thread rule validation; compatibility fallback remains available. Turbo removes artificial wait and bypasses visual queues while preserving normal/relaxed settings and checkpoints. Portable versioned JSON backups explicitly replace local profile/library/preferences after validation and confirmation; best-effort rollback on storage failure, no cloud or encryption. Full future-turn search and real iOS testing remain pending.
+
+Browser smoke tests run against production preview in Chromium desktop and WebKit iPhone viewport: real Worker, offline cache, save/resume and portable backup transfer. This is browser emulation, not physical iPhone verification.

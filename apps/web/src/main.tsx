@@ -1,6 +1,6 @@
 import {StrictMode,useMemo,useRef,useState,useEffect,useLayoutEffect,type KeyboardEvent,type PointerEvent} from 'react';
 import {createRoot} from 'react-dom/client';
-import {generateBoard,tilePosition,vertexPosition,type BoardSize,type Terrain,createSetup,activePlayer,legalSettlements,legalRoads,applySetup,type PlayerCount,type SetupState,startGame,applyGame,legalBuilds,rollDice,RESOURCES,type GameState,type BuildKind,freeRoadSites,playerScore,chooseFirstPlayer,chooseSetupAction,chooseBotAction,decisionPlayer,type Difficulty} from '@orvane/engine';
+import {generateBoard,tilePosition,vertexPosition,type BoardSize,type Terrain,createSetup,activePlayer,legalSettlements,legalRoads,applySetup,type PlayerCount,type SetupState,startGame,applyGame,legalBuilds,rollDice,RESOURCES,type GameState,type BuildKind,freeRoadSites,playerScore,chooseFirstPlayer,decisionPlayer,type Difficulty} from '@orvane/engine';
 import './style.css';
 import {DevelopmentPanel} from './DevelopmentPanel';
 import {TradePanel} from './TradePanel';
@@ -20,7 +20,9 @@ import {effectiveLoadout,DEFAULT_LOADOUT,cosmetic} from './cosmetics';
 import {EMPTY_METRICS} from './matchMetrics';
 import {MatchRewards} from './ChallengePanel';
 import {ProfileScreen} from './ProfileScreen';
+import {type Backup} from './backup';
 import {SavedGames} from './SavedGames';
+import {BotClient} from './botClient';
 import {usePwa} from './pwa';
 import {HomeMenu,Guide,ExpansionRoadmap,PlayerStrip,ResourceHand,BuildMenu,requiredPanel,visiblePanel,type Panel} from './GameUI';
 
@@ -66,6 +68,8 @@ function App(){
  const [botError,setBotError]=useState('');
  const [activity,setActivity]=useState<string[]>([]);
  const attempts=useRef({turn:0,count:0});
+ const botClient=useRef<BotClient|null>(null);
+ useEffect(()=>()=>{botClient.current?.dispose();botClient.current=null;},[]);
  const [setup,setSetup]=useState<SetupState|null>(null);
  const [game,setGame]=useState<GameState|null>(null);
  const [build,setBuild]=useState<BuildKind>('road');
@@ -110,6 +114,11 @@ function App(){
  };
  const leave=()=>{if(storageError&&!window.confirm('Saving failed. Leave anyway?'))return false;setMatchId(null);setSavedAt(null);setMenu('home');setGame(null);setSetup(null);setSelection(null);setBotError('');setActivity([]);setVisualQueue([]);setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};return true;};
  const deleteSave=(id:string)=>{try{setLibrary(removeMatch(localStorage,id));setStorageError('');}catch(e){setStorageError(e instanceof Error?e.message:'Could not delete saved game');}};
+ const restoreLocal=(b:Backup)=>{
+   const p=b.preferences;setLibrary(b.library);setProfile(b.profile);setProfileError('');setStorageError('');
+   setCount(p.count);setHumans(p.humans);setDifficulty(p.difficulty);setPace(p.pace);setFollow(p.follow);setSize(p.count<=4?'standard':'extended');
+   if(!b.profile){try{setProfile(writeProfile(localStorage,createProfile(crypto.randomUUID(),Date.now())));}catch(e){setProfileError(e instanceof Error?e.message:'Profile unavailable');}}
+ };
  const latest=latestUnfinished(library);
  const current=view?.players.find(p=>p.id===playerId);
  const myHand=view?.players.find(p=>p.id===showHand);
@@ -118,7 +127,7 @@ function App(){
  const openPanel=(p:Panel)=>{setPanel(p);requestAnimationFrame(()=>document.getElementById('action-panel')?.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'}));};
  useEffect(()=>{
    const old=previous.current;previous.current={game,setup};
-   if(!game&&!setup)setVisualQueue([]);
+   if(!game&&!setup||pace==='turbo')setVisualQueue([]);
    else {const next=game?gameVisual(board,old.game,game,humans===1):setupVisual(old.setup,setup);if(next.length)setVisualQueue(q=>[...q,...next]);}
    const event=game?matchEvent(old.game,game,humans):setupEvent(old.setup,setup);
    if(event)setActivity(items=>[event,...items].slice(0,24));
@@ -130,7 +139,7 @@ function App(){
    audio.play(humanPrompt&&cue==='turn'?'turn':cue,!humanPrompt&&cue!=='victory'&&cue!=='defeat'&&oldActor!==null&&oldActor>=humans);
  },[game,setup,humans,board]);
  useEffect(()=>{const media=window.matchMedia('(prefers-reduced-motion: reduce)');const change=()=>setReduced(media.matches);media.addEventListener('change',change);const visibility=()=>setHidden(document.hidden);document.addEventListener('visibilitychange',visibility);return()=>{media.removeEventListener('change',change);document.removeEventListener('visibilitychange',visibility);};},[]);
- useEffect(()=>{if(!visual||hidden)return;const timer=window.setTimeout(()=>setVisualQueue(q=>q.slice(1)),duration);return()=>window.clearTimeout(timer);},[visual,duration,hidden]);
+ useEffect(()=>{if(!visual||hidden)return;if(pace==='turbo'){setVisualQueue([]);return;}const timer=window.setTimeout(()=>setVisualQueue(q=>q.slice(1)),duration);return()=>window.clearTimeout(timer);},[visual,duration,hidden,pace]);
  const legal=game&&humanActive?legalBuilds(board,game,build):[];
  const validVertices=new Set(game?(build==='road'?[]:legal):setup&&humanDecision?legalSettlements(board,setup):[]);
  const validEdges=new Set(game?(game.phase==='freeRoad'&&humanActive?freeRoadSites(board,game):build==='road'?legal:[]):setup&&humanDecision?legalRoads(board,setup):[]);
@@ -141,25 +150,29 @@ function App(){
  const confirmPlacement=()=>{if(!humanDecision||!setup||!selection||!selectionLegal||playerId===null||selection.kind==='tile')return;setSetup(applySetup(board,setup,{kind:selection.kind==='vertex'?'settlement':'road',id:selection.id,playerId}));setSelection(null);};
  useEffect(()=>{
    if(!botBusy||visual||hidden||paused&&!stepRequested)return;
-   const timer=window.setTimeout(()=>{
+   let cancelled=false,started=false;
+   const client=botClient.current??(botClient.current=new BotClient());
+   const timer=window.setTimeout(async()=>{
+     started=true;
      try{
-       if(stepRequested)setStepRequested(false);
        if(game){
-         if(attempts.current.turn!==game.turn)attempts.current={turn:game.turn,count:0};
-         const action=chooseBotAction(board,game,{difficulty,offers:attempts.current.count});
-         if(!action)return;
-         if(action.kind==='offer'||action.kind==='counter')attempts.current.count++;
-         const next=applyGame(board,game,action);
+         const offers=attempts.current.turn===game.turn?attempts.current.count:0;
+         const answer=await client.request({kind:'game',board,state:game,difficulty,offers});
+         if(cancelled||answer.kind!=='game'||!answer.action)return;
+         const action=answer.action;
+         const next=applyGame(board,game,action); // main thread is authoritative
+         attempts.current={turn:game.turn,count:offers+Number(action.kind==='offer'||action.kind==='counter')};
          setGame(next);
-
        }else if(setup){
-         const action=chooseSetupAction(board,setup,{difficulty});
-         if(action)setSetup(applySetup(board,setup,action));
+         const answer=await client.request({kind:'setup',board,state:setup,difficulty});
+         if(cancelled||answer.kind!=='setup'||!answer.action)return;
+         setSetup(applySetup(board,setup,answer.action));
        }
+       if(stepRequested)setStepRequested(false);
        setSelection(null);
-     }catch(error){setBotError(error instanceof Error?error.message:'Bot action failed');}
+     }catch(error){if(!cancelled){setStepRequested(false);setBotError(error instanceof Error?error.message:'Bot action failed');}}
    },botDelay(pace,game,stepRequested));
-   return ()=>window.clearTimeout(timer);
+   return ()=>{cancelled=true;window.clearTimeout(timer);if(started)client.cancel();};
  },[board,game,setup,botBusy,difficulty,pace,paused,stepRequested,visual,hidden]);
  useEffect(()=>{
    if(!visual||hidden||heard.current===visual)return;
@@ -209,13 +222,13 @@ function App(){
  }
  const viewW=bounds.w/zoom,viewH=bounds.h/zoom;
  return <main className={view?"in-match":""} data-dice={loadout.dice} data-card-back={loadout.cardBack} data-board-theme={loadout.board}>
-  <header><div><p className="eyebrow">ORVANE / FIELD NOTES</p><h1>Founders of Orvane</h1><p className="subtitle">Build. Trade. Explore. Prosper.</p></div><div className="header-actions"><span className="version">v0.9.1</span><button aria-label={audio.settings.enabled?"Mute sound":"Enable sound"} aria-pressed={audio.settings.enabled} onClick={audio.toggle}>{audio.settings.enabled?"🔊":"🔇"}</button>{view&&<button aria-expanded={guideOpen} aria-label="Game guide" onClick={()=>setGuideOpen(v=>!v)}>📖</button>}<button aria-expanded={soundOpen} onClick={()=>setSoundOpen(v=>!v)}>⚙️</button></div></header>
+  <header><div><p className="eyebrow">ORVANE / FIELD NOTES</p><h1>Founders of Orvane</h1><p className="subtitle">Build. Trade. Explore. Prosper.</p></div><div className="header-actions"><span className="version">v0.9.2</span><button aria-label={audio.settings.enabled?"Mute sound":"Enable sound"} aria-pressed={audio.settings.enabled} onClick={audio.toggle}>{audio.settings.enabled?"🔊":"🔇"}</button>{view&&<button aria-expanded={guideOpen} aria-label="Game guide" onClick={()=>setGuideOpen(v=>!v)}>📖</button>}<button aria-expanded={soundOpen} onClick={()=>setSoundOpen(v=>!v)}>⚙️</button></div></header>
   {soundOpen&&<section className="setup-bar sound-settings"><label>🔊 Effects volume <input aria-label="Effects volume" type="range" min={0} max={100} value={Math.round(audio.settings.volume*100)} onChange={e=>audio.setVolume(Number(e.target.value)/100)}/></label><label><input type="checkbox" checked={audio.settings.bots} onChange={audio.toggleBots}/> Bot sounds</label><label><input type="checkbox" checked={audio.settings.music} onChange={audio.toggleMusic}/> 🎵 Ambient music</label><label>Music volume <input aria-label="Music volume" type="range" min={0} max={100} value={Math.round(audio.settings.musicVolume*100)} onChange={e=>audio.setMusicVolume(Number(e.target.value)/100)}/></label>{typeof navigator.vibrate==='function'&&<label><input type="checkbox" checked={audio.settings.haptic} onChange={audio.toggleHaptic}/> Haptics</label>}<button onClick={()=>{void audio.unlock().then(()=>audio.play('trade'));}}>Test sound</button><span className="muted">{audio.ready?'Audio ready':'Tap to activate audio'}</span></section>}
   {storageError&&<p className="storage-warning" role="alert">⚠️ {storageError} · Progress may not be saved.</p>}
   {profileError&&<p className="storage-warning" role="alert">⚠️ {profileError}</p>}
   {!view&&menu==='home'&&<HomeMenu onProfile={()=>setMenu('profile')} profileLabel={profile&&progress?avatarIcon(profile.avatar,progress.level)+' '+profile.name+' · Lv. '+progress.level+' · '+cosmetic(loadout.title).name:undefined} onContinue={latest?()=>resume(latest):undefined} onSaves={()=>setMenu('saves')} onPlay={()=>setMenu('setup')} onGuide={()=>setMenu('guide')} onSettings={()=>setSoundOpen(v=>!v)} onExpansions={()=>setMenu('expansions')}/>}
   {!view&&menu==='profile'&&(profile?<ProfileScreen key={profile.id} profile={profile} results={library.results} onSave={updateProfile} onBack={()=>setMenu('home')}/>:<section className="panel"><button onClick={()=>setMenu('home')}>← Main menu</button><p>Local profile unavailable. You can still play.</p></section>)}
-  {!view&&menu==='saves'&&<SavedGames library={library} onResume={resume} onDelete={deleteSave} onBack={()=>setMenu('home')}/>}
+  {!view&&menu==='saves'&&<SavedGames onRestore={restoreLocal} library={library} onResume={resume} onDelete={deleteSave} onBack={()=>setMenu('home')}/>}
   {!view&&menu==='home'&&<section className="setup-bar install-bar"><div><strong>{pwa.installed?'📱 Installed':pwa.offline?'🛜 Offline':pwa.ready?'✓ Offline ready':'📱 Play anywhere'}</strong><p className="muted">{pwa.error?'Offline setup failed. Reload when connected.':pwa.installed?'Open Orvane from your home screen.':pwa.canInstall?'Install for quick access.':'On iPhone: Safari → Share → Add to Home Screen.'}</p></div>{pwa.canInstall&&!pwa.installed&&<button onClick={()=>{void pwa.install().catch(()=>{});}}>Install</button>}</section>}
   {!view&&menu==='guide'&&<section className="panel"><button onClick={()=>setMenu('home')}>← Main menu</button><h2>📖 How to play</h2><Guide/></section>}
   {!view&&menu==='expansions'&&<><button onClick={()=>setMenu('home')}>← Main menu</button><ExpansionRoadmap/></>}

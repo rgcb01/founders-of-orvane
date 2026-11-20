@@ -19,3 +19,6 @@ Six additional slots per collection: settlement, city, road, robber, ambient mus
 
 ## Challenges and achievements (0.8.4)
 Optional per-match metrics accumulated from consecutive persisted game snapshots, using actual dice production, accepted trades, bank exchanges, new pieces, longest route and largest army. Initial pieces are excluded from build counts. Partial pre-upgrade matches only count observed actions; old completed matches remain unchanged. Metrics are saved with the checkpoint and frozen on completion. Five repeatable UTC daily/weekly objectives credit on match completion and derive permanent XP from unique result IDs and period keys. No streak penalties for missing days. Eight advanced achievements, career stats and historical per-match reward summaries. All data local, no online verification; device time is not authoritative. No game rule changes.
+
+## Portable backup (0.9.2)
+Versioned JSON includes profile UUID, loadout, match checkpoints, historical results and match preferences. Import is explicit replacement, not merge; validate before writes and attempt rollback on quota errors. Audio preferences remain device-local. Backup contains private match state and is unencrypted. No backend or account.

@@ -2,7 +2,7 @@ import {activePlayer,RESOURCES,type GameState,type SetupState} from '@orvane/eng
 import {resourceEmoji} from './resources';
 
 export type Pace='relaxed'|'normal'|'turbo';
-export const PACES:Record<Pace,{label:string;delay:number;rollDelay:number}>={relaxed:{label:'Relaxed',delay:1400,rollDelay:2200},normal:{label:'Normal',delay:700,rollDelay:1200},turbo:{label:'Turbo',delay:35,rollDelay:70}};
+export const PACES:Record<Pace,{label:string;delay:number;rollDelay:number}>={relaxed:{label:'Relaxed',delay:1400,rollDelay:2200},normal:{label:'Normal',delay:700,rollDelay:1200},turbo:{label:'Turbo',delay:0,rollDelay:0}};
 export function botDelay(pace:Pace,game:GameState|null,stepping=false):number{
  if(stepping)return 0;
  return game?.dice&&game.phase==='action'?PACES[pace].rollDelay:PACES[pace].delay;
