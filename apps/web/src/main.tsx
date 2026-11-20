@@ -389,7 +389,7 @@ function App(){
       <rect x={-10000} y={-10000} width={20000} height={20000} fill="url(#waves)" className={reduced||hidden||pace==='turbo'||paused?"sea-texture":"sea-texture sea-breathe"} pointerEvents="none"/>
       {board.tiles.map(t=>{const p=tilePosition(t,R),meta=terrain[t.terrain];return <g key={t.id} role="button" tabIndex={0} aria-label={meta.name+' '+(t.number??'desert')} aria-pressed={activeTile?.id===t.id} onClick={()=>select('tile',t.id)} onKeyDown={e=>keySelect(e,'tile',t.id)} className="tile">
         <polygon points={t.vertices.map(id=>{const v=points.get(id)!;return v.x+','+v.y;}).join(' ')} fill={meta.color} stroke={activeTile?.id===t.id?'#fff4c9':'#3c615c'} strokeWidth={activeTile?.id===t.id?4:1.7}/>
-        <TerrainArt terrain={t.terrain} p={p}/>
+        <TerrainArt terrain={t.terrain} p={p} harvesting={!reduced&&duration>0&&visual?.kind==='production'&&visual.tiles.includes(t.id)} duration={duration}/>
         {t.number!==null&&<><circle cx={p.x} cy={p.y+13} r={16} fill="#203b39" opacity=".20" pointerEvents="none"/><circle cx={p.x} cy={p.y+11} r={16} fill="#f4f0e5" stroke="#64736b" strokeWidth="1"/><text x={p.x} y={p.y+12} className={'token '+(t.number===6||t.number===8?'red':'')}>{t.number}</text><text x={p.x} y={p.y+37} className="pips">{'•'.repeat(6-Math.abs(7-t.number))}</text></>}
         {game?.development.robber===t.id&&!(visual?.kind==='robber'&&duration>0&&!reduced)&&<RobberArt p={{x:p.x+24,y:p.y-5}} styleId={loadout.robber}/>}
       </g>;})}
