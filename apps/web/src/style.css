@@ -314,3 +314,11 @@ main.front-menu{max-width:none;width:100%;min-height:100dvh;margin:0;padding:0;g
 }
 @media(max-width:420px){.in-match .tutorial-coach{width:min(225px,68%);bottom:151px;max-height:218px}.in-match .coach-topline{font-size:.61rem;letter-spacing:0}.in-match .coach-checklist:not([open]){display:none}}
 @media(prefers-reduced-motion:reduce){.in-match .coach-track span{transition:none}}
+
+/* Mobile coach must stay in the viewport. Short board panels can otherwise
+   clip its close button underneath the player strip on iOS/WebKit. */
+@media(max-width:900px){
+ .in-match .tutorial-coach{position:fixed;right:8px;bottom:calc(126px + env(safe-area-inset-bottom));top:auto;width:min(240px,63vw);max-height:min(180px,calc(100dvh - 355px));z-index:24;overflow:auto}
+ .in-match .immersive-layout.drawer-active .tutorial-coach{display:none}
+}
+@media(max-width:420px){.in-match .tutorial-coach{right:7px;bottom:calc(124px + env(safe-area-inset-bottom));width:min(225px,65vw);max-height:min(172px,calc(100dvh - 355px))}}
