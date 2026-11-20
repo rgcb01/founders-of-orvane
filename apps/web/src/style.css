@@ -475,3 +475,5 @@ html:has(main.in-match),body:has(main.in-match){height:100%;overflow:hidden;over
 
 /* Lift a card by touch or keyboard without triggering a game action. */
 .resource-hand.fan-hand{height:112px}.fan-card{top:24px;appearance:none;cursor:pointer;outline-offset:2px;transition:left .22s ease,transform .22s ease,box-shadow .22s ease}.fan-card:hover{top:24px}.fan-card.raised{box-shadow:0 5px 14px #0008;border-color:#f7dc95}.fan-card:focus-visible{outline:2px solid #f7dc95;z-index:301!important}.fan-empty-target{top:52px}@media(max-width:780px){.resource-hand.fan-hand{height:96px}.fan-card,.fan-card:hover{top:22px}}@media(prefers-reduced-motion:reduce){.fan-card{transition:none}}
+
+.fan-card{touch-action:pan-x}.drag-resource-ghost{position:fixed;z-index:10000;pointer-events:none;width:54px;height:74px;transform:translate(-50%,-65%) rotate(-6deg);padding:2px;background:#eee4cf;border-radius:6px;box-shadow:0 8px 18px #0007}[data-card-drop]{outline-offset:-2px}.build-option[data-card-drop]:hover,.trade-panel [data-card-drop]:hover{outline:1px dashed #e6c886}

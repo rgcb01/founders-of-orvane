@@ -1,5 +1,5 @@
-import {useState,useEffect} from 'react';
-import {botPersonality,PERSONALITIES,RESOURCES,COSTS,legalBuilds,playerScore,VICTORY_TARGET,type Board,type GameState,type SetupState,type BuildKind,type Resources} from '@orvane/engine';
+import {useState,useEffect,useRef} from 'react';
+import {botPersonality,PERSONALITIES,RESOURCES,COSTS,legalBuilds,playerScore,VICTORY_TARGET,type Board,type GameState,type SetupState,type BuildKind,type Resources,type Resource} from '@orvane/engine';
 import {resourceName} from './resources';
 import {ResourceIcon,ResourceFace} from './ResourceArt';
 import {pendingIncome,type VisualEvent} from './visualEvents';
@@ -18,16 +18,19 @@ export function visiblePanel(game:GameState|null,humanDecision:boolean,selected:
  if(selected==='cards'&&game.offer)return 'info';
  return selected;
 }
-export function ResourceHand({resources,queue,solo,desktop=false}:{resources:Resources;queue:VisualEvent[];solo:boolean;desktop?:boolean}){
+export function ResourceHand({resources,queue,solo,desktop=false,canDrag=false}:{resources:Resources;queue:VisualEvent[];solo:boolean;desktop?:boolean;canDrag?:boolean}){
+ const gesture=useRef<{id:number;x:number;y:number;resource:Resource;drag:boolean}|null>(null);
+ const [drag,setDrag]=useState<{resource:Resource;x:number;y:number}|null>(null);
+ const suppressClick=useRef(false);
  const [selected,setSelected]=useState<string|null>(null);
  const cards=RESOURCES.flatMap(resource=>Array.from({length:Math.max(0,resources[resource]-(solo?pendingIncome(queue,resource):0))},(_,index)=>({resource,index})));
  const selectedCard=cards.find(c=>c.resource+ c.index===selected);
  useEffect(()=>{if(selected&&!selectedCard)setSelected(null);},[selected,selectedCard]);
  return <div className={'resource-hand hand-strip fan-hand'+(desktop?' desktop-hand':'')} aria-label="Your resources">
   <div className="fan-scroll"><div className="fan-deck" style={{width:`max(100%, ${64+Math.max(0,cards.length-1)*13}px)`}}>
-   {cards.map(({resource,index},i)=>{const offset=i-(cards.length-1)/2;const t=cards.length>1?offset/((cards.length-1)/2):0;const id=resource+index,raised=selected===id;return <button type="button" key={id} className={'fan-card'+(raised?' raised':'')} aria-pressed={raised} onClick={()=>setSelected(v=>v===id?null:id)} onKeyDown={e=>{if(e.key==='Escape')setSelected(null);}} data-income-target={resource} aria-label={resourceName[resource]} title={resourceName[resource]} style={{left:`calc(50% + ${offset*13}px)`,transform:`translateX(-50%) translateY(${(raised?-18:Math.abs(t)*Math.abs(t)*9)}px) rotate(${raised?0:t*12}deg) scale(${raised?1.12:1})`,zIndex:raised?300:i+1}}><ResourceFace resource={resource}/></button>;})}
+   {cards.map(({resource,index},i)=>{const offset=i-(cards.length-1)/2;const t=cards.length>1?offset/((cards.length-1)/2):0;const id=resource+index,raised=selected===id;return <button type="button" key={id} className={'fan-card'+(raised?' raised':'')} aria-pressed={raised} onClick={()=>{if(suppressClick.current){suppressClick.current=false;return;}setSelected(v=>v===id?null:id)}} onPointerDown={e=>{suppressClick.current=false;if(canDrag&&e.button===0)gesture.current={id:e.pointerId,x:e.clientX,y:e.clientY,resource,drag:false};}} onPointerMove={e=>{const g=gesture.current;if(!g||g.id!==e.pointerId)return;if(!g.drag&&g.y-e.clientY>14&&Math.abs(e.clientY-g.y)>Math.abs(e.clientX-g.x)){g.drag=true;e.currentTarget.setPointerCapture(e.pointerId);}if(g.drag)setDrag({resource:g.resource,x:e.clientX,y:e.clientY});}} onPointerUp={e=>{const g=gesture.current;gesture.current=null;setDrag(null);if(!canDrag||!g?.drag||g.id!==e.pointerId)return;suppressClick.current=true;const target=document.elementFromPoint(e.clientX,e.clientY)?.closest<HTMLElement>('[data-card-drop]');if(target)target.dispatchEvent(new CustomEvent('orvane-card-drop',{bubbles:true,detail:g.resource}));}} onPointerCancel={()=>{gesture.current=null;setDrag(null);}} onKeyDown={e=>{if(e.key==='Escape')setSelected(null);}} data-income-target={resource} aria-label={resourceName[resource]} title={resourceName[resource]} style={{left:`calc(50% + ${offset*13}px)`,transform:`translateX(-50%) translateY(${(raised?-18:Math.abs(t)*Math.abs(t)*9)}px) rotate(${raised?0:t*12}deg) scale(${raised?1.12:1})`,zIndex:raised?300:i+1}}><ResourceFace resource={resource}/></button>;})}
    {RESOURCES.filter(k=>!cards.some(c=>c.resource===k)).map(k=><span key={k} className="fan-empty-target" data-income-target={k} aria-hidden="true"/>)}
-  </div></div>
+  </div></div>{drag&&<span className="drag-resource-ghost" aria-hidden="true" style={{left:drag.x,top:drag.y}}><ResourceFace resource={drag.resource}/></span>}
  </div>;
 }
 export function PlayerStrip({view,game,active,humans,showHand,soloAvatar,soloTitle,seed}:{seed?:string;soloTitle?:string;soloAvatar?:string;view:GameState|SetupState;game:GameState|null;active:number|null;humans:number;showHand:number|null}){
@@ -35,7 +38,9 @@ export function PlayerStrip({view,game,active,humans,showHand,soloAvatar,soloTit
 }
 export function BuildMenu({board,game,build,onSelect}:{board:Board;game:GameState;build:BuildKind;onSelect:(k:BuildKind)=>void}){
  const actor=game.players.find(p=>p.id===game.active)!;
- return <section className="build-menu" id="construction" tabIndex={-1} data-coach-target="build" aria-label="Construction menu">{(Object.keys(BUILD_ART) as BuildKind[]).map(k=>{const n=legalBuilds(board,game,k).length;return <button key={k} className="build-option" aria-pressed={build===k} onClick={()=>onSelect(k)}><span className="build-title"><span>{BUILD_ART[k].icon}</span> {BUILD_ART[k].label}</span><span className="build-cost">{RESOURCES.filter(r=>COSTS[k][r]>0).map(r=><span key={r} className={actor.resources[r]<COSTS[k][r]?'missing-cost':''} title={resourceName[r]}><ResourceIcon resource={r}/>{COSTS[k][r]}</span>)}</span><small>{n?n+' sites':'Not available'}</small></button>;})}</section>;
+ const menu=useRef<HTMLElement|null>(null);
+ useEffect(()=>{const el=menu.current;if(!el)return;const drop=(e:Event)=>{const resource=(e as CustomEvent<Resource>).detail;const kind=(e.target as HTMLElement).closest<HTMLElement>('[data-build-drop]')?.dataset.buildDrop as BuildKind|undefined;if(kind&&RESOURCES.includes(resource)&&COSTS[kind][resource]>0&&actor.resources[resource]>0&&legalBuilds(board,game,kind).length)onSelect(kind);};el.addEventListener('orvane-card-drop',drop);return()=>el.removeEventListener('orvane-card-drop',drop);},[board,game,actor,onSelect]);
+ return <section className="build-menu" ref={menu} id="construction" tabIndex={-1} data-coach-target="build" aria-label="Construction menu">{(Object.keys(BUILD_ART) as BuildKind[]).map(k=>{const n=legalBuilds(board,game,k).length;return <button key={k} className="build-option" data-card-drop="" data-build-drop={k} aria-pressed={build===k} onClick={()=>onSelect(k)}><span className="build-title"><span>{BUILD_ART[k].icon}</span> {BUILD_ART[k].label}</span><span className="build-cost">{RESOURCES.filter(r=>COSTS[k][r]>0).map(r=><span key={r} className={actor.resources[r]<COSTS[k][r]?'missing-cost':''} title={resourceName[r]}><ResourceIcon resource={r}/>{COSTS[k][r]}</span>)}</span><small>{n?n+' sites':'Not available'}</small></button>;})}</section>;
 }
 export function Guide({phase}:{phase?:string}){
  const steps=[['🏠','Settle','Place two settlements and adjoining roads. Choose productive hexes with varied resources.'],['🎲','Produce','Roll the dice. Matching numbered tiles supply adjacent buildings; cities collect twice as much.'],['🛤️','Expand','Select a construction card, then a highlighted board site. Confirm to pay and build.'],['⚓','Trade','Exchange with the bank or offer resources to another player. Ports improve your rate.'],['🥷','Robber','A seven triggers discards and robber movement. Select a new hex and a victim if available.'],['🏆','Win','Reach ten points through buildings, hidden victory cards and awards.']];
