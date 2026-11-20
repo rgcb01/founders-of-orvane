@@ -4,8 +4,13 @@ import {RESOURCES,type Resource} from '@orvane/engine';
 import {ResourceFace} from './ResourceArt';
 import type {VisualEvent} from './visualEvents';
 const pipPositions:Record<number,number[]>={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+function DieFace({value,face}:{value:number;face:string}){
+ return <span className={'cube-face cube-'+face}>{Array.from({length:9},(_,j)=><i key={j} className={pipPositions[value].includes(j)?'pip on':'pip'}/>)}</span>;
+}
 export function DicePair({dice,duration}:{dice:[number,number];duration:number}){
- return <div className="dice-table" aria-label={'Dice '+dice.join(' + ')+' = '+(dice[0]+dice[1])}>{dice.map((n,i)=><div className={'physical-die die-'+i} key={i} style={{animationDuration:duration+'ms'}} aria-hidden="true">{Array.from({length:9},(_,j)=><i key={j} className={pipPositions[n].includes(j)?'pip on':'pip'}/>)}</div>)}<b className="dice-total" style={{animationDuration:duration+'ms'}}>{dice[0]+dice[1]}</b></div>;
+ return <div className="dice-table physical-table" aria-label={'Dice '+dice.join(' + ')+' = '+(dice[0]+dice[1])}>
+ {dice.map((n,i)=>{const side=[1,2,3,4,5,6].filter(v=>v!==n&&v!==7-n);return <div className={'dice-landing landing-'+i} key={i} aria-hidden="true" style={{animationDuration:duration+'ms'}}><span className="dice-shadow" style={{animationDuration:duration+'ms'}}/><div className={'physical-die cube-die die-'+i} style={{animationDuration:duration+'ms'}}><DieFace value={n} face="front"/><DieFace value={7-n} face="back"/><DieFace value={side[0]} face="right"/><DieFace value={7-side[0]} face="left"/><DieFace value={side.find(v=>v!==side[0]&&v!==7-side[0])!} face="top"/><DieFace value={7-side.find(v=>v!==side[0]&&v!==7-side[0])!} face="bottom"/></div></div>})}
+ <b className="dice-total" style={{animationDuration:duration+'ms'}}>{dice[0]+dice[1]}</b></div>;
 }
 function TransferCards({cards,hidden=false,incoming=false,duration,proposal=false}:{cards:Resource[];hidden?:boolean;incoming?:boolean;duration:number;proposal?:boolean}){
  const items=hidden?[null]:cards;
