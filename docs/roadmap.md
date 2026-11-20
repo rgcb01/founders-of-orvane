@@ -94,3 +94,6 @@ Tutorial progress is an optional versioned field in each existing save and backu
 
 ## 1.0 Release gate (v0.9.6)
 Automated full-match audit covers 3–6 seats, up to five local human-seat proxies, rotating deterministic seeds/difficulties, game completion, resource and piece conservation, hidden victory threshold and exact state replay across repeated local save/read checkpoints. Browser smoke adds two-human six-player setup and tutorial milestones. These checks improve confidence but do not replace device and human playtesting; see docs/release-audit.md for the open manual acceptance matrix. No graphics expansion or backend work in the release freeze.
+
+## 0.9.7 stabilization
+Fix local pass-and-play turn handoff privacy so a different human hand is never rendered before explicit confirmation. Keep solo unchanged; prevent keyboard shortcuts while awaiting ready. Add functional browser and unit regression coverage, plus manual QA acceptance notes. No new gameplay features. Device-specific physical touch/privacy QA is still required for 1.0 RC.
