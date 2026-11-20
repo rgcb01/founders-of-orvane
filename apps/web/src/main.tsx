@@ -106,8 +106,11 @@ function App(){
    // Revoke permission before paint when the device changes hands.
    if(previousDecision.current===decision)return;
    previousDecision.current=decision;
-   setRevealedSeat(null);setSelection(null);setDrawerOpen(false);
- },[decision]);
+   if(humans>1){
+     setRevealedSeat(null);
+     if(decision!==null&&decision<humans){setSelection(null);setDrawerOpen(false);}
+   }
+ },[decision,humans]);
  useEffect(()=>{
    const load=()=>{try{const old=readProfile(localStorage);const next=old??writeProfile(localStorage,createProfile(crypto.randomUUID(),Date.now()));setProfile(next);setProfileError('');}catch(e){setProfileError(e instanceof Error?e.message:'Local profile unavailable');}};
    load();const changed=(e:StorageEvent)=>{if(e.key===PROFILE_KEY)load();};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);
