@@ -91,28 +91,28 @@ async function iphoneTouch(browser){
   await page.goto(url);await start(page);
   const coach=page.getByRole('complementary',{name:'Interactive tutorial'});
   if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
-  const svg=page.locator('.board-panel svg'),box=await page.locator('.board-panel').boundingBox();
+  const svg=page.locator('.board-panel [data-board-root]'),box=await page.locator('.board-panel').boundingBox();
   assert.ok(box&&box.height>280,'portrait island must have ample playing space');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,'portrait has no horizontal document overflow');
   const initial=Number((await svg.getAttribute('viewBox')).split(' ')[2]);
   // Real app PointerEvent handlers: two simultaneous pointers for zoom,
   // then single-pointer movement to pan without scrolling the document.
   await page.evaluate(()=>{
-   const el=document.querySelector('.board-panel svg'),r=el.getBoundingClientRect();
+   const el=document.querySelector('.board-panel [data-board-root]'),r=el.getBoundingClientRect();
    const cx=r.left+r.width/2,cy=r.top+r.height/2;
    const ptr=(type,id,x,y)=>el.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:id,pointerType:'touch',isPrimary:id===11,button:0,buttons:1,clientX:x,clientY:y}));
    ptr('pointerdown',11,cx-60,cy);ptr('pointerdown',12,cx+60,cy);
    ptr('pointermove',11,cx-115,cy);ptr('pointermove',12,cx+115,cy);
    ptr('pointerup',11,cx-115,cy);ptr('pointerup',12,cx+115,cy);
   });
-  await page.waitForFunction(initial=>Number(document.querySelector('.board-panel svg').getAttribute('viewBox').split(' ')[2])<initial*.8,initial);
+  await page.waitForFunction(initial=>Number(document.querySelector('.board-panel [data-board-root]').getAttribute('viewBox').split(' ')[2])<initial*.8,initial);
   const before=(await svg.getAttribute('viewBox')).split(' ').map(Number);
   await page.evaluate(()=>{
-   const el=document.querySelector('.board-panel svg'),r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+   const el=document.querySelector('.board-panel [data-board-root]'),r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
    const ptr=(type,x,y)=>el.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:33,pointerType:'touch',isPrimary:true,button:0,buttons:1,clientX:x,clientY:y}));
    ptr('pointerdown',cx,cy);ptr('pointermove',cx+60,cy+16);ptr('pointerup',cx+60,cy+16);
   });
-  await page.waitForFunction(before=>Math.abs(Number(document.querySelector('.board-panel svg').getAttribute('viewBox').split(' ')[0])-before)>5,before[0]);
+  await page.waitForFunction(before=>Math.abs(Number(document.querySelector('.board-panel [data-board-root]').getAttribute('viewBox').split(' ')[0])-before)>5,before[0]);
   await page.getByRole('button',{name:'Reset view'}).click();
   await page.waitForTimeout(400);
   const site=page.locator('g.vertex.legal-site, g.edge.legal-site').first();

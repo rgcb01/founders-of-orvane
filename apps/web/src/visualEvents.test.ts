@@ -26,7 +26,7 @@ describe('visual events',()=>{
  it('shows only public offered bundles and does not expose hidden card purchases',()=>{
   const {board,game}=fixture();const give={forest:1,pasture:0,field:0,hill:0,mountain:0},want={forest:0,pasture:0,field:1,hill:0,mountain:0};
   const offered={...game,offer:{from:0,to:1,give,want}};
-  expect(gameVisual(board,game,offered)).toEqual([{kind:'offer',playerId:0,other:1,give:'🪵×1',want:'🌾×1'}]);
+  expect(gameVisual(board,game,offered)).toEqual([{kind:'offer',playerId:0,other:1,give:'🪵×1',want:'🌾×1',giveCards:give,wantCards:want}]);
   const purchased={...game,development:{...game.development,deck:game.development.deck.slice(1)}};
   expect(gameVisual(board,game,purchased)).toEqual([{kind:'card',playerId:0,card:null,symbol:'🃏'}]);
  });

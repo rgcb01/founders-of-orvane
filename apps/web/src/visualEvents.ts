@@ -10,7 +10,7 @@ export type VisualEvent=
  | {kind:'card';playerId:number;card:CardKind|null;symbol:string}
  | {kind:'road'|'settlement'|'city';playerId:number;id:string}
  | {kind:'robber';playerId:number;from:string;to:string}
- | {kind:'trade'|'offer';playerId:number;other:number|null;give:string;want:string}
+ | {kind:'trade'|'offer';playerId:number;other:number|null;give:string;want:string;giveCards?:Partial<Record<Resource,number>>;wantCards?:Partial<Record<Resource,number>>}
  | {kind:'award'|'victory'|'turn'|'discard';playerId:number;symbol:string};
 export function visualDuration(event:VisualEvent,pace:Pace,reduced=false):number{
  if(pace==='turbo')return 0;
@@ -64,13 +64,13 @@ export function gameVisual(board:Board,before:GameState|null,after:GameState|nul
    const victim=before.players.find(p=>p.id!==id&&total(p.resources)-total(after.players.find(x=>x.id===p.id)!.resources)===1);
    if(victim)events.push({kind:'steal',playerId:id,other:victim.id,symbol:'🂠'});
  }
- if(after.offer&&after.offer!==before.offer)events.push({kind:'offer',playerId:after.offer.from,other:after.offer.to,give:bundle(after.offer.give),want:bundle(after.offer.want)});
- if(before.offer&&!after.offer&&after.players.some((p,i)=>RESOURCES.some(k=>p.resources[k]!==before.players[i].resources[k])))events.push({kind:'trade',playerId:before.offer.from,other:before.offer.to,give:bundle(before.offer.give),want:bundle(before.offer.want)});
+ if(after.offer&&after.offer!==before.offer)events.push({kind:'offer',playerId:after.offer.from,other:after.offer.to,give:bundle(after.offer.give),want:bundle(after.offer.want),giveCards:after.offer.give,wantCards:after.offer.want});
+ if(before.offer&&!after.offer&&after.players.some((p,i)=>RESOURCES.some(k=>p.resources[k]!==before.players[i].resources[k])))events.push({kind:'trade',playerId:before.offer.from,other:before.offer.to,give:bundle(before.offer.give),want:bundle(before.offer.want),giveCards:before.offer.give,wantCards:before.offer.want});
  if(!events.length&&before.phase==='action'&&after.phase==='action'&&before.bank!==after.bank&&after.development.deck.length===before.development.deck.length&&!(!before.development.played&&after.development.played)){
    const old=before.players.find(p=>p.id===id)!,next=after.players.find(p=>p.id===id)!;
    const give=Object.fromEntries(RESOURCES.map(k=>[k,Math.max(0,old.resources[k]-next.resources[k])])) as Record<Resource,number>;
    const want=Object.fromEntries(RESOURCES.map(k=>[k,Math.max(0,next.resources[k]-old.resources[k])])) as Record<Resource,number>;
-   if(bundle(give)&&bundle(want))events.push({kind:'trade',playerId:id,other:null,give:bundle(give),want:bundle(want)});
+   if(bundle(give)&&bundle(want))events.push({kind:'trade',playerId:id,other:null,give:bundle(give),want:bundle(want),giveCards:give,wantCards:want});
  }
  if(after.development.deck.length<before.development.deck.length)events.push({kind:'card',playerId:id,card:null,symbol:'🃏'});
  if(after.development.played&&!before.development.played){const played=before.development.hands[id].find(card=>!after.development.hands[id].some(c=>c.id===card.id));events.unshift({kind:'card',playerId:id,card:played?.kind==='victory'?null:played?.kind??null,symbol:'🃏'});}
