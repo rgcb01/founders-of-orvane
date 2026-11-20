@@ -20,6 +20,12 @@ jobs:
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium webkit
       - run: pnpm test:browser
+      - if: github.event_name == 'pull_request' && github.head_ref == 'visual/1.1-lowpoly-foundation'
+        uses: actions/upload-artifact@v4
+        with:
+          name: orvane-1.1.0-beta.1-web
+          path: apps/web/dist
+          retention-days: 14
       - if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:

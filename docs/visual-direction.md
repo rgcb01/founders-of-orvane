@@ -18,3 +18,10 @@ Approved direction: minimalist low-poly. Matte colors, simple geometry, readable
 - Compare frame timing on desktop and physical mobile before further graphics work; do not claim 60 FPS without measurement.
 
 Next: dedicated resource icons, ports and robber art; then HUD and card art. Keep the stable 1.0 release independent and do not merge visual changes until the 1.0 acceptance gate is resolved.
+
+## 1.1.0-beta.1 acceptance
+The preceding visual commit 87cc79e passed typecheck, unit tests, build and Chromium/WebKit browser smoke tests in run 44764541088. This beta version bump requires a fresh run. No physical device performance or audio listening test has been completed. Main stays unchanged; the beta is not a stable release.
+
+Manual gates: iPhone portrait/landscape pan/pinch and legal placements; card tap/drag, income/spend and private handoff; full match and reward replay without duplicate XP; music variants, mute, background/resume; reduced motion; offline relaunch and backup; frame pacing during six-player matches. Record exact build, device and failures.
+
+The CI beta artifact is a static web build for a separately hosted preview; it is not an iOS native package. Do not overwrite the stable Pages site.
