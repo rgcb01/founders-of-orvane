@@ -55,6 +55,29 @@ async function exerciseWorker(page){
  await button(page,'Save & exit').click();
  return workers[0];
 }
+async function passAndPlay(browser){
+ const ctx=await browser.newContext({viewport:{width:1366,height:768}}),page=await ctx.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ try{
+  await page.goto(url);
+  await page.getByRole('button',{name:/New game/}).first().click();
+  await page.getByRole('button',{name:'6 players',exact:true}).click();
+  await page.getByLabel('Humans').selectOption('2');
+  await page.getByLabel('Bot pace').first().selectOption('turbo');
+  await button(page,'Start setup').click();
+  const vertex=page.locator('g.vertex.legal-site').first();await vertex.waitFor({timeout:30000});await vertex.focus();await vertex.press('Enter');await button(page,'Confirm placement').click();
+  const edge=page.locator('g.edge.legal-site').first();await edge.waitFor({timeout:10000});await edge.focus();await edge.press('Enter');await button(page,'Confirm placement').click();
+  await page.waitForFunction(()=>{
+   const r=JSON.parse(localStorage.getItem('orvane.library.v1')??'{"matches":[]}');
+   return r.matches[0]?.setup.roads.some(p=>p.playerId<2);
+  });
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0]);
+  assert.equal(saved.preferences.humans,2);assert.equal(saved.preferences.count,6);
+  assert.ok(saved.setup.settlements.some(p=>p.playerId<2));
+  assert.ok(saved.tutorial.done.includes('settlement')&&saved.tutorial.done.includes('road'),'tutorial counts human setup moves');
+  assert.deepEqual(errors,[]);console.log('Chromium six-player pass-and-play: two human seats, legal vertex/road and tutorial checkpoints passed');
+ }finally{await ctx.close();}
+}
 async function run(){
  await ready();
  const browser=await chromium.launch();
@@ -76,6 +99,7 @@ async function run(){
   assert.equal(await p.evaluate(()=>JSON.parse(localStorage.getItem('orvane.profile.v1')).id),parsed.profile.id);
   await button(p,'← Main menu').click();await p.getByRole('button',{name:/Continue/}).first().click();await p.getByRole('button',{name:'▶ Resume bots'}).waitFor();
   await target.close();console.log('Chromium desktop: full-viewport HUD, drawers, pause, worker, offline, save/resume and backups passed');
+ await passAndPlay(browser);
  }finally{await browser.close();}
  const mobile=await webkit.launch();
  try{
