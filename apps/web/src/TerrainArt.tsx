@@ -56,6 +56,6 @@ const motifs:Record<Terrain,readonly Facet[]>={
 export function TerrainArt({terrain,p,harvesting=false,duration=0}:{terrain:Terrain;p:{x:number;y:number};harvesting?:boolean;duration?:number}){
  return <g className="terrain-art" transform={`translate(${p.x} ${p.y})`} pointerEvents="none" aria-hidden="true">
   <ellipse cx="0" cy="-10" rx="30" ry="6" fill="#203b30" opacity=".10"/>
-  <g className={harvesting?'terrain-harvesting':''} style={{animationDuration:duration+'ms'}}>{motifs[terrain].map(([d,fill],i)=><path key={i} d={d} fill={fill}/>)}</g>
+  <g className={harvesting?'terrain-harvesting':terrain==='forest'||terrain==='field'?'terrain-wind':''} style={harvesting?{animationDuration:duration+'ms'}:{animationDelay:-(Math.abs(p.x*13+p.y*7)%6000)+'ms'}}>{motifs[terrain].map(([d,fill],i)=><path key={i} d={d} fill={fill}/>)}</g>
  </g>;
 }
