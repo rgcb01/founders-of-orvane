@@ -1,7 +1,7 @@
 import {tilePosition,type Board} from '@orvane/engine';
 import type {VisualEvent} from './visualEvents';
 import {DicePair,TransferStage,SpendStage,Confetti} from './GameFeel';
-import {BuildingArt,RoadArt,robberSymbol,effectColor} from './PieceArt';
+import {BuildingArt,RoadArt,RobberArt,effectColor} from './PieceArt';
 import {DEFAULT_LOADOUT,type Loadout} from './cosmetics';
 import {CardArt} from './CardArt';
 import {ResourceIcon} from './ResourceArt';
@@ -17,7 +17,7 @@ export function BoardEffects({event,board,points,r,duration,color,loadout=DEFAUL
  if(event.kind==='spend'){const e=event.build==='road'?board.edges.find(e=>e.id===event.id):undefined;const a=e?points.get(e.a):undefined,b=e?points.get(e.b):undefined;const p=a&&b?{x:(a.x+b.x)/2,y:(a.y+b.y)/2}:points.get(event.id);if(!p)return null;return <g className="board-effects" aria-hidden="true">{ring(p,'spend')}</g>;}
  if(event.kind==='road'){const e=board.edges.find(x=>x.id===event.id);if(!e)return null;const a=points.get(e.a)!,b=points.get(e.b)!;const length=Math.hypot(b.x-a.x,b.y-a.y),angle=Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;return <g className="board-effects" aria-hidden="true"><g transform={`translate(${a.x} ${a.y}) rotate(${angle})`}><g className="road-assembly" style={{animationDuration:time}}><RoadArt a={{x:0,y:0}} b={{x:length,y:0}} color={color} styleId={loadout.road}/></g>{[.25,.5,.75,1].map((f,i)=><circle key={i} cx={length*f} cy="0" r="3" fill="#f4dfb0" className="build-joint" style={{animationDuration:duration*.25+'ms',animationDelay:duration*f*.55+'ms'}}/>)}</g></g>;}
  if(event.kind==='settlement'||event.kind==='city'){const p=points.get(event.id);if(!p)return null;const city=event.kind==='city';return <g className="board-effects" aria-hidden="true"><g transform={'translate('+p.x+' '+p.y+')'}><ellipse cx="0" cy="9" rx={city?16:12} ry="5" fill="#d8c59a" className="build-foundation" style={{animationDuration:time}}/>{city&&<g className="upgrade-old" style={{animationDuration:time}}><BuildingArt p={{x:0,y:0}} city={false} color={color} styleId={loadout.settlement}/></g>}<g className="build-rise" style={{animationDuration:time}}><BuildingArt p={{x:0,y:0}} city={city} color={color} styleId={city?loadout.city:loadout.settlement}/></g>{[-1,1].flatMap(side=>[0,1,2].map(i=><circle key={side+':'+i} cx={side*(8+i*3)} cy={8-i%2*2} r={1.8+i*.3} fill="#e0cba3" className="build-dust" style={{animationDuration:duration*.4+'ms',animationDelay:duration*.4+i*25+'ms','--dust-x':side*(5+i*2)+'px'} as import('react').CSSProperties}/>))}</g></g>;}
- if(event.kind==='robber'){const a=tile(event.from),b=tile(event.to);if(!a||!b)return null;return <g className="board-effects" aria-hidden="true">{ring(b,'robber')}<text textAnchor="middle" fontSize="32">{robberSymbol(loadout.robber)}<animateMotion path={'M '+a.x+' '+a.y+' Q '+((a.x+b.x)/2)+' '+(Math.min(a.y,b.y)-65)+' '+b.x+' '+b.y} dur={time} fill="freeze"/></text></g>;}
+ if(event.kind==='robber'){const a=tile(event.from),b=tile(event.to);if(!a||!b)return null;return <g className="board-effects" aria-hidden="true">{ring(b,'robber')}<g><RobberArt p={{x:24,y:-5}} styleId={loadout.robber}/><animateMotion path={'M '+a.x+' '+a.y+' Q '+((a.x+b.x)/2)+' '+(Math.min(a.y,b.y)-65)+' '+b.x+' '+b.y} dur={time} fill="freeze"/></g></g>;}
  return null;
 }
 export function EventStage({event,name,other,duration,color,celebrate=false,effectId=DEFAULT_LOADOUT.effects}:{effectId?:string;event:VisualEvent;name:string;other:string;duration:number;color:string;celebrate?:boolean}){
