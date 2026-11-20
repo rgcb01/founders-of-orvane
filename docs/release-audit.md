@@ -33,3 +33,6 @@ These are **manual** acceptance checks and have not been verified solely by the 
 ## Release criteria
 
 Do not tag `1.0.0` or claim physical-device compatibility until all automated gates are green **and** the human QA matrix is checked. Record defects with reproduction, seed, platform, and expected/observed behavior. Keep 1.0 focused on stability, clarity and rule correctness.
+
+## 0.9.7 privacy fix
+Local pass-and-play now gates every human actor change with a confirm-to-reveal screen. The prior player's hand and hidden victory points are removed from rendered private controls while awaiting confirmation. Verify manually in multiplayer after setup, trade offers and returning to an earlier human seat. Local JSON backups and browser storage remain readable to device owners; do not treat screen privacy as encryption.

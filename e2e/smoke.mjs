@@ -55,8 +55,8 @@ async function exerciseWorker(page){
  await button(page,'Save & exit').click();
  return workers[0];
 }
-async function passAndPlay(browser){
- const ctx=await browser.newContext({viewport:{width:1366,height:768}}),page=await ctx.newPage(),errors=[];
+async function passAndPlay(browser,mobile=false){
+ const ctx=await browser.newContext(mobile?{...devices['iPhone 13']}:{viewport:{width:1366,height:768}}),page=await ctx.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  try{
   await page.goto(url);
@@ -65,8 +65,18 @@ async function passAndPlay(browser){
   await page.getByLabel('Humans').selectOption('2');
   await page.getByLabel('Bot pace').first().selectOption('turbo');
   await button(page,'Start setup').click();
+  const gate=page.getByRole('dialog',{name:'Pass the device'});
+  await gate.waitFor({timeout:30000});
+  const before=await page.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0]);
+  assert.equal(await page.getByLabel('Your resources').count(),0,'no private hand before ready');
+  assert.ok(before.setup.phase!=='complete');
+  await gate.getByRole('button',{name:/I'm ready/}).click();
+  await gate.waitFor({state:'hidden'});
   const vertex=page.locator('g.vertex.legal-site').first();await vertex.waitFor({timeout:30000});await vertex.focus();await vertex.press('Enter');await button(page,'Confirm placement').click();
   const edge=page.locator('g.edge.legal-site').first();await edge.waitFor({timeout:10000});await edge.focus();await edge.press('Enter');await button(page,'Confirm placement').click();
+  // Another human must explicitly accept the next device handoff.
+  await gate.waitFor({timeout:30000});
+  assert.equal(await page.getByLabel('Your resources').count(),0,'next human hand hidden until confirmed');
   await page.waitForFunction(()=>{
    const r=JSON.parse(localStorage.getItem('orvane.library.v1')??'{"matches":[]}');
    return r.matches[0]?.setup.roads.some(p=>p.playerId<2);
@@ -75,7 +85,7 @@ async function passAndPlay(browser){
   assert.equal(saved.preferences.humans,2);assert.equal(saved.preferences.count,6);
   assert.ok(saved.setup.settlements.some(p=>p.playerId<2));
   assert.ok(saved.tutorial.done.includes('settlement')&&saved.tutorial.done.includes('road'),'tutorial counts human setup moves');
-  assert.deepEqual(errors,[]);console.log('Chromium six-player pass-and-play: two human seats, legal vertex/road and tutorial checkpoints passed');
+  assert.deepEqual(errors,[]);console.log((mobile?'WebKit iPhone':'Chromium desktop')+' six-player pass-and-play: private seat handoff, legal placement and tutorial checkpoints passed');
  }finally{await ctx.close();}
 }
 async function run(){
@@ -105,7 +115,7 @@ async function run(){
  try{
   const ctx=await mobile.newContext({...devices['iPhone 13']});const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url);
   await exerciseWorker(page);await page.getByRole('button',{name:/Continue/}).first().click();await page.getByRole('button',{name:'▶ Resume bots'}).waitFor();
-  assert.deepEqual(errors,[]);await ctx.close();console.log('WebKit iPhone viewport: HUD, drawer, pause, worker and save/resume passed');
+  assert.deepEqual(errors,[]);await ctx.close();await passAndPlay(mobile,true);console.log('WebKit iPhone viewport: HUD, handoff, drawer, pause, worker and save/resume passed');
  }finally{await mobile.close();}
 }
 try{await run();}finally{server.kill();}

@@ -322,3 +322,14 @@ main.front-menu{max-width:none;width:100%;min-height:100dvh;margin:0;padding:0;g
  .in-match .immersive-layout.drawer-active .tutorial-coach{display:none}
 }
 @media(max-width:420px){.in-match .tutorial-coach{right:7px;bottom:calc(124px + env(safe-area-inset-bottom));width:min(225px,65vw);max-height:min(172px,calc(100dvh - 355px))}}
+
+/* Private pass-the-device gate for local multiplayer. */
+.handoff-curtain{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:18px;background:radial-gradient(ellipse at center,#07202be8,#020b13fa);backdrop-filter:blur(12px)}
+.handoff-window{display:grid;justify-items:center;text-align:center;gap:13px;width:min(420px,100%);max-height:calc(100dvh - 36px);overflow:auto;padding:clamp(20px,5vw,38px);background:linear-gradient(155deg,#25434b,#102a34 75%,#071923);border:1px solid #e2c288;border-radius:16px;box-shadow:0 25px 80px #000d,inset 0 1px 0 #f9eac333}
+.handoff-sigil{font:normal 3rem Georgia,serif;color:#f1d39a}
+.handoff-window h2{font:normal clamp(1.8rem,6vw,2.5rem) Georgia,serif;color:#f5e1b5;margin:0}
+.handoff-window p{line-height:1.5;margin:0;max-width:330px}
+.handoff-window strong{color:#f6daa4}
+.handoff-window .primary-action{min-height:51px;width:min(260px,100%);font-weight:800;background:linear-gradient(180deg,#f1d99e,#c9a66d);color:#142b33;border-color:#f6dfa4}
+@media(max-width:600px){.handoff-window{gap:10px;padding:25px 20px}}
+@media(prefers-reduced-motion:reduce){.handoff-curtain{backdrop-filter:none}}
