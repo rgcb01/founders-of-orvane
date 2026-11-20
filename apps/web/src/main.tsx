@@ -23,6 +23,7 @@ import {ProfileScreen} from './ProfileScreen';
 import {type Backup} from './backup';
 import {SavedGames} from './SavedGames';
 import {BotClient} from './botClient';
+import {needsHandoff,privateHandSeat} from './privateHandoff';
 import {TutorialCoach} from './TutorialCoach';
 import {advanceTutorial,currentLesson,newTutorial,setTutorialEnabled,tutorialTip,TUTORIAL_SEEN_KEY,type TutorialProgress,type TutorTarget} from './tutorial';
 import {usePwa} from './pwa';
@@ -55,6 +56,8 @@ function App(){
  const [panel,setPanel]=useState<Panel>('info');
  const [drawerOpen,setDrawerOpen]=useState(false);
  const [pauseMenuOpen,setPauseMenuOpen]=useState(false);
+ const [revealedSeat,setRevealedSeat]=useState<number|null>(null);
+ const previousDecision=useRef<number|null>(null);
  const [fullscreen,setFullscreen]=useState(()=>Boolean(document.fullscreenElement));
  const [guideOpen,setGuideOpen]=useState(false);
  const [tutorial,setTutorial]=useState<TutorialProgress>(()=>newTutorial());
@@ -95,9 +98,16 @@ function App(){
  const playerId=game?game.active:setup?activePlayer(setup):null;
  const decision=game?decisionPlayer(game):setup?activePlayer(setup):null;
  const botBusy=decision!==null&&decision>=humans&&!botError;
- const humanDecision=decision!==null&&decision<humans&&!visual;
+ const handoffPending=!!view&&needsHandoff(humans,decision,revealedSeat);
+ const humanDecision=decision!==null&&decision<humans&&!visual&&!handoffPending;
  const humanActive=humanDecision&&decision===playerId&&!game?.offer;
- const showHand=humans===1?0:decision!==null&&decision<humans?decision:null;
+ const showHand=privateHandSeat(humans,decision,revealedSeat);
+ useLayoutEffect(()=>{
+   // Revoke permission before paint when the device changes hands.
+   if(previousDecision.current===decision)return;
+   previousDecision.current=decision;
+   setRevealedSeat(null);setSelection(null);setDrawerOpen(false);
+ },[decision]);
  useEffect(()=>{
    const load=()=>{try{const old=readProfile(localStorage);const next=old??writeProfile(localStorage,createProfile(crypto.randomUUID(),Date.now()));setProfile(next);setProfileError('');}catch(e){setProfileError(e instanceof Error?e.message:'Local profile unavailable');}};
    load();const changed=(e:StorageEvent)=>{if(e.key===PROFILE_KEY)load();};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed);
@@ -119,9 +129,9 @@ function App(){
    const p=m.preferences;createdAt.current=m.createdAt;setMatchId(m.id);setSavedAt(m.updatedAt);
    setCount(p.count);setHumans(p.humans);setDifficulty(p.difficulty);setPace(p.pace);setFollow(p.follow);setSize(m.size);setSeed(m.seed);setDraft(m.seed);
    previous.current={setup:m.setup,game:m.game};setSetup(m.setup);setGame(m.game);setActivity(m.activity);attempts.current={...m.attempts};
-   setVisualQueue([]);setSelection(null);setPan({x:0,y:0});setZoom(1);setBotError('');setPanel('info');setDrawerOpen(false);setPauseMenuOpen(false);setTutorial(m.tutorial??newTutorial());setCoachOpen(m.tutorial?.enabled??false);setCoachFocus(null);setPaused(true);setStepRequested(false);setMenu('setup');
+   setVisualQueue([]);setSelection(null);setPan({x:0,y:0});setZoom(1);setBotError('');setPanel('info');setDrawerOpen(false);setPauseMenuOpen(false);setTutorial(m.tutorial??newTutorial());setCoachOpen(m.tutorial?.enabled??false);setCoachFocus(null);setRevealedSeat(null);previousDecision.current=null;setPaused(true);setStepRequested(false);setMenu('setup');
  };
- const leave=()=>{if(storageError&&!window.confirm('Saving failed. Leave anyway?'))return false;setMatchId(null);setSavedAt(null);setMenu('home');setDrawerOpen(false);setPauseMenuOpen(false);setGame(null);setSetup(null);setSelection(null);setBotError('');setActivity([]);setCoachOpen(false);setCoachFocus(null);setTutorial(newTutorial());setVisualQueue([]);setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};return true;};
+ const leave=()=>{if(storageError&&!window.confirm('Saving failed. Leave anyway?'))return false;setMatchId(null);setSavedAt(null);setMenu('home');setDrawerOpen(false);setPauseMenuOpen(false);setGame(null);setSetup(null);setSelection(null);setBotError('');setActivity([]);setCoachOpen(false);setCoachFocus(null);setTutorial(newTutorial());setRevealedSeat(null);previousDecision.current=null;setVisualQueue([]);setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};return true;};
  const deleteSave=(id:string)=>{try{setLibrary(removeMatch(localStorage,id));setStorageError('');}catch(e){setStorageError(e instanceof Error?e.message:'Could not delete saved game');}};
  const restoreLocal=(b:Backup)=>{
    const p=b.preferences;setLibrary(b.library);setProfile(b.profile);setProfileError('');setStorageError('');
@@ -221,6 +231,7 @@ function App(){
  useEffect(()=>{
   if(!view)return;
   const handler=(e:globalThis.KeyboardEvent)=>{
+     if(handoffPending)return;
     const el=e.target,typing=el instanceof HTMLElement&&(el.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(el.tagName));
     if(e.key==='Escape'){
       e.preventDefault();
@@ -239,7 +250,7 @@ function App(){
     else if(e.key.toLowerCase()==='t'&&game&&humanDecision&&game.phase==='action'){e.preventDefault();openPanel('trade');}
   };
   window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);
- },[view,game,humanActive,humanDecision,drawerOpen,pauseMenuOpen,guideOpen,soundOpen]);
+ },[view,game,humanActive,humanDecision,handoffPending,drawerOpen,pauseMenuOpen,guideOpen,soundOpen]);
  const points=useMemo(()=>new Map(board.vertices.map(v=>[v.id,vertexPosition(v,R)])),[board]);
  const bounds=useMemo(()=>{
    const p=[...points.values()],xs=p.map(v=>v.x),ys=p.map(v=>v.y);
@@ -262,11 +273,11 @@ function App(){
    createdAt.current=Date.now();setMatchId(crypto.randomUUID());setSavedAt(null);setSelection(null);
    const s=createSetup(board,count,chooseFirstPlayer(count));
    setSetup({...s,players:s.players.map(p=>({...p,name:p.id>=humans?['🤖 Ada','🤖 Bruno','🤖 Cleo','🤖 Darius','🤖 Elara','🤖 Finn'][p.id]:humans===1?(profile?.name??'You'):p.name}))});
-   setGame(null);setActivity([]);setPanel('info');setDrawerOpen(false);setPauseMenuOpen(false);setBotError('');setPaused(false);setStepRequested(false);setVisualQueue([]);
+   setGame(null);setActivity([]);setPanel('info');setDrawerOpen(false);setPauseMenuOpen(false);setBotError('');setPaused(false);setStepRequested(false);setVisualQueue([]);setRevealedSeat(null);previousDecision.current=null;
    attempts.current={turn:0,count:0};previous.current={game:null,setup:null};
    setTutorial(newTutorial(enabled));setCoachOpen(enabled);setCoachFocus(null);setForceGuided(false);
  };
- const setBoard=(s:BoardSize,seed:string)=>{setSize(s);setGame(null);setSetup(null);setBotError('');setActivity([]);setVisualQueue([]);setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};setSeed(seed);setDraft(seed);setSelection(null);setPan({x:0,y:0});setZoom(1);};
+ const setBoard=(s:BoardSize,seed:string)=>{setSize(s);setGame(null);setSetup(null);setBotError('');setActivity([]);setVisualQueue([]);setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};setSeed(seed);setDraft(seed);setSelection(null);setPan({x:0,y:0});setZoom(1);setRevealedSeat(null);previousDecision.current=null;};
  const select=(kind:Selection['kind'],id:string)=>setSelection({kind,id});
  const keySelect=(event:KeyboardEvent,kind:Selection['kind'],id:string)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select(kind,id);}};
  function start(e:PointerEvent<SVGSVGElement>){
@@ -290,7 +301,7 @@ function App(){
  }
  const viewW=bounds.w/zoom,viewH=bounds.h/zoom;
  return <main className={view?"in-match":menu==="home"?"front-menu":""} data-coach-focus={coachOpen?coachFocus??undefined:undefined} data-dice={loadout.dice} data-card-back={loadout.cardBack} data-board-theme={loadout.board}>
-  <header><div><p className="eyebrow">ORVANE / FIELD NOTES</p><h1>Founders of Orvane</h1><p className="subtitle">Build. Trade. Explore. Prosper.</p></div><div className="header-actions"><span className="version">v0.9.6</span>{view&&<>{document.fullscreenEnabled&&<button aria-label="Toggle fullscreen" aria-pressed={fullscreen} title="Fullscreen" onClick={toggleFullscreen}>⛶</button>}<button aria-label="Pause menu" aria-expanded={pauseMenuOpen} onClick={()=>setPauseMenuOpen(true)}>☰</button></>}<button aria-label={audio.settings.enabled?"Mute sound":"Enable sound"} aria-pressed={audio.settings.enabled} onClick={audio.toggle}>{audio.settings.enabled?"🔊":"🔇"}</button>{view&&<button aria-label="Guided tutorial" aria-expanded={coachOpen} aria-pressed={tutorial.enabled&&coachOpen} onClick={activateTutorial}>🧭</button>}{view&&<button aria-expanded={guideOpen} aria-label="Game guide" onClick={()=>setGuideOpen(v=>!v)}>📖</button>}<button aria-expanded={soundOpen} onClick={()=>setSoundOpen(v=>!v)}>⚙️</button></div></header>
+  <header><div><p className="eyebrow">ORVANE / FIELD NOTES</p><h1>Founders of Orvane</h1><p className="subtitle">Build. Trade. Explore. Prosper.</p></div><div className="header-actions"><span className="version">v0.9.7</span>{view&&<>{document.fullscreenEnabled&&<button aria-label="Toggle fullscreen" aria-pressed={fullscreen} title="Fullscreen" onClick={toggleFullscreen}>⛶</button>}<button aria-label="Pause menu" aria-expanded={pauseMenuOpen} onClick={()=>setPauseMenuOpen(true)}>☰</button></>}<button aria-label={audio.settings.enabled?"Mute sound":"Enable sound"} aria-pressed={audio.settings.enabled} onClick={audio.toggle}>{audio.settings.enabled?"🔊":"🔇"}</button>{view&&<button aria-label="Guided tutorial" aria-expanded={coachOpen} aria-pressed={tutorial.enabled&&coachOpen} onClick={activateTutorial}>🧭</button>}{view&&<button aria-expanded={guideOpen} aria-label="Game guide" onClick={()=>setGuideOpen(v=>!v)}>📖</button>}<button aria-expanded={soundOpen} onClick={()=>setSoundOpen(v=>!v)}>⚙️</button></div></header>
   {soundOpen&&<section className="setup-bar sound-settings"><label>🔊 Effects volume <input aria-label="Effects volume" type="range" min={0} max={100} value={Math.round(audio.settings.volume*100)} onChange={e=>audio.setVolume(Number(e.target.value)/100)}/></label><label><input type="checkbox" checked={audio.settings.bots} onChange={audio.toggleBots}/> Bot sounds</label><label><input type="checkbox" checked={audio.settings.music} onChange={audio.toggleMusic}/> 🎵 Ambient music</label><label>Music volume <input aria-label="Music volume" type="range" min={0} max={100} value={Math.round(audio.settings.musicVolume*100)} onChange={e=>audio.setMusicVolume(Number(e.target.value)/100)}/></label>{typeof navigator.vibrate==='function'&&<label><input type="checkbox" checked={audio.settings.haptic} onChange={audio.toggleHaptic}/> Haptics</label>}<button onClick={()=>{void audio.unlock().then(()=>audio.play('trade'));}}>Test sound</button><span className="muted">{audio.ready?'Audio ready':'Tap to activate audio'}</span></section>}
   {storageError&&<p className="storage-warning" role="alert">⚠️ {storageError} · Progress may not be saved.</p>}
   {profileError&&<p className="storage-warning" role="alert">⚠️ {profileError}</p>}
@@ -352,8 +363,9 @@ function App(){
    <section className="panel terrain-legend"><h2>Terrain</h2>{(Object.keys(terrain) as Terrain[]).map(t=><div key={t} className="legend"><span style={{background:terrain[t].color}} className="swatch"/><span>{terrain[t].name}</span><span>{board.tiles.filter(x=>x.terrain===t).length}</span></div>)}</section>{activity.length>0&&<details className="panel activity"><summary>📜 Activity</summary>{activity.slice(0,24).map((a,i)=><p key={i}>{a}</p>)}</details>}</div>}
    </aside>
   </div>
-  {view&&<nav className="match-dock" aria-label="Match controls">{myHand?<ResourceHand resources={myHand.resources} queue={visualQueue} solo={humans===1}/>:<div className="hand-strip">🤖 Opponent turn</div>}<div className="dock-actions"><button onClick={()=>setDrawerOpen(false)}>🗺️ Map</button>{game&&humanActive&&game.phase==="action"&&<button onClick={()=>setDrawerOpen(false)}>🏗️ Build</button>}{game&&humanDecision&&game.phase==="action"&&<button onClick={()=>openPanel('trade')}>⚓ Trade</button>}{game&&humanDecision&&!game.offer&&<button onClick={()=>openPanel('cards')}>🃏 Cards</button>}{!game&&setup?.phase==="complete"&&humanDecision?<button data-coach-target="launch" disabled={!!visual} onClick={()=>{setGame(startGame(board,setup));setSelection(null);}}>▶ Begin game</button>:!game&&humanDecision&&setup?.phase!=="complete"?<button disabled={!selectionLegal} onClick={confirmPlacement}>✓ Place</button>:game&&humanActive&&game.phase==="roll"?<button onClick={()=>{setGame(applyGame(board,game,{kind:"roll",playerId:game.active,dice:rollDice()}));setSelection(null);}}>🎲 Roll</button>:game&&humanActive&&game.phase==="action"?<button onClick={()=>{setGame(applyGame(board,game,{kind:"end",playerId:game.active}));setSelection(null);}}>⏭ End</button>:<button onClick={()=>setPauseMenuOpen(true)}>☰ Menu</button>}</div></nav>}
-  {view&&pauseMenuOpen&&<div className="pause-curtain" onClick={()=>setPauseMenuOpen(false)}><section className="pause-window" role="dialog" aria-modal="true" aria-label="Pause menu" onClick={e=>e.stopPropagation()}><span className="pause-sigil">♜</span><p className="eyebrow">FOUNDERS OF ORVANE</p><h2>Game menu</h2><p className="muted">Bots pause while this menu is open.</p><div className="pause-commands"><button className="primary-action" onClick={()=>setPauseMenuOpen(false)}>▶ Resume game</button><button onClick={()=>{setPauseMenuOpen(false);setGuideOpen(true);}}>📖 How to play</button><button onClick={()=>{setPauseMenuOpen(false);setSoundOpen(true);}}>⚙️ Audio settings</button><button onClick={()=>{if(leave())setPauseMenuOpen(false);}}>💾 Save & exit to menu</button></div><small>ESC · Menu　　1 / 2 / 3 · Build　　I · Journal　　T · Trade　　C · Cards</small></section></div>}
+  {view&&<nav className="match-dock" aria-label="Match controls">{myHand?<ResourceHand resources={myHand.resources} queue={visualQueue} solo={humans===1}/>:<div className="hand-strip">{handoffPending?"🔒 Hand hidden · pass device":"🤖 Opponent turn"}</div>}<div className="dock-actions"><button onClick={()=>setDrawerOpen(false)}>🗺️ Map</button>{game&&humanActive&&game.phase==="action"&&<button onClick={()=>setDrawerOpen(false)}>🏗️ Build</button>}{game&&humanDecision&&game.phase==="action"&&<button onClick={()=>openPanel('trade')}>⚓ Trade</button>}{game&&humanDecision&&!game.offer&&<button onClick={()=>openPanel('cards')}>🃏 Cards</button>}{!game&&setup?.phase==="complete"&&humanDecision?<button data-coach-target="launch" disabled={!!visual} onClick={()=>{setGame(startGame(board,setup));setSelection(null);}}>▶ Begin game</button>:!game&&humanDecision&&setup?.phase!=="complete"?<button disabled={!selectionLegal} onClick={confirmPlacement}>✓ Place</button>:game&&humanActive&&game.phase==="roll"?<button onClick={()=>{setGame(applyGame(board,game,{kind:"roll",playerId:game.active,dice:rollDice()}));setSelection(null);}}>🎲 Roll</button>:game&&humanActive&&game.phase==="action"?<button onClick={()=>{setGame(applyGame(board,game,{kind:"end",playerId:game.active}));setSelection(null);}}>⏭ End</button>:<button onClick={()=>setPauseMenuOpen(true)}>☰ Menu</button>}</div></nav>}
+  {handoffPending&&view&&decision!==null&&<div className="handoff-curtain" role="presentation"><section className="handoff-window" role="dialog" aria-modal="true" aria-label="Pass the device"><span className="handoff-sigil" aria-hidden="true">♜</span><p className="eyebrow">PRIVATE PLAYER TURN</p><h2>Pass the device</h2><p>Hand the screen to <strong>{view.players.find(p=>p.id===decision)?.name??'the next player'}</strong>.</p><p className="muted">Your cards and private actions remain hidden until you are ready.</p><button className="primary-action" autoFocus onClick={()=>{setRevealedSeat(decision);setSelection(null);setDrawerOpen(false);}}>✓ I'm ready</button></section></div>}
+   {view&&pauseMenuOpen&&<div className="pause-curtain" onClick={()=>setPauseMenuOpen(false)}><section className="pause-window" role="dialog" aria-modal="true" aria-label="Pause menu" onClick={e=>e.stopPropagation()}><span className="pause-sigil">♜</span><p className="eyebrow">FOUNDERS OF ORVANE</p><h2>Game menu</h2><p className="muted">Bots pause while this menu is open.</p><div className="pause-commands"><button className="primary-action" onClick={()=>setPauseMenuOpen(false)}>▶ Resume game</button><button onClick={()=>{setPauseMenuOpen(false);setGuideOpen(true);}}>📖 How to play</button><button onClick={()=>{setPauseMenuOpen(false);setSoundOpen(true);}}>⚙️ Audio settings</button><button onClick={()=>{if(leave())setPauseMenuOpen(false);}}>💾 Save & exit to menu</button></div><small>ESC · Menu　　1 / 2 / 3 · Build　　I · Journal　　T · Trade　　C · Cards</small></section></div>}
    {visual?.kind==='income'&&duration>0&&!reduced&&<IncomeFlights event={visual} svg={svg} points={points} duration={duration}/>}
   </>}
   {!view&&<footer>Local base game · Autosave · Offline play · Online optional.</footer>}
