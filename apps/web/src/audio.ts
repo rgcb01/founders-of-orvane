@@ -23,6 +23,24 @@ const tones:Record<Cue,Note[]>={
  victory:[[262,0,1.1,'sine',.09],[392,.06,1.04,'triangle',.07],[523,.15,.28,'sine',.14],[659,.36,.28,'sine',.13],[784,.57,.65,'sine',.14],[1047,.78,.48,'sine',.05]],
  defeat:[[392,0,.2,'sine'],[330,.18,.2,'sine'],[262,.36,.35,'triangle']]
 };
+// Short filtered noise transients approximate tactile materials without asset downloads.
+const tactile:Partial<Record<Cue,{at:number;length:number;frequency:number;volume:number}[]>>={
+ dice:[{at:0,length:.055,frequency:850,volume:.16},{at:.08,length:.045,frequency:1250,volume:.13},{at:.17,length:.08,frequency:680,volume:.18}],
+ card:[{at:0,length:.11,frequency:2400,volume:.12}],
+ spend:[{at:0,length:.12,frequency:1800,volume:.09}],
+ trade:[{at:0,length:.12,frequency:2100,volume:.10},{at:.15,length:.08,frequency:2600,volume:.07}],
+ road:[{at:0,length:.08,frequency:490,volume:.18},{at:.13,length:.09,frequency:730,volume:.12}],
+ settlement:[{at:0,length:.10,frequency:380,volume:.16},{at:.17,length:.08,frequency:820,volume:.13}],
+ city:[{at:0,length:.12,frequency:950,volume:.14},{at:.19,length:.12,frequency:1500,volume:.12}],
+ robber:[{at:0,length:.24,frequency:420,volume:.08}]
+};
+function materialSound(ctx:AudioContext,out:GainNode,cue:Cue,now:number){
+ for(const hit of tactile[cue]??[]){
+  const buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*hit.length),ctx.sampleRate),samples=buffer.getChannelData(0);
+  for(let i=0;i<samples.length;i++)samples[i]=(Math.random()*2-1)*Math.exp(-5*i/samples.length);
+  const source=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();source.buffer=buffer;filter.type='bandpass';filter.frequency.value=hit.frequency;filter.Q.value=.8;gain.gain.value=hit.volume;source.connect(filter);filter.connect(gain);gain.connect(out);source.onended=()=>{source.disconnect();filter.disconnect();gain.disconnect();};source.start(now+hit.at);
+ }
+}
 const key='orvane.audio.v1';
 function load():{enabled:boolean;volume:number;bots:boolean;music:boolean;musicVolume:number;haptic:boolean}{
  try{const saved=JSON.parse(localStorage.getItem(key)??'null');if(saved&&typeof saved.enabled==='boolean'&&typeof saved.bots==='boolean'&&typeof saved.volume==='number'&&Number.isFinite(saved.volume))return {enabled:saved.enabled,bots:saved.bots,volume:Math.max(0,Math.min(1,saved.volume)),music:saved.music===true,musicVolume:typeof saved.musicVolume==='number'&&Number.isFinite(saved.musicVolume)?Math.max(0,Math.min(1,saved.musicVolume)):.25,haptic:saved.haptic===true};}catch{}
@@ -75,9 +93,10 @@ export function useGameAudio(musicId='classic-music'){
    const now=ctx.currentTime;
    if(!urgent&&now-last.current<.16)return;
    last.current=now;
+   materialSound(ctx,out,cue,now);
    for(const [frequency,start,duration,type='sine',volume=.20] of tones[cue]){
      const t=now+start,osc=ctx.createOscillator(),gain=ctx.createGain();osc.type=type;osc.frequency.value=frequency;
-     gain.gain.setValueAtTime(.001,t);gain.gain.exponentialRampToValueAtTime(volume,t+.012);gain.gain.exponentialRampToValueAtTime(.001,t+duration);
+     gain.gain.setValueAtTime(.001,t);gain.gain.exponentialRampToValueAtTime(volume*(tactile[cue]?.length? .48:1),t+.012);gain.gain.exponentialRampToValueAtTime(.001,t+duration);
      osc.connect(gain);gain.connect(out);osc.onended=()=>{osc.disconnect();gain.disconnect();};osc.start(t);osc.stop(t+duration+.015);
    }
  }
