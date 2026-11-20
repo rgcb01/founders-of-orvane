@@ -333,3 +333,112 @@ main.front-menu{max-width:none;width:100%;min-height:100dvh;margin:0;padding:0;g
 .handoff-window .primary-action{min-height:51px;width:min(260px,100%);font-weight:800;background:linear-gradient(180deg,#f1d99e,#c9a66d);color:#142b33;border-color:#f6dfa4}
 @media(max-width:600px){.handoff-window{gap:10px;padding:25px 20px}}
 @media(prefers-reduced-motion:reduce){.handoff-curtain{backdrop-filter:none}}
+
+/* v0.9.8: phone-first HUD, physical touch targets and safe-area handling. */
+html:has(main.in-match),body:has(main.in-match){height:100%;overflow:hidden;overscroll-behavior:none}
+.in-match .board-panel svg{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.in-match .tile,.in-match .edge,.in-match .vertex{touch-action:none;-webkit-touch-callout:none}
+.in-match button,.in-match select{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.in-match .game-players{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.in-match .game-sidebar{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.in-match .game-sidebar button,.in-match .match-dock button{min-height:42px}
+.mobile-pause-options{display:none}
+@media (hover:none) and (pointer:coarse){
+ .in-match .tile:not([aria-pressed=true]):hover polygon{stroke:#183a3e;stroke-width:2}
+ .in-match .edge:not([aria-pressed=true]):not(.legal-site):hover line:last-child{stroke:#e4d7af;stroke-width:1.5;opacity:.55}
+ .in-match .vertex:not([aria-pressed=true]):not(.legal-site):hover circle:last-child{fill:#e4d7af}
+}
+@media(max-width:600px){
+ .in-match>header{flex:0 0 calc(45px + env(safe-area-inset-top));min-height:calc(45px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 10px 0;gap:6px}
+ .in-match header h1{font-size:1rem;white-space:nowrap}
+ .in-match .header-actions{gap:3px}
+ .in-match .header-actions button{min-width:44px;min-height:42px}
+ .in-match .header-actions button[aria-label="Enable sound"],.in-match .header-actions button[aria-label="Mute sound"],.in-match .header-actions button[aria-label="Guided tutorial"],.in-match .header-actions button[aria-label="Game guide"],.in-match .header-actions button:not([aria-label]):not([aria-pressed]){display:none}
+ .in-match .pace-bar{display:none}
+ .in-match .turn-bar{flex:0 0 51px;min-height:51px;padding:5px 10px}
+ .in-match .turn-bar .sizes{display:none}
+ .in-match .turn-ident{min-width:0;width:100%}
+ .in-match .turn-ident .turn-emblem{width:34px;height:34px}
+ .in-match .turn-ident p{max-width:calc(100vw - 110px);font-size:.68rem}
+ .in-match .game-players{flex:0 0 51px;min-height:51px;padding:4px 8px}
+ .in-match .game-players .player-seat{min-height:42px;min-width:120px;max-width:142px;flex-basis:120px;padding:4px 6px}
+ .in-match .seat-avatar{width:27px;height:27px}
+ .in-match .seat-title{display:none}
+ .in-match .seat-stats{font-size:.6rem}
+ .in-match .immersive-layout{min-height:0}
+ .in-match .layout{padding-bottom:calc(95px + env(safe-area-inset-bottom))}
+ .in-match .match-dock{padding:5px 8px calc(6px + env(safe-area-inset-bottom));gap:3px;min-height:calc(95px + env(safe-area-inset-bottom))}
+ .in-match .match-dock .resource-hand{padding:0;gap:4px;min-height:44px}
+ .in-match .match-dock .resource-card{min-height:45px;max-width:72px;padding:2px 4px;gap:0}
+ .in-match .match-dock .resource-card-icon{font-size:1rem!important;line-height:1.05}
+ .in-match .match-dock .resource-card small{display:none}
+ .in-match .match-dock .resource-card b{font-size:.9rem}
+ .in-match .dock-actions{gap:4px}
+ .in-match .dock-actions button{min-height:43px;padding:5px 3px;font-size:.72rem;line-height:1.14;border-radius:9px}
+ .in-match .game-sidebar{bottom:calc(95px + env(safe-area-inset-bottom));max-height:min(65dvh,620px)}
+ .in-match .game-sidebar .panel-nav button{min-height:44px}
+ .in-match .build-menu{bottom:72px;width:min(96%,370px);padding:5px}
+ .in-match .build-option{min-height:59px}
+ .in-match .map-confirm{bottom:15px}
+ .in-match .map-confirm button{min-height:46px}
+ .in-match .map-top{top:6px;left:8px;right:8px}
+ .in-match .map-top button{min-height:44px;min-width:44px;font-size:.9rem;padding:6px}
+ .in-match .map-top>div{gap:0;padding:0}
+ .in-match .map-help{font-size:.66rem;max-width:140px;top:60px;left:8px}
+ .in-match .dice-display{top:112px;right:8px}
+ .in-match .tutorial-coach{bottom:calc(103px + env(safe-area-inset-bottom));max-height:min(185px,32dvh);width:min(220px,55vw)}
+ .in-match .sound-settings{top:calc(52px + env(safe-area-inset-top));max-height:calc(100dvh - 80px);overflow:auto}
+ .in-match .match-guide{top:calc(53px + env(safe-area-inset-top))}
+ .mobile-pause-options{display:grid;gap:8px;width:100%;grid-template-columns:1fr 1fr}
+ .mobile-pause-options label{display:grid;gap:4px;text-align:left;font-size:.76rem;color:#e7d3ae}
+ .mobile-pause-options select,.mobile-pause-options button{min-width:0;width:100%;min-height:44px;padding:7px 8px;border:1px solid #56726c;border-radius:8px;background:#1b3941;color:#e7e4cf;font-size:.79rem}
+ .pause-window{max-height:calc(100dvh - 30px);overflow:auto;padding:21px 18px;gap:7px}
+ .pause-window h2{font-size:1.7rem}
+ .pause-sigil{font-size:1.9rem}
+ .pause-commands{margin:4px 0;gap:5px}
+ .pause-commands button{min-height:44px}
+ .pause-window small{font-size:.61rem}
+}
+@media(max-width:480px){
+ .in-match .turn-ident small{font-size:.58rem}
+ .in-match .game-players .seat-stats{gap:3px}
+ .in-match .map-top>span{display:none}
+ .in-match .map-help{top:57px}
+}
+@media(orientation:landscape) and (max-height:540px) and (pointer:coarse){
+ .in-match>header{flex:0 0 calc(38px + env(safe-area-inset-top));min-height:calc(38px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 9px 0}
+ .in-match header h1{font-size:.92rem}
+ .in-match .header-actions button{min-height:36px;min-width:40px}
+ .in-match .header-actions button[aria-label="Enable sound"],.in-match .header-actions button[aria-label="Mute sound"],.in-match .header-actions button[aria-label="Guided tutorial"],.in-match .header-actions button[aria-label="Game guide"]{display:none}
+ .in-match .turn-bar{flex:0 0 37px;min-height:37px;padding:2px 10px}
+ .in-match .turn-bar .turn-emblem{width:29px;height:29px;font-size:1rem}
+ .in-match .turn-ident p{display:none}
+ .in-match .turn-bar .sizes{display:none}
+ .in-match .pace-bar{display:none}
+ .in-match .game-players{flex:0 0 37px;min-height:37px;padding:3px 8px}
+ .in-match .game-players .player-seat{min-height:30px;padding:2px 6px;min-width:105px;max-width:130px;flex:0 0 112px}
+ .in-match .game-players .seat-avatar{width:23px;height:23px;font-size:.86rem}
+ .in-match .game-players .seat-stats,.in-match .game-players .seat-title{display:none}
+ .in-match .immersive-layout{min-height:0}
+ .in-match .layout{padding-bottom:calc(62px + env(safe-area-inset-bottom))}
+ .in-match .match-dock{min-height:calc(62px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:9px;padding:4px 9px calc(4px + env(safe-area-inset-bottom))}
+ .in-match .match-dock>.resource-hand,.in-match .match-dock>.hand-strip{flex:1;min-width:0;justify-content:flex-start;padding:0}
+ .in-match .match-dock .resource-card{min-height:48px;max-width:53px;flex-basis:53px}
+ .in-match .match-dock .resource-card small{display:none}
+ .in-match .dock-actions{flex:1;min-width:0;gap:3px}
+ .in-match .dock-actions button{min-height:44px;padding:4px;font-size:.7rem}
+ .in-match .game-sidebar{bottom:calc(62px + env(safe-area-inset-bottom));max-height:calc(100dvh - 90px)}
+ .in-match .build-menu{bottom:67px;left:8px;transform:none;width:235px}
+ .in-match .build-option{min-height:47px}
+ .in-match .map-confirm{bottom:8px;left:auto;right:9px;transform:none;width:185px}
+ .in-match .map-confirm button{min-width:0;min-height:44px;padding:5px}
+ .in-match .map-help,.in-match .event-idle{display:none}
+ .in-match .board-event-slot{top:8px;width:34%;max-width:250px}
+ .in-match .dice-display{top:9px;right:8px}
+ .in-match .tutorial-coach{bottom:calc(67px + env(safe-area-inset-bottom));max-height:55dvh;width:230px}
+ .in-match .map-top{top:7px;left:7px;right:7px}
+ .in-match .map-top>span{display:none}
+ .in-match .map-top button{min-height:36px;min-width:36px}
+ .pause-window{max-height:calc(100dvh - 20px);padding:12px 22px}
+ .pause-sigil{display:none}
+}
