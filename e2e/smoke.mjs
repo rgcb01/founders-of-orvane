@@ -16,6 +16,18 @@ async function start(page){
 async function exerciseWorker(page){
  const workers=[];page.on('worker',w=>workers.push(w.url()));
  await start(page);
+ const stage=await page.locator('main.in-match').boundingBox(),map=await page.locator('.board-panel').boundingBox(),viewport=page.viewportSize();
+ assert.ok(stage&&viewport&&Math.abs(stage.height-viewport.height)<8,'match uses the complete viewport');
+ assert.ok(map&&map.height>175,'interactive board remains substantial');
+ assert.equal(await page.locator('.game-sidebar').isVisible(),false,'journal hidden until opened');
+ await page.getByRole('button',{name:'Open journal'}).click();
+ await page.getByRole('button',{name:'Close game panel'}).waitFor();
+ await page.getByRole('button',{name:'Close game panel'}).click();
+ await page.getByRole('button',{name:'Pause menu'}).click();
+ await page.getByRole('dialog',{name:'Pause menu'}).waitFor();
+ await page.getByRole('button',{name:'▶ Resume game'}).click();
+ assert.equal(await page.getByRole('dialog',{name:'Pause menu'}).count(),0);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,'no horizontal page overflow');
  // If the human starts, place the first settlement and its road via keyboard.
  for(let i=0;i<12&&!workers.length;i++){
   await sleep(100);
@@ -51,13 +63,13 @@ async function run(){
   await button(p,'Replace local data').click();await p.getByText('Backup restored.',{exact:true}).waitFor();
   assert.equal(await p.evaluate(()=>JSON.parse(localStorage.getItem('orvane.profile.v1')).id),parsed.profile.id);
   await button(p,'← Main menu').click();await p.getByRole('button',{name:/Continue/}).first().click();await p.getByRole('button',{name:'▶ Resume bots'}).waitFor();
-  await target.close();console.log('Chromium desktop: worker, offline cache, save/resume, backup export/import passed');
+  await target.close();console.log('Chromium desktop: full-viewport HUD, drawers, pause, worker, offline, save/resume and backups passed');
  }finally{await browser.close();}
  const mobile=await webkit.launch();
  try{
   const ctx=await mobile.newContext({...devices['iPhone 13']});const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url);
   await exerciseWorker(page);await page.getByRole('button',{name:/Continue/}).first().click();await page.getByRole('button',{name:'▶ Resume bots'}).waitFor();
-  assert.deepEqual(errors,[]);await ctx.close();console.log('WebKit iPhone viewport: worker and save/resume passed');
+  assert.deepEqual(errors,[]);await ctx.close();console.log('WebKit iPhone viewport: HUD, drawer, pause, worker and save/resume passed');
  }finally{await mobile.close();}
 }
 try{await run();}finally{server.kill();}
