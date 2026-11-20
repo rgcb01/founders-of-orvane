@@ -7,6 +7,13 @@ function fixture(count:PlayerCount=4){const seed='save-test',size=count<=4?'stan
 describe('local persistence',()=>{
  it('round trips a complete match and resumes a legal action without changing deck or resources',()=>{const {board,match,game}=fixture(),store=storage();saveMatch(store,match);const restored=readLibrary(store).matches[0];expect(restored).toEqual(match);expect(applyGame(board,restored.game!,{kind:'roll',playerId:game.active,dice:[3,4]})).toEqual(applyGame(board,game,{kind:'roll',playerId:game.active,dice:[3,4]}));});
  it('saves partially completed initial placement',()=>{const {board,match}=fixture();const s=createSetup(board,4);const next=applySetup(board,s,{kind:'settlement',playerId:0,id:legalSettlements(board,s)[0]});const store=storage();const partial={...match,setup:next,game:null};expect(validateSave(partial)).toBe(true);saveMatch(store,partial);expect(readLibrary(store).matches[0]).toEqual(partial);});
+ it('persists optional guided progress without breaking legacy saves',()=>{
+  const {match}=fixture(),store=storage(),tutorial={version:1 as const,enabled:true,done:['settlement','road'] as ('settlement'|'road')[]};
+  saveMatch(store,{...match,tutorial});expect(readLibrary(store).matches[0].tutorial).toEqual(tutorial);
+  saveMatch(store,{...match,tutorial:undefined});expect(readLibrary(store).matches[0].tutorial).toBeUndefined();
+  expect(validateSave({...match,tutorial:{...tutorial,done:['road','road']}})).toBe(false);
+  expect(validateSave({...match,tutorial:{version:2,enabled:true,done:[]}})).toBe(false);
+ });
  it('keeps independent matches and removes only selected match',()=>{const {match}=fixture(),store=storage();saveMatch(store,match);saveMatch(store,{...match,id:'two',updatedAt:3});expect(latestUnfinished(readLibrary(store))?.id).toBe('two');expect(removeMatch(store,'one').matches.map(m=>m.id)).toEqual(['two']);});
  it('records finished matches once, retaining history after deletion',()=>{const {match,game}=fixture(),store=storage();const won:SavedMatch={...match,game:{...game,phase:'finished',winner:0}};saveMatch(store,won);saveMatch(store,{...won,updatedAt:4});expect(soloStats(readLibrary(store))).toEqual({played:1,wins:1,losses:0});expect(latestUnfinished(readLibrary(store))).toBeUndefined();expect(removeMatch(store,'one').results.length).toBe(1);});
  it('preserves incompatible data and rejects invalid state',()=>{const {match,game}=fixture(),store=storage();const raw='{"schema":99,"matches":[]}';store.setItem(SAVE_KEY,raw);expect(()=>saveMatch(store,match)).toThrow();expect(store.getItem(SAVE_KEY)).toBe(raw);expect(validateSave({...match,game:{...game,bank:{...game.bank,forest:99}}})).toBe(false);});
