@@ -1,5 +1,6 @@
 import {botPersonality,PERSONALITIES,RESOURCES,COSTS,legalBuilds,playerScore,VICTORY_TARGET,type Board,type GameState,type SetupState,type BuildKind,type Resources} from '@orvane/engine';
-import {resourceEmoji,resourceName} from './resources';
+import {resourceName} from './resources';
+import {ResourceIcon,ResourceFace} from './ResourceArt';
 import {pendingIncome,type VisualEvent} from './visualEvents';
 export const BUILD_ART:Record<BuildKind,{icon:string;label:string}>={road:{icon:'🛤️',label:'Road'},settlement:{icon:'🏠',label:'Settlement'},city:{icon:'🏰',label:'City'}};
 export type Panel='cards'|'trade'|'info';
@@ -17,7 +18,7 @@ export function visiblePanel(game:GameState|null,humanDecision:boolean,selected:
  return selected;
 }
 export function ResourceHand({resources,queue,solo,desktop=false}:{resources:Resources;queue:VisualEvent[];solo:boolean;desktop?:boolean}){
- return <div className={'resource-hand hand-strip'+(desktop?' desktop-hand':'')} aria-label="Your resources">{RESOURCES.map(k=>{const count=Math.max(0,resources[k]-(solo?pendingIncome(queue,k):0));return <span className={'resource-card resource-'+k} key={k} data-income-target={k} aria-label={resourceName[k]+': '+count} title={resourceName[k]}><span className="resource-card-icon"><ResourceIcon resource={k}/></span><b>{count}</b><small>{resourceName[k]}</small></span>;})}</div>;
+ return <div className={'resource-hand hand-strip'+(desktop?' desktop-hand':'')} aria-label="Your resources">{RESOURCES.map(k=>{const count=Math.max(0,resources[k]-(solo?pendingIncome(queue,k):0));return <span className={'resource-card resource-'+k} key={k} data-income-target={k} aria-label={resourceName[k]+': '+count} title={resourceName[k]}><ResourceFace resource={k} count={count}/></span>;})}</div>;
 }
 export function PlayerStrip({view,game,active,humans,showHand,soloAvatar,soloTitle,seed}:{seed?:string;soloTitle?:string;soloAvatar?:string;view:GameState|SetupState;game:GameState|null;active:number|null;humans:number;showHand:number|null}){
  return <section className="player-strip game-players" aria-label="Players">{view.players.map(p=>{const personality=p.id>=humans&&seed!==undefined?PERSONALITIES[botPersonality(seed,p.id)]:null;const score=game?playerScore(game,p.id,p.id===showHand||game.phase==='finished').total:null;return <div key={p.id} className={'player player-seat'+(p.id===active?' active':'')} aria-label={p.name+(p.id===active?', active player':'')}><span className="seat-avatar" style={{background:p.color}}>{p.id<humans?(humans===1?soloAvatar??'👤':'👤'):'🤖'}</span><div className="seat-main"><strong>{p.name.replace('🤖 ','')}</strong>{humans===1&&p.id===0&&soloTitle&&<small className="seat-title">{soloTitle}</small>}{personality&&<small className="seat-title bot-personality" title={personality.label}>{personality.icon} {personality.label}</small>}<div className="seat-stats"><span title="Resource cards">🃏 {Object.values(p.resources).reduce((a,b)=>a+b,0)}</span>{game&&<><span title="Longest road length">🛤️ {game.awards.roadLengths[p.id]}</span><span title="Played knights">⚔️ {game.development.knights[p.id]}</span></>}</div></div>{score!==null&&<span className="seat-score" title={score+' of '+VICTORY_TARGET+' victory points'}>🏆 {score}<small>/{VICTORY_TARGET}</small></span>}{game&&(game.awards.longestRoad===p.id||game.awards.largestArmy===p.id)&&<span className="seat-award" title="Award holder">{game.awards.longestRoad===p.id?'🛤️':''}{game.awards.largestArmy===p.id?'⚔️':''}</span>}</div>;})}</section>;
@@ -54,14 +55,3 @@ export function HomeMenu({onPlay,onGuide,onSettings,onExpansions,onContinue,onSa
 }
 export function ExpansionRoadmap(){return <section className="panel expansion-roadmap"><h2>🌍 Planned expansions</h2>{[['⛵','Uncharted Seas'],['🏰','Crowns & Knights'],['🐪','Trade & Tribes'],['🏴‍☠️','Beyond the Horizon'],['🌍','Grand Campaign']].map(([icon,title])=><div key={title}><span>{icon}</span><strong>{title}</strong><small>Planned</small></div>)}<p className="muted">The base game is the current playable mode. Online is optional.</p></section>;}
 
-// Lightweight inline resource art; text labels remain the accessible names.
-function ResourceIcon({resource}:{resource:keyof typeof resourceEmoji}){
- const shapes:Record<keyof typeof resourceEmoji,import("react").ReactNode>={
- forest:<><path d="M4 9 15 3 21 7 10 14Z" fill="#ab875e"/><path d="M4 9 10 14 10 21 4 16Z" fill="#76583e"/><path d="M10 14 21 7 21 14 10 21Z" fill="#936b49"/></>,
- pasture:<><path d="M3 10 8 4 17 4 21 10 19 18 7 20 3 15Z" fill="#eee9dd"/><path d="M12 4 17 4 21 10 19 18 12 20 15 12Z" fill="#c8c9bd"/></>,
- field:<><path d="M12 22V3" stroke="#a78442" strokeWidth="2"/><path d="M12 9 5 4 6 10 12 14 18 9 19 3Z M12 16 5 11 6 17 12 21 18 16 19 10Z" fill="#d5af59"/></>,
- hill:<><path d="M3 9 15 4 22 9 10 14Z" fill="#d49a7c"/><path d="M3 9 10 14 10 21 3 16Z" fill="#a2604b"/><path d="M10 14 22 9 22 16 10 21Z" fill="#bd795f"/></>,
- mountain:<><path d="M2 17 7 6 16 3 22 12 18 21 8 22Z" fill="#93a3ab"/><path d="M7 6 13 13 8 22 2 17Z" fill="#687e89"/><path d="M13 13 22 12 18 21 8 22Z" fill="#526b77"/></>
- };
- return <svg width="1.35em" height="1.35em" viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{display:'inline-block',verticalAlign:'middle',pointerEvents:'none'}}>{shapes[resource]}</svg>;
-}
