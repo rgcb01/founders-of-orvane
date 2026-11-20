@@ -421,13 +421,15 @@ html:has(main.in-match),body:has(main.in-match){height:100%;overflow:hidden;over
  .in-match .game-players .seat-stats,.in-match .game-players .seat-title{display:none}
  .in-match .immersive-layout{min-height:0}
  .in-match .layout{padding-bottom:calc(62px + env(safe-area-inset-bottom))}
- .in-match .match-dock{min-height:calc(62px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:9px;padding:4px 9px calc(4px + env(safe-area-inset-bottom))}
+ .in-match .match-dock{position:fixed;z-index:22;left:0;right:0;bottom:0;width:100%;min-height:calc(62px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:9px;padding:4px calc(9px + env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) calc(9px + env(safe-area-inset-left));background:#091f29f5;border-top:1px solid #ab956a;box-shadow:0 -10px 35px #0009}
  .in-match .match-dock>.resource-hand,.in-match .match-dock>.hand-strip{flex:1;min-width:0;justify-content:flex-start;padding:0}
  .in-match .match-dock .resource-card{min-height:48px;max-width:53px;flex-basis:53px}
  .in-match .match-dock .resource-card small{display:none}
  .in-match .dock-actions{flex:1;min-width:0;gap:3px}
  .in-match .dock-actions button{min-height:44px;padding:4px;font-size:.7rem}
  .in-match .game-sidebar{bottom:calc(62px + env(safe-area-inset-bottom));max-height:calc(100dvh - 90px)}
+ .in-match .immersive-layout.drawer-active{grid-template-columns:minmax(0,1fr)}
+ .in-match .immersive-layout.drawer-active .game-sidebar{display:flex;position:fixed;z-index:30;left:0;right:0;border-radius:15px 15px 0 0;background:#0e2831f6}
  .in-match .build-menu{bottom:67px;left:8px;transform:none;width:235px}
  .in-match .build-option{min-height:47px}
  .in-match .map-confirm{bottom:8px;left:auto;right:9px;transform:none;width:185px}
