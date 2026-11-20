@@ -11,4 +11,4 @@ export function ResourceIcon({resource}:{resource:keyof typeof resourceEmoji}){
  return <svg width="1.35em" height="1.35em" viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{display:'inline-block',verticalAlign:'middle',pointerEvents:'none'}}>{shapes[resource]}</svg>;
 }
 
-export function ResourceFace({resource,count}:{resource:keyof typeof resourceEmoji;count:number}){return <span className={'resource-face resource-'+resource}><span className="resource-card-icon"><ResourceIcon resource={resource}/></span><small>{resourceName[resource]}</small><b>{count}</b></span>}
+export function ResourceFace({resource}:{resource:keyof typeof resourceEmoji}){return <span className={'resource-face resource-'+resource}><span className="resource-card-icon"><ResourceIcon resource={resource}/></span><small>{resourceName[resource]}</small></span>}

@@ -4,7 +4,7 @@ import type {VisualEvent} from './visualEvents';
 import {ResourceFace} from './ResourceArt';
 import type {Resource} from '@orvane/engine';
 type Point={x:number;y:number};
-type FlightStyle={resource:Resource;count:number;style:CSSProperties};
+type FlightStyle={resource:Resource;style:CSSProperties};
 export function IncomeFlights({event,svg,points,duration,spendPoint}:{event:VisualEvent;svg:RefObject<SVGSVGElement|null>;points:Map<string,Point>;duration:number;spendPoint?:Point}){
  const [items,setItems]=useState<FlightStyle[]>([]);
  useLayoutEffect(()=>{
@@ -19,9 +19,9 @@ export function IncomeFlights({event,svg,points,duration,spendPoint}:{event:Visu
      const to=target.getBoundingClientRect(),from=new DOMPoint(p.x,p.y).matrixTransform(matrix);
      const x=Math.max(16,Math.min(window.innerWidth-16,from.x)),y=Math.max(16,Math.min(window.innerHeight-16,from.y));
      const tx=to.x+to.width/2,ty=to.y+to.height/2,spend=event.kind==='spend';
-     result.push({resource:f.resource,count:f.count,style:{left:spend?tx:x,top:spend?ty:y,'--dx':(spend?x-tx:tx-x)+'px','--dy':(spend?y-ty:ty-y)+'px',animationDuration:duration+'ms'} as CSSProperties});
+     for(let i=0;i<f.count;i++){const delay=Math.min(duration*.35,i*65);result.push({resource:f.resource,style:{left:spend?tx:x,top:spend?ty:y,'--dx':(spend?x-tx:tx-x)+'px','--dy':(spend?y-ty:ty-y)+'px',animationDelay:delay+'ms',animationDuration:(duration-delay)+'ms'} as CSSProperties});}
    }
    setItems(result);
  },[event,svg,points,duration,spendPoint?.x,spendPoint?.y]);
- return createPortal(<div className="income-layer" aria-hidden="true">{items.map((f,i)=><span key={i} className={"income-flight card-flight "+(event.kind==="spend"?"card-spend":"card-gain")} style={f.style}><ResourceFace resource={f.resource} count={f.count}/></span>)}</div>,document.body);
+ return createPortal(<div className="income-layer" aria-hidden="true">{items.map((f,i)=><span key={i} className={"income-flight card-flight "+(event.kind==="spend"?"card-spend":"card-gain")} style={f.style}><ResourceFace resource={f.resource}/></span>)}</div>,document.body);
 }
