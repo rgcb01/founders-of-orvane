@@ -67,7 +67,7 @@ function legalChoices(board:Board,s:GameState,id:number,style:typeof PERSONALITI
  for(const give of RESOURCES)for(const want of RESOURCES)if(give!==want&&s.bank[want]>0){
   const rate=tradeRate(board,s,id,give);if(h[give]<rate)continue;
   const after={...h,[give]:h[give]-rate,[want]:h[want]+1},prior=production(board,s,id);
-  const utility=(after[want]===COSTS.city[want]&&want!=='give'?5:0)+(after[want]===COSTS.settlement[want]?3:0)+(prior[want]<prior[give]?1:0);
+  const utility=(after[want]===COSTS.city[want]&&want!==give?5:0)+(after[want]===COSTS.settlement[want]?3:0)+(prior[want]<prior[give]?1:0);
   bankTrades.push({a:{kind:'bankTrade',playerId:id,give,want},score:utility+h[give]-rate});
  }
  bankTrades.sort((a,b)=>b.score-a.score);
