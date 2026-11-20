@@ -6,6 +6,7 @@ import {DevelopmentPanel} from './DevelopmentPanel';
 import {TradePanel} from './TradePanel';
 import {resourceEmoji} from './resources';
 import {BuildingArt,RoadArt,RobberArt} from './PieceArt';
+import {TerrainArt,TERRAIN_COLORS} from './TerrainArt';
 import {useGameAudio} from './audio';
 import {gameCue,setupCue} from './soundEvents';
 import {botDelay,matchEvent,setupEvent,PACES,type Pace} from './matchUX';
@@ -31,12 +32,12 @@ import {usePwa} from './pwa';
 import {HomeMenu,Guide,ExpansionRoadmap,PlayerStrip,ResourceHand,BuildMenu,requiredPanel,visiblePanel,type Panel} from './GameUI';
 
 const terrain:Record<Terrain,{name:string;icon:string;color:string;resource:string}>={
- forest:{name:'Forest',icon:'🌲',color:'#4c7957',resource:'Lumber'},
- pasture:{name:'Pasture',icon:'🐑',color:'#a2b96c',resource:'Wool'},
- field:{name:'Field',icon:'🌾',color:'#d8b45b',resource:'Grain'},
- hill:{name:'Hills',icon:'🧱',color:'#bb7350',resource:'Brick'},
- mountain:{name:'Mountain',icon:'⛰️',color:'#7d8795',resource:'Ore'},
- desert:{name:'Desert',icon:'🏜️',color:'#c9a97c',resource:'None'}
+ forest:{name:'Forest',icon:'🌲',color:TERRAIN_COLORS.forest,resource:'Lumber'},
+ pasture:{name:'Pasture',icon:'🐑',color:TERRAIN_COLORS.pasture,resource:'Wool'},
+ field:{name:'Field',icon:'🌾',color:TERRAIN_COLORS.field,resource:'Grain'},
+ hill:{name:'Hills',icon:'🧱',color:TERRAIN_COLORS.hill,resource:'Brick'},
+ mountain:{name:'Mountain',icon:'⛰️',color:TERRAIN_COLORS.mountain,resource:'Ore'},
+ desert:{name:'Desert',icon:'🏜️',color:TERRAIN_COLORS.desert,resource:'None'}
 };
 type Selection={kind:'tile'|'vertex'|'edge';id:string};
 const R=49;
@@ -384,12 +385,12 @@ function App(){
          const id=vertexMode?nearestVertex(points,validVertices,world,radius):nearestEdge(board.edges,points,validEdges,world,radius);
          if(id){e.preventDefault();e.stopPropagation();setSelection({kind:vertexMode?'vertex':'edge',id});}
        }} aria-label="Hexagonal island; drag with one finger, pinch with two to zoom" className={roadMode?"road-mode":vertexMode?"vertex-mode":""}>
-      <defs><pattern id="waves" width="36" height="28" patternUnits="userSpaceOnUse"><path d="M0 14 Q9 7 18 14 T36 14" fill="none" stroke="#9ec1c2" opacity=".12"/></pattern></defs>
-      <rect x={-10000} y={-10000} width={20000} height={20000} fill="url(#waves)"/>
+      <defs><pattern id="waves" width="64" height="48" patternUnits="userSpaceOnUse"><path d="M8 13 H25 M40 35 H55" fill="none" stroke="#d6eeea" strokeWidth="1.4" strokeLinecap="round" opacity=".2"/></pattern></defs>
+      <rect x={-10000} y={-10000} width={20000} height={20000} fill="url(#waves)" className={reduced||hidden||pace==='turbo'||paused?"sea-texture":"sea-texture sea-breathe"} pointerEvents="none"/>
       {board.tiles.map(t=>{const p=tilePosition(t,R),meta=terrain[t.terrain];return <g key={t.id} role="button" tabIndex={0} aria-label={meta.name+' '+(t.number??'desert')} aria-pressed={activeTile?.id===t.id} onClick={()=>select('tile',t.id)} onKeyDown={e=>keySelect(e,'tile',t.id)} className="tile">
-        <polygon points={t.vertices.map(id=>{const v=points.get(id)!;return v.x+','+v.y;}).join(' ')} fill={meta.color} stroke={activeTile?.id===t.id?'#fff4c9':'#183a3e'} strokeWidth={activeTile?.id===t.id?4:2}/>
-        <text x={p.x} y={p.y-14} className="terrain-symbol">{meta.icon}</text>
-        {t.number!==null&&<><circle cx={p.x} cy={p.y+11} r={17} fill="#f3e5c8" stroke="#806e56"/><text x={p.x} y={p.y+12} className={'token '+(t.number===6||t.number===8?'red':'')}>{t.number}</text><text x={p.x} y={p.y+37} className="pips">{'•'.repeat(6-Math.abs(7-t.number))}</text></>}
+        <polygon points={t.vertices.map(id=>{const v=points.get(id)!;return v.x+','+v.y;}).join(' ')} fill={meta.color} stroke={activeTile?.id===t.id?'#fff4c9':'#3c615c'} strokeWidth={activeTile?.id===t.id?4:1.7}/>
+        <TerrainArt terrain={t.terrain} p={p}/>
+        {t.number!==null&&<><circle cx={p.x} cy={p.y+13} r={16} fill="#203b39" opacity=".20" pointerEvents="none"/><circle cx={p.x} cy={p.y+11} r={16} fill="#f4f0e5" stroke="#64736b" strokeWidth="1"/><text x={p.x} y={p.y+12} className={'token '+(t.number===6||t.number===8?'red':'')}>{t.number}</text><text x={p.x} y={p.y+37} className="pips">{'•'.repeat(6-Math.abs(7-t.number))}</text></>}
         {game?.development.robber===t.id&&!(visual?.kind==='robber'&&duration>0&&!reduced)&&<RobberArt p={{x:p.x+24,y:p.y-5}} styleId={loadout.robber}/>}
       </g>;})}
       {board.harbors.map(h=>{const e=board.edges.find(e=>e.id===h.edgeId)!,a=points.get(e.a)!,b=points.get(e.b)!,t=board.tiles.find(t=>t.id===e.tiles[0])!,center=tilePosition(t,R),mx=(a.x+b.x)/2,my=(a.y+b.y)/2,dx=mx-center.x,dy=my-center.y,len=Math.hypot(dx,dy),x=mx+dx/len*28,y=my+dy/len*28;return <g key={h.edgeId} aria-label={(h.resource?terrain[h.resource].resource:'Generic')+' harbor '+h.rate+':1'} pointerEvents="none"><line x1={a.x} y1={a.y} x2={x} y2={y} stroke="#b8a57e" strokeWidth="2"/><line x1={b.x} y1={b.y} x2={x} y2={y} stroke="#b8a57e" strokeWidth="2"/><rect x={x-20} y={y-12} width={40} height={24} rx={7} fill="#e8d5aa" stroke="#806e56"/><text x={x} y={y+4} textAnchor="middle" fontSize={10} fill="#183a3e" fontWeight="bold">{h.resource?resourceEmoji[h.resource]:'⚓'} {h.rate}:1</text></g>;})}
