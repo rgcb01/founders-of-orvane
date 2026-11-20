@@ -14,7 +14,7 @@ export function IncomeFlights({event,svg,points,duration,spendPoint}:{event:Visu
    for(const f of event.kind==='income'?event.flights:Object.entries(event.resources).filter(([,n])=>n>0).map(([resource,count])=>({resource:resource as Resource,count,vertexId:event.id}))){
      const p=event.kind==='spend'?spendPoint:points.get(f.vertexId);if(!p)continue;
      const targets=Array.from(document.querySelectorAll<HTMLElement>('[data-income-target="'+f.resource+'"]'));
-     const target=targets.find(t=>{const b=t.getBoundingClientRect();return b.width>0&&b.height>0&&b.bottom>0&&b.top<window.innerHeight;});
+     const target=targets.reverse().find(t=>{const b=t.getBoundingClientRect();return b.width>0&&b.height>0&&b.bottom>0&&b.top<window.innerHeight;});
      if(!target)continue;
      const to=target.getBoundingClientRect(),from=new DOMPoint(p.x,p.y).matrixTransform(matrix);
      const x=Math.max(16,Math.min(window.innerWidth-16,from.x)),y=Math.max(16,Math.min(window.innerHeight-16,from.y));
