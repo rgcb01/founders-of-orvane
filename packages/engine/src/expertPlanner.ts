@@ -90,25 +90,26 @@ function simulate(board:Board,s:GameState,a:Choice):GameState{
 export function planExpertAction(board:Board,s:GameState,personality:BotPersonality):GameAction|null{
  if(s.phase!=='action'||s.offer)return null;
  const id=s.active,style=PERSONALITIES[personality],baseline=value(board,s,id,style);
- const moves=legalChoices(board,s,id,style);
- if(!moves.length)return null;
- let winner:Choice|null=null,high=baseline+1.5;
+ const immediateCities=legalBuilds(board,s,'city').length>0;
+ const immediateSites=new Set(legalBuilds(board,s,'settlement'));
+ // Preserve the proven one-step policy. Search is a targeted tactical override,
+ // not a replacement for straightforward builds, road awards, card plays or offers.
+ if(playerScore(s,id,true).total>=9&&(immediateCities||immediateSites.size>0))return null;
+ const moves=legalChoices(board,s,id,style).filter(a=>a.kind==='bankTrade'||a.kind==='build'&&a.build==='road');
+ let winner:Choice|null=null,high=baseline+16;
  for(const first of moves){
-  const after=simulate(board,s,first),initial=value(board,after,id,style),firstIsTrade=first.kind==='bankTrade';
-  let merit=initial-(firstIsTrade?1.1:.3);
-  if(first.kind==='build'&&first.build==='road'){
-   const length=longestRoad(board,after,id);
-   if(awardHolder({...after.awards.roadLengths,[id]:length},5,after.awards.longestRoad)===id&&after.awards.longestRoad!==id)merit+=62;
-  }
-  // Two legal actions in the same action window: trade -> city, road -> settlement, etc.
-  const follow=legalChoices(board,after,id,style).slice(0,PLANNER_LIMITS.second);
+  const trade=first.kind==='bankTrade',after=simulate(board,s,first);
+  // Only combinations which create a genuinely new building opportunity.
+  const follow=legalChoices(board,after,id,style)
+   .filter(a=>a.kind==='build'&&(a.build==='city'&&!immediateCities||a.build==='settlement'&&!immediateSites.has(a.id)))
+   .slice(0,PLANNER_LIMITS.second);
   for(const second of follow){
-    if(firstIsTrade&&second.kind==='bankTrade'&&second.give===first.want&&second.want===first.give)continue;
-    const afterSecond=simulate(board,after,second);
-    const continuation=baseline+(value(board,afterSecond,id,style)-baseline)*.86-1.5-(firstIsTrade?1.1:0);
-    if(continuation>merit)merit=continuation;
+   const afterSecond=simulate(board,after,second);
+   const change=value(board,afterSecond,id,style)-baseline;
+   // Moving twice has an opportunity cost; require a substantial actual gain.
+   const merit=baseline+change*.86-(trade?2.3:2.8);
+   if(merit>high){high=merit;winner=first;}
   }
-  if(merit>high){high=merit;winner=first;}
  }
  return winner;
 }
