@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {scheduleAmbientBar} from './ambient';
+import {scheduleAmbientBar,AMBIENT_BAR_MS} from './ambient';
 import type {Cue} from './soundEvents';
 
 type Note=[frequency:number,start:number,duration:number,type?:OscillatorType,volume?:number];
@@ -20,7 +20,7 @@ const tones:Record<Cue,Note[]>={
  turn:[[392,0,.10,'sine'],[523,.10,.18,'sine']],
  award:[[392,0,.15,'triangle'],[523,.12,.16,'triangle'],[659,.24,.25,'sine']],
  start:[[262,0,.16,'triangle'],[330,.12,.17,'triangle'],[392,.24,.22,'sine']],
- victory:[[262,0,.18,'triangle'],[330,.12,.18,'triangle'],[392,.24,.20,'triangle'],[523,.36,.30,'sine'],[659,.48,.32,'sine'],[784,.60,.40,'sine']],
+ victory:[[262,0,1.1,'sine',.09],[392,.06,1.04,'triangle',.07],[523,.15,.28,'sine',.14],[659,.36,.28,'sine',.13],[784,.57,.65,'sine',.14],[1047,.78,.48,'sine',.05]],
  defeat:[[392,0,.2,'sine'],[330,.18,.2,'sine'],[262,.36,.35,'triangle']]
 };
 const key='orvane.audio.v1';
@@ -65,7 +65,7 @@ export function useGameAudio(musicId='classic-music'){
    let cancelBar:(()=>void)|undefined,index=0;
    const playBar=()=>{const ctx=context.current,out=musicGain.current;if(!document.hidden&&ctx&&out&&ctx.state==='running'){cancelBar?.();cancelBar=scheduleAmbientBar(ctx,out,index++,musicId);}};
    const visibility=()=>{if(document.hidden){cancelBar?.();cancelBar=undefined;}else playBar();};
-   playBar();const timer=window.setInterval(playBar,4480);document.addEventListener('visibilitychange',visibility);
+   playBar();const timer=window.setInterval(playBar,AMBIENT_BAR_MS);document.addEventListener('visibilitychange',visibility);
    return()=>{window.clearInterval(timer);cancelBar?.();document.removeEventListener('visibilitychange',visibility);};
  },[ready,settings.enabled,settings.music,musicId]);
  function play(cue:Cue,bot=false){

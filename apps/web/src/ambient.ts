@@ -14,13 +14,27 @@ const THEMES:Record<string,{notes:number[][];type:OscillatorType}>={
  celestial:{notes:[[262,392,494,659,587,494,392,330],[220,330,440,587,523,440,330,294]],type:'sine'}
 };
 export function ambientBar(id:string,index:number){const theme=THEMES[id.replace(/-music$/,'')];const bars=theme?.notes??AMBIENT_BARS;return {notes:bars[index%bars.length],type:theme?.type??'sine'};}
+export const AMBIENT_BAR_MS=4480;
 export function scheduleAmbientBar(ctx:AudioContext,out:GainNode,index:number,id='classic-music'){
- const now=ctx.currentTime+.02,{notes:bar,type}=ambientBar(id,index);
+ const now=ctx.currentTime+.025,{notes:bar,type}=ambientBar(id,Math.floor(index/2));
  const nodes:OscillatorNode[]=[];
- for(const [i,f] of bar.entries()){
-   const osc=ctx.createOscillator(),g=ctx.createGain(),t=now+i*.56;
-   osc.type=type;osc.frequency.value=f;g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(.055,t+.025);g.gain.exponentialRampToValueAtTime(.001,t+.48);
-   osc.connect(g);g.connect(out);osc.onended=()=>{osc.disconnect();g.disconnect();};osc.start(t);osc.stop(t+.5);nodes.push(osc);
+ function voice(f:number,t:number,d:number,amp:number,wave:OscillatorType,attack:number){
+  const osc=ctx.createOscillator(),g=ctx.createGain(),filter=ctx.createBiquadFilter();osc.type=wave;osc.frequency.value=f;filter.type='lowpass';filter.frequency.value=wave==='triangle'?1350:2100;
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(amp,t+attack);g.gain.exponentialRampToValueAtTime(.0001,t+d);
+  osc.connect(filter);filter.connect(g);g.connect(out);osc.onended=()=>{osc.disconnect();filter.disconnect();g.disconnect();};osc.start(t);osc.stop(t+d+.015);nodes.push(osc);
  }
+ // Alternating plucked phrases, a soft bass and breathing upper harmony.
+ const root=bar[0]/2;
+ voice(root,now,4.36,.035,'sine',.8);
+ voice(bar[2]/2,now,4.36,.018,'triangle',1);
+ voice(bar[1],now,4.36,.012,'sine',1.2);
+ const order=index%2===0?[0,1,2,3,4,5,6,7]:[0,2,1,3,5,4,7,6];
+ for(const [i,k] of order.entries()){
+  if(index%4===3&&i===7)continue;
+  const t=now+i*.56,f=bar[k];
+  voice(f,t,.49,.044,type,.018);
+  voice(f*2,t,.24,.009,'sine',.012);
+ }
+ for(const i of [0,4]){const f=bar[order[i]]*2;voice(f,now+i*.56,1.95,.013,'sine',.27);}
  return ()=>{for(const n of nodes)try{n.stop();}catch{}};
 }

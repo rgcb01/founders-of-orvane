@@ -12,7 +12,7 @@ export function ChallengePanel({results,profileId}:{results:Result[];profileId:s
 }
 export function MatchRewards({results,profileId,matchId}:{results:Result[];profileId:string;matchId:string}){
  const r=rewardSummary(results,profileId,matchId);if(!r)return null;
- return <section className="match-rewards"><h3>🎁 Match rewards</h3><strong className="reward-total">+{r.xp} XP</strong><p>Match {r.matchXP} · Achievements {r.achievementXP} · Challenges {r.challengeXP}</p>{r.toLevel>r.fromLevel&&<p>🌟 Level {r.fromLevel} → {r.toLevel}</p>}
+ return <section className="match-rewards"><h3>🎁 Match rewards</h3><div className="reward-hero"><strong className="reward-total">+{r.xp} XP</strong><div className="reward-meter" aria-hidden="true"><span/></div></div><p>Match {r.matchXP} · Achievements {r.achievementXP} · Challenges {r.challengeXP}</p>{r.toLevel>r.fromLevel&&<p className="reward-level">Level up · {r.fromLevel} → {r.toLevel}</p>}
  {r.earned.map(a=><p key={a.id}>{a.icon} {a.name} · +{a.xp} XP</p>)}
  {r.rewards.length+r.avatars.length>0&&<details open><summary>{r.rewards.length+r.avatars.length} new cosmetics & avatars</summary><div className="reward-items">{[...r.rewards,...r.avatars].map(c=><span key={c.id}>{c.icon} {c.name}</span>)}</div></details>}
  {r.metrics&&<p className="muted">🌾 {r.metrics.produced} produced · ⚓ {r.metrics.trades+r.metrics.bankTrades} trades · 🛤️ {r.metrics.roads} roads · 🏰 {r.metrics.cities} cities</p>}
