@@ -1,3 +1,4 @@
+import {useState,useEffect} from 'react';
 import {botPersonality,PERSONALITIES,RESOURCES,COSTS,legalBuilds,playerScore,VICTORY_TARGET,type Board,type GameState,type SetupState,type BuildKind,type Resources} from '@orvane/engine';
 import {resourceName} from './resources';
 import {ResourceIcon,ResourceFace} from './ResourceArt';
@@ -18,10 +19,13 @@ export function visiblePanel(game:GameState|null,humanDecision:boolean,selected:
  return selected;
 }
 export function ResourceHand({resources,queue,solo,desktop=false}:{resources:Resources;queue:VisualEvent[];solo:boolean;desktop?:boolean}){
+ const [selected,setSelected]=useState<string|null>(null);
  const cards=RESOURCES.flatMap(resource=>Array.from({length:Math.max(0,resources[resource]-(solo?pendingIncome(queue,resource):0))},(_,index)=>({resource,index})));
+ const selectedCard=cards.find(c=>c.resource+ c.index===selected);
+ useEffect(()=>{if(selected&&!selectedCard)setSelected(null);},[selected,selectedCard]);
  return <div className={'resource-hand hand-strip fan-hand'+(desktop?' desktop-hand':'')} aria-label="Your resources">
   <div className="fan-scroll"><div className="fan-deck" style={{width:`max(100%, ${64+Math.max(0,cards.length-1)*13}px)`}}>
-   {cards.map(({resource,index},i)=>{const offset=i-(cards.length-1)/2;const t=cards.length>1?offset/((cards.length-1)/2):0;return <span key={resource+index} className="fan-card" data-income-target={resource} aria-label={resourceName[resource]} title={resourceName[resource]} style={{left:`calc(50% + ${offset*13}px)`,transform:`translateX(-50%) translateY(${Math.abs(t)*Math.abs(t)*9}px) rotate(${t*12}deg)`,zIndex:i+1}}><ResourceFace resource={resource}/></span>;})}
+   {cards.map(({resource,index},i)=>{const offset=i-(cards.length-1)/2;const t=cards.length>1?offset/((cards.length-1)/2):0;const id=resource+index,raised=selected===id;return <button type="button" key={id} className={'fan-card'+(raised?' raised':'')} aria-pressed={raised} onClick={()=>setSelected(v=>v===id?null:id)} onKeyDown={e=>{if(e.key==='Escape')setSelected(null);}} data-income-target={resource} aria-label={resourceName[resource]} title={resourceName[resource]} style={{left:`calc(50% + ${offset*13}px)`,transform:`translateX(-50%) translateY(${(raised?-18:Math.abs(t)*Math.abs(t)*9)}px) rotate(${raised?0:t*12}deg) scale(${raised?1.12:1})`,zIndex:raised?300:i+1}}><ResourceFace resource={resource}/></button>;})}
    {RESOURCES.filter(k=>!cards.some(c=>c.resource===k)).map(k=><span key={k} className="fan-empty-target" data-income-target={k} aria-hidden="true"/>)}
   </div></div>
  </div>;
