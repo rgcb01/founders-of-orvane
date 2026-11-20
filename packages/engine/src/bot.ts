@@ -4,6 +4,7 @@ import {RESOURCES,COSTS,legalBuilds,rollDice,type GameState,type GameAction,type
 import {canBuy,canPlay,freeRoadSites,robberVictims,CARD_COST} from './development';
 import {tradeRate} from './trade';
 import {playerScore,longestRoad,awardHolder} from './victory';
+import {planExpertAction} from './expertPlanner';
 import {botPersonality,PERSONALITIES,type BotPersonality} from './personality';
 export {botPersonality,PERSONALITIES,type BotPersonality} from './personality';
 
@@ -191,6 +192,10 @@ export function chooseBotAction(board:Board,raw:GameState,options:BotOptions):Ga
    }
  }
  if(s.phase==='roll')return {kind:'roll',playerId:id,dice:rollDice(random)};
+ if(policy.lookahead&&s.phase==='action'){
+   const planned=planExpertAction(board,s,personality);
+   if(planned)return planned;
+ }
  const own=s.settlements.filter(b=>b.playerId===id).map(b=>b.vertexId);
  const sites=legalBuilds(board,s,'settlement'),cities=legalBuilds(board,s,'city'),roads=legalBuilds(board,s,'road');
  const score=playerScore(s,id,true).total;
