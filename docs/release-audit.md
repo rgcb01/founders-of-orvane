@@ -38,4 +38,37 @@ Do not tag `1.0.0` or claim physical-device compatibility until all automated ga
 Local pass-and-play now gates every human actor change with a confirm-to-reveal screen. The prior player's hand and hidden victory points are removed from rendered private controls while awaiting confirmation. Verify manually in multiplayer after setup, trade offers and returning to an earlier human seat. Local JSON backups and browser storage remain readable to device owners; do not treat screen privacy as encryption.
 
 ## iPhone 15 Pro Max retest (v0.9.8)
-Observed issue: match feels like a web page and map gestures unreliable on physical iPhone. Fixed in candidate: single-finger pan, two-finger zoom, larger road/vertex hit targets, compact portrait and landscape layouts and PWA safe areas. **Needs physical device verification** in both Safari tab and home-screen standalone mode, including board tap vs drag, pinch focal stability, accidental placement prevention, turnbar/dock obstruction, small text, and bottom safe area. Automated simulated WebKit checks are supporting evidence only.
+Observed issue: match feels like a web page and map gestures unreliable on physical iPhone. Fixed in candidate: single-finger pan, two-finger zoom, larger road/vertex hit targets, compact portrait and landscape layouts and PWA safe areas. **Interaction verification reported passed below; launch-mode and offline verification remain pending** in Safari tab and home-screen standalone mode, including board tap vs drag, pinch focal stability, accidental placement prevention, turnbar/dock obstruction, small text, and bottom safe area. Automated simulated WebKit checks are supporting evidence only.
+
+## Physical iPhone acceptance — 2026-11-20
+
+**Device:** iPhone 15 Pro Max. **Tested version:** published v0.9.8. **Evidence:** direct tester report, not browser emulation.
+
+| Check | Result |
+| --- | --- |
+| Move the board with one finger | Passed |
+| Pinch with two fingers to zoom | Passed |
+| Select settlements and roads without difficulty | Passed |
+| Play in portrait and landscape | Passed |
+| Close and resume a saved match | Passed |
+| Improved app-like experience versus the previous web-like presentation | Passed |
+
+The tester reported no outstanding issues from these six checks. The mobile interaction blocker is accepted for this device/version. The report does not establish which launch modes were tested, airplane-mode relaunch, physical Android compatibility, a complete human match, all phase-specific recovery paths, or accessibility. These remain separate acceptance items. Do not extrapolate to other devices.
+
+## Release candidate 1.0.0-rc.1
+
+Candidate scope is unchanged from v0.9.8; version and cache identifiers are updated and the pause menu exposes a build label to identify installed versions. No gameplay, persistence schema, or AI changes.
+
+| Gate | Evidence/status |
+| --- | --- |
+| Previous v0.9.8 automated gates | Passed: 117/117 tests, 26 files, Chromium and WebKit, 27 seeded configurations replayed with/without checkpoint reload (54 matches), 799 checkpoints; CI 44680142102; main deployment 44681219845 |
+| iPhone interaction acceptance | Passed on v0.9.8, six checks above |
+| Candidate automated gates | Pending RC-specific CI |
+| Physical iPhone home-screen installation and offline relaunch | Pending explicit confirmation |
+| Physical Android Chrome touch/PWA/offline/background | Pending |
+| Desktop physical mouse/keyboard and accessibility | Pending |
+| Human pass-and-play with private trade responses | Pending |
+| Full human-versus-five-bots match and rewards | Pending |
+| Physical special-phase recovery and cross-device backup | Pending |
+
+Final release remains gated by the outstanding manual checks. Retest affected behavior if any functional change is introduced during RC stabilization.
