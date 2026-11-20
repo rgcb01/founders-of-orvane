@@ -282,3 +282,43 @@ main.front-menu{max-width:none;width:100%;min-height:100dvh;margin:0;padding:0;g
 
 /* Explicitly outrank the legacy mobile .layout aside display rule. */
 @media(max-width:900px){.in-match .immersive-layout:not(.drawer-active) > .game-sidebar{display:none}.in-match .immersive-layout.drawer-active > .game-sidebar{display:flex}}
+
+
+/* v0.9.5: contextual in-game onboarding. Never intercept legal board sites beyond the coach. */
+.in-match .tutorial-coach{position:absolute;right:13px;bottom:105px;z-index:8;width:min(315px,calc(100% - 26px));max-height:min(420px,75%);overflow:auto;overscroll-behavior:contain;display:grid;gap:8px;padding:13px 14px;border-radius:13px;background:linear-gradient(155deg,#234047f5,#0d2833f5);border:1px solid #dbbe83;box-shadow:0 15px 42px #000a,inset 0 1px 0 #ffe7ad33;backdrop-filter:blur(9px);scrollbar-width:thin}
+.in-match .coach-topline{display:flex;align-items:center;gap:7px;color:#efdaac;font-size:.67rem;font-weight:800;letter-spacing:.12em}
+.in-match .coach-topline span:nth-child(2){margin-left:auto;color:#c6d5c9;font-variant-numeric:tabular-nums}
+.in-match .coach-topline button{padding:0 5px;background:transparent;border-color:transparent;color:#e1dabf;font-size:1.15rem;min-height:26px;min-width:26px}
+.in-match .coach-track{height:5px;overflow:hidden;border-radius:7px;background:#18313b}
+.in-match .coach-track span{display:block;height:100%;background:#e1c488;border-radius:7px;transition:width .24s ease}
+.in-match .tutorial-coach h2{font-family:Georgia,serif;font-weight:500;font-size:1.24rem;color:#ffdfab;margin:0}
+.in-match .tutorial-coach p{font-size:.78rem;line-height:1.5;margin:0;color:#e1e5d6}
+.in-match .tutorial-coach .coach-tip{font-size:.72rem;color:#edcf90;background:#13303b;padding:7px 9px;border-radius:6px}
+.in-match .coach-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.in-match .coach-actions button{min-height:36px;padding:6px 9px;font-size:.72rem;border-radius:7px;white-space:nowrap}
+.in-match .coach-actions .coach-show{background:linear-gradient(180deg,#f1d99e,#c9a66d);border-color:#f6dfa4;color:#1a3134;font-weight:800}
+.in-match .coach-checklist{border-top:1px solid #667a6f;padding-top:7px}
+.in-match .coach-checklist summary{cursor:pointer;color:#d6c491;font-size:.72rem}
+.in-match .coach-checklist ul{list-style:none;display:grid;gap:4px;padding:7px 0;margin:0;font-size:.73rem;color:#9eafa9}
+.in-match .coach-checklist li.complete{color:#dfce99}
+.in-match .coach-checklist small{font-size:.67rem;line-height:1.45;color:#b6cac4}
+.in-match[data-coach-focus="board"] .legal-site{filter:drop-shadow(0 0 5px #ffeaa1)}
+.in-match[data-coach-focus="launch"] [data-coach-target="launch"],.in-match[data-coach-focus="roll"] [data-coach-target="roll"],.in-match[data-coach-focus="build"] [data-coach-target="build"],.in-match[data-coach-focus="trade"] [data-coach-target="trade"],.in-match[data-coach-focus="cards"] [data-coach-target="cards"],.in-match[data-coach-focus="info"] [data-coach-target="info"]{outline:3px solid #ffe4a5;outline-offset:3px;box-shadow:0 0 0 6px #ffe4a526,0 0 22px #ffd98e5b}
+@media(max-width:900px){
+ .in-match .tutorial-coach{bottom:155px;right:8px;width:min(245px,64%);max-height:min(255px,46dvh);padding:10px;gap:6px}
+ .in-match .tutorial-coach h2{font-size:1.03rem}
+ .in-match .tutorial-coach p{font-size:.7rem;line-height:1.35}
+ .in-match .coach-actions{grid-template-columns:1fr}
+ .in-match .coach-actions button{min-height:31px;padding:4px 7px}
+ .in-match .coach-tip{display:none}
+}
+@media(max-width:420px){.in-match .tutorial-coach{width:min(225px,68%);bottom:151px;max-height:218px}.in-match .coach-topline{font-size:.61rem;letter-spacing:0}.in-match .coach-checklist:not([open]){display:none}}
+@media(prefers-reduced-motion:reduce){.in-match .coach-track span{transition:none}}
+
+/* Mobile coach must stay in the viewport. Short board panels can otherwise
+   clip its close button underneath the player strip on iOS/WebKit. */
+@media(max-width:900px){
+ .in-match .tutorial-coach{position:fixed;right:8px;bottom:calc(126px + env(safe-area-inset-bottom));top:auto;width:min(240px,63vw);max-height:min(180px,calc(100dvh - 355px));z-index:24;overflow:auto}
+ .in-match .immersive-layout.drawer-active .tutorial-coach{display:none}
+}
+@media(max-width:420px){.in-match .tutorial-coach{right:7px;bottom:calc(124px + env(safe-area-inset-bottom));width:min(225px,65vw);max-height:min(172px,calc(100dvh - 355px))}}

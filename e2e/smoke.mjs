@@ -16,6 +16,18 @@ async function start(page){
 async function exerciseWorker(page){
  const workers=[];page.on('worker',w=>workers.push(w.url()));
  await start(page);
+ // Optional guided play is visible in a first-time match, but never blocks
+ // toggling or real game actions.
+ const coach=page.getByRole('complementary',{name:'Interactive tutorial'});
+ await coach.waitFor();
+ assert.ok(await coach.getByRole('button',{name:'Hide tutorial'}).isVisible());
+ await coach.getByRole('button',{name:'Hide tutorial'}).click();
+ assert.equal(await coach.count(),0);
+ await page.getByRole('button',{name:'Guided tutorial'}).click();
+ await coach.waitFor();
+ await coach.getByRole('button',{name:'Hide tutorial'}).click();
+ const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].tutorial);
+ assert.equal(saved.version,1);assert.equal(saved.enabled,true);
  const stage=await page.locator('main.in-match').boundingBox(),map=await page.locator('.board-panel').boundingBox(),viewport=page.viewportSize();
  assert.ok(stage&&viewport&&Math.abs(stage.height-viewport.height)<8,'match uses the complete viewport');
  assert.ok(map&&map.height>175,'interactive board remains substantial');
@@ -55,7 +67,7 @@ async function run(){
   assert.ok(await page.evaluate(async u=>!!(await caches.match(u)),workerUrl),'worker included in offline cache');
   await page.getByRole('button',{name:/Saved games & statistics/}).click();
   const downloadPromise=page.waitForEvent('download');await button(page,'⬇ Export backup').click();const download=await downloadPromise;
-  const backup=await readFile(await download.path(),'utf8');const parsed=JSON.parse(backup);assert.equal(parsed.format,'orvane-backup');assert.equal(parsed.library.matches.length,1);assert.ok(parsed.profile.id);
+  const backup=await readFile(await download.path(),'utf8');const parsed=JSON.parse(backup);assert.equal(parsed.format,'orvane-backup');assert.equal(parsed.library.matches.length,1);assert.ok(parsed.profile.id);assert.equal(parsed.library.matches[0].tutorial.version,1);
   await ctx.setOffline(true);await page.reload();await page.getByRole('button',{name:/Continue/}).first().click();await page.getByRole('button',{name:'▶ Resume bots'}).waitFor();await button(page,'Save & exit').click();
   assert.deepEqual(errors,[]);await ctx.close();
   const target=await browser.newContext(),p=await target.newPage();await p.goto(url);await p.getByRole('button',{name:/Saved games & statistics/}).click();
