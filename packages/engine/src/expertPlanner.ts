@@ -1,5 +1,7 @@
 // Deterministic, bounded two-action tactical search. No unrevealed cards or random rolls.
-import {RESOURCES,COSTS,legalBuilds,type Board,type GameAction,type GameState,type Resources,type Resource} from './economy';
+import type {Board} from './index';
+import type {Resource,Resources} from './setup';
+import {RESOURCES,COSTS,legalBuilds,type GameAction,type GameState} from './economy';
 import {tradeRate} from './trade';
 import {playerScore,longestRoad,awardHolder} from './victory';
 import {PERSONALITIES,type BotPersonality} from './personality';
@@ -83,7 +85,7 @@ function simulate(board:Board,s:GameState,a:Choice):GameState{
  if(a.kind==='bankTrade')return {...s,players,bank};
  if(a.build==='road')return {...s,players,bank,roads:[...s.roads,{edgeId:a.id,playerId:id}]};
  if(a.build==='settlement')return {...s,players,bank,settlements:[...s.settlements,{vertexId:a.id,playerId:id,kind:'settlement'}]};
- return {...s,players,bank,settlements:s.settlements.map(b=>b.vertexId===a.id?{...b,kind:'city'}:b)};
+ return {...s,players,bank,settlements:s.settlements.map(b=>b.vertexId===a.id?{...b,kind:'city' as const}:b)};
 }
 export function planExpertAction(board:Board,s:GameState,personality:BotPersonality):GameAction|null{
  if(s.phase!=='action'||s.offer)return null;
