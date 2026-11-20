@@ -30,9 +30,9 @@ function summarize(rows:ReturnType<typeof simulate>[]){
 describe('seeded AI balance benchmark',()=>{
  it('runs rotating mixed-difficulty seats and old/new policy head to head',()=>{
   const tiers:Difficulty[]=['easy','normal','hard','expert'];
-  const mixed=Array.from({length:32},(_,i)=>simulate('mixed-091-'+Math.floor(i/4),tiers.map((_,j)=>({difficulty:tiers[(j+i%4)%4]})),Math.floor(i/4)%4));
-  const versus=Array.from({length:32},(_,i)=>simulate('versus-091-'+Math.floor(i/2),Array.from({length:4},(_,j)=>({difficulty:'expert',legacy:(j+i%2)%2===0})),Math.floor(i/2)%4));
-  const extended=Array.from({length:16},(_,i)=>simulate('extended-091-'+Math.floor(i/2),Array.from({length:6},(_,j)=>({difficulty:'expert',legacy:(j+i%2)%2===0})),Math.floor(i/2)%6));
+  const mixed=Array.from({length:80},(_,i)=>simulate('mixed-091-'+Math.floor(i/4),tiers.map((_,j)=>({difficulty:tiers[(j+i%4)%4]})),Math.floor(i/4)%4));
+  const versus=Array.from({length:80},(_,i)=>simulate('versus-091-'+Math.floor(i/2),Array.from({length:4},(_,j)=>({difficulty:'expert',legacy:(j+i%2)%2===0})),Math.floor(i/2)%4));
+  const extended=Array.from({length:40},(_,i)=>simulate('extended-091-'+Math.floor(i/2),Array.from({length:6},(_,j)=>({difficulty:'expert',legacy:(j+i%2)%2===0})),Math.floor(i/2)%6));
   console.log('AI PLANNER '+JSON.stringify({mixed:summarize(mixed),versus:summarize(versus),extended:summarize(extended)}));
   expect(mixed.every(r=>r.winner!==null&&r.builds>0)).toBe(true);
   expect(versus.every(r=>r.winner!==null&&r.trades>0)).toBe(true);

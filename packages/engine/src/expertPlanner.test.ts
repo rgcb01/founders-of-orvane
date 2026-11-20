@@ -25,7 +25,7 @@ describe('bounded expert tactical planning',()=>{
   expect(RESOURCES.every(k=>rich.bank[k]>=0)).toBe(true);
   expect(rich.bank.field).toBeGreaterThan(0);
   const first=planExpertAction(board,botView(rich,seat),'builder');
-  expect(first).not.toBeNull();
+  expect(first).toMatchObject({kind:'bankTrade',give:'hill',want:'field'});
   if(first?.kind==='bankTrade'){
     const after=applyGame(board,rich,first);
     expect(after.players[seat].resources.field).toBeGreaterThanOrEqual(2);
