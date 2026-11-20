@@ -7,6 +7,34 @@ const server=spawn('pnpm',['--filter','@orvane/web','exec','vite','preview','--h
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function ready(){for(let i=0;i<100;i++){try{if((await fetch(url)).ok)return;}catch{}await sleep(100);}throw Error('Preview did not start');}
 const button=(page,name)=>page.getByRole('button',{name,exact:true}).first();
+async function onPhone(page){return !(await button(page,'Confirm placement').isVisible());}
+async function confirmSite(page){
+ if(await onPhone(page))await page.getByRole('button',{name:'✓ Place'}).click();
+ else await button(page,'Confirm placement').click();
+}
+async function tutorialToggle(page){
+ if(await page.getByRole('button',{name:'Guided tutorial',exact:true}).first().isVisible()){
+  await page.getByRole('button',{name:'Guided tutorial',exact:true}).first().click();
+ }else{
+  await page.getByRole('button',{name:'Pause menu'}).click();
+  const menu=page.getByRole('dialog',{name:'Pause menu'});
+  await menu.getByRole('button',{name:'🧭 Guided tutorial'}).click();
+ }
+}
+async function saveAndExit(page){
+ if(await button(page,'Save & exit').isVisible())await button(page,'Save & exit').click();
+ else{
+  await page.getByRole('button',{name:'Pause menu'}).click();
+  await page.getByRole('dialog',{name:'Pause menu'}).getByRole('button',{name:'💾 Save & exit to menu'}).click();
+ }
+}
+async function botsResumeControl(page){
+ if(await button(page,'▶ Resume bots').isVisible())return;
+ await page.getByRole('button',{name:'Pause menu'}).click();
+ await page.getByRole('dialog',{name:'Pause menu'}).getByRole('button',{name:'▶ Resume bots'}).waitFor();
+ await page.getByRole('dialog',{name:'Pause menu'}).getByRole('button',{name:'▶ Resume game'}).click();
+}
+
 async function start(page){
  await page.getByRole('button',{name:/New game/}).first().click();
  await page.getByLabel('Bot pace').first().selectOption('turbo');
@@ -23,7 +51,7 @@ async function exerciseWorker(page){
  assert.ok(await coach.getByRole('button',{name:'Hide tutorial'}).isVisible());
  await coach.getByRole('button',{name:'Hide tutorial'}).click();
  assert.equal(await coach.count(),0);
- await page.getByRole('button',{name:'Guided tutorial'}).click();
+ await tutorialToggle(page);
  await coach.waitFor();
  await coach.getByRole('button',{name:'Hide tutorial'}).click();
  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].tutorial);
@@ -46,13 +74,13 @@ async function exerciseWorker(page){
   if(workers.length)break;
   const legal=page.locator('g.vertex.legal-site, g.edge.legal-site').first();
   if(await legal.count()){
-    await legal.focus();await legal.press('Enter');await button(page,'Confirm placement').click();
+    await legal.focus();await legal.press('Enter');await confirmSite(page);
   }
  }
  await page.waitForFunction(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step>=1);
  assert.ok(workers.length,'real module worker should start');
  assert.ok(workers.some(x=>/bot\.worker|bot-worker/.test(x)),workers.join(','));
- await button(page,'Save & exit').click();
+ await saveAndExit(page);
  return workers[0];
 }
 async function iphoneTouch(browser){
@@ -90,7 +118,7 @@ async function iphoneTouch(browser){
   const site=page.locator('g.vertex.legal-site, g.edge.legal-site').first();
   await site.waitFor({timeout:30000});
   await site.tap();
-  assert.ok(await button(page,'Confirm placement').isEnabled(),'real touchscreen tap selects a legal site');
+  assert.ok(await page.getByRole('button',{name:/✓ Place|Confirm placement/}).filter({visible:true}).first().isEnabled(),'real touchscreen tap selects a legal site');
   await page.setViewportSize({width:932,height:430});
   const landscape=await page.locator('.board-panel').boundingBox();
   assert.ok(landscape&&landscape.height>=130,'landscape keeps the board usable');
@@ -116,8 +144,8 @@ async function passAndPlay(browser,mobile=false){
   assert.ok(before.setup.phase!=='complete');
   await gate.getByRole('button',{name:/I'm ready/}).click();
   await gate.waitFor({state:'hidden'});
-  const vertex=page.locator('g.vertex.legal-site').first();await vertex.waitFor({timeout:30000});await vertex.focus();await vertex.press('Enter');await button(page,'Confirm placement').click();
-  const edge=page.locator('g.edge.legal-site').first();await edge.waitFor({timeout:10000});await edge.focus();await edge.press('Enter');await button(page,'Confirm placement').click();
+  const vertex=page.locator('g.vertex.legal-site').first();await vertex.waitFor({timeout:30000});await vertex.focus();await vertex.press('Enter');await confirmSite(page);
+  const edge=page.locator('g.edge.legal-site').first();await edge.waitFor({timeout:10000});await edge.focus();await edge.press('Enter');await confirmSite(page);
   // Another human must explicitly accept the next device handoff.
   await gate.waitFor({timeout:30000});
   assert.equal(await page.getByLabel('Your resources').count(),0,'next human hand hidden until confirmed');
@@ -145,20 +173,20 @@ async function run(){
   await page.getByRole('button',{name:/Saved games & statistics/}).click();
   const downloadPromise=page.waitForEvent('download');await button(page,'⬇ Export backup').click();const download=await downloadPromise;
   const backup=await readFile(await download.path(),'utf8');const parsed=JSON.parse(backup);assert.equal(parsed.format,'orvane-backup');assert.equal(parsed.library.matches.length,1);assert.ok(parsed.profile.id);assert.equal(parsed.library.matches[0].tutorial.version,1);
-  await ctx.setOffline(true);await page.reload();await page.getByRole('button',{name:/Continue/}).first().click();await page.getByRole('button',{name:'▶ Resume bots'}).waitFor();await button(page,'Save & exit').click();
+  await ctx.setOffline(true);await page.reload();await page.getByRole('button',{name:/Continue/}).first().click();await botsResumeControl(page);await saveAndExit(page);
   assert.deepEqual(errors,[]);await ctx.close();
   const target=await browser.newContext(),p=await target.newPage();await p.goto(url);await p.getByRole('button',{name:/Saved games & statistics/}).click();
   await p.getByLabel('Backup JSON file').setInputFiles({name:'orvane.json',mimeType:'application/json',buffer:Buffer.from(backup)});
   await button(p,'Replace local data').click();await p.getByText('Backup restored.',{exact:true}).waitFor();
   assert.equal(await p.evaluate(()=>JSON.parse(localStorage.getItem('orvane.profile.v1')).id),parsed.profile.id);
-  await button(p,'← Main menu').click();await p.getByRole('button',{name:/Continue/}).first().click();await p.getByRole('button',{name:'▶ Resume bots'}).waitFor();
+  await button(p,'← Main menu').click();await p.getByRole('button',{name:/Continue/}).first().click();await botsResumeControl(p);
   await target.close();console.log('Chromium desktop: full-viewport HUD, drawers, pause, worker, offline, save/resume and backups passed');
  await passAndPlay(browser);
  }finally{await browser.close();}
  const mobile=await webkit.launch();
  try{
   const ctx=await mobile.newContext({...devices['iPhone 13']});const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url);
-  await exerciseWorker(page);await page.getByRole('button',{name:/Continue/}).first().click();await page.getByRole('button',{name:'▶ Resume bots'}).waitFor();
+  await exerciseWorker(page);await page.getByRole('button',{name:/Continue/}).first().click();await botsResumeControl(page);
   assert.deepEqual(errors,[]);await ctx.close();await passAndPlay(mobile,true);await iphoneTouch(mobile);console.log('WebKit iPhone viewport: HUD, touch gestures, handoff, drawer, pause, worker and save/resume passed');
  }finally{await mobile.close();}
 }
