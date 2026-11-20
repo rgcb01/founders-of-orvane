@@ -55,8 +55,8 @@ async function exerciseWorker(page){
  await button(page,'Save & exit').click();
  return workers[0];
 }
-async function passAndPlay(browser){
- const ctx=await browser.newContext({viewport:{width:1366,height:768}}),page=await ctx.newPage(),errors=[];
+async function passAndPlay(browser,mobile=false){
+ const ctx=await browser.newContext(mobile?{...devices['iPhone 13']}:{viewport:{width:1366,height:768}}),page=await ctx.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  try{
   await page.goto(url);
@@ -85,7 +85,7 @@ async function passAndPlay(browser){
   assert.equal(saved.preferences.humans,2);assert.equal(saved.preferences.count,6);
   assert.ok(saved.setup.settlements.some(p=>p.playerId<2));
   assert.ok(saved.tutorial.done.includes('settlement')&&saved.tutorial.done.includes('road'),'tutorial counts human setup moves');
-  assert.deepEqual(errors,[]);console.log('Chromium six-player pass-and-play: private seat handoff, legal placement and tutorial checkpoints passed');
+  assert.deepEqual(errors,[]);console.log((mobile?'WebKit iPhone':'Chromium desktop')+' six-player pass-and-play: private seat handoff, legal placement and tutorial checkpoints passed');
  }finally{await ctx.close();}
 }
 async function run(){
@@ -115,7 +115,7 @@ async function run(){
  try{
   const ctx=await mobile.newContext({...devices['iPhone 13']});const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url);
   await exerciseWorker(page);await page.getByRole('button',{name:/Continue/}).first().click();await page.getByRole('button',{name:'▶ Resume bots'}).waitFor();
-  assert.deepEqual(errors,[]);await ctx.close();console.log('WebKit iPhone viewport: HUD, drawer, pause, worker and save/resume passed');
+  assert.deepEqual(errors,[]);await ctx.close();await passAndPlay(mobile,true);console.log('WebKit iPhone viewport: HUD, handoff, drawer, pause, worker and save/resume passed');
  }finally{await mobile.close();}
 }
 try{await run();}finally{server.kill();}
