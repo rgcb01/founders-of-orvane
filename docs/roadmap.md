@@ -100,3 +100,6 @@ Fix local pass-and-play turn handoff privacy so a different human hand is never 
 
 ## v0.9.8 mobile release blocker
 Physical iPhone 15 Pro Max feedback reported web-like density and unreliable touch. Introduce anchored pinch/drag camera controls, touch hit zones, reduced phone chrome, safe-area/landscape layout and in-menu pace access. Automated WebKit viewport tests are not physical Safari verification. Keep 1.0 RC manual acceptance open until device retest.
+
+## 1.0.0-rc.1 — Release candidate
+The v0.9.8 physical iPhone 15 Pro Max retest passed all six requested checks (pan, pinch, selection, orientation, save/resume, app-like feel). The mobile blocker is closed for the tested experience. Freeze gameplay and begin release candidate validation; see the manual evidence and remaining gates in docs/release-audit.md. No 1.0.0 stable tag until remaining gates are checked.
