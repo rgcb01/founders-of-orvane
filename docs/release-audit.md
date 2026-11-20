@@ -63,7 +63,7 @@ Candidate scope is unchanged from v0.9.8; version and cache identifiers are upda
 | --- | --- |
 | Previous v0.9.8 automated gates | Passed: 117/117 tests, 26 files, Chromium and WebKit, 27 seeded configurations replayed with/without checkpoint reload (54 matches), 799 checkpoints; CI 44680142102; main deployment 44681219845 |
 | iPhone interaction acceptance | Passed on v0.9.8, six checks above |
-| Candidate automated gates | Pending RC-specific CI |
+| Candidate automated gates | Passed: `pnpm check`, `pnpm build`, Chromium and WebKit browser smoke; [CI 44686110039](https://github.com/rgcb01/founders-of-orvane/actions/runs/44686110039) |
 | Physical iPhone home-screen installation and offline relaunch | Pending explicit confirmation |
 | Physical Android Chrome touch/PWA/offline/background | Pending |
 | Desktop physical mouse/keyboard and accessibility | Pending |
@@ -72,3 +72,20 @@ Candidate scope is unchanged from v0.9.8; version and cache identifiers are upda
 | Physical special-phase recovery and cross-device backup | Pending |
 
 Final release remains gated by the outstanding manual checks. Retest affected behavior if any functional change is introduced during RC stabilization.
+
+## RC acceptance execution checklist
+
+RC merged in PR #29, commit `712fe28a6ffd04c2874f62d81485595880589f6b`. Main deployment [44689314627](https://github.com/rgcb01/founders-of-orvane/actions/runs/44689314627) was in progress when this evidence was recorded. Verify deployment success and the pause-menu build label before starting physical tests.
+
+Record Pass / Fail / Not tested for each item, with device, build, browser and launch mode. Do not infer acceptance from silence.
+
+- [ ] iPhone Safari: install to home screen, open once online, enable airplane mode, close and relaunch, resume a match; confirm touch and safe areas in both orientations.
+- [ ] Android Chrome: repeat install/offline, touch, orientation and background/resume.
+- [ ] Desktop: mouse and keyboard navigation, camera, hotkeys, focus visibility and panel operation.
+- [ ] Local multiplayer: alternate two humans; inspect hand visibility before and after handoff, including trade offers.
+- [ ] Complete one human vs. five bots match; check history, rewards and XP once, including after reload.
+- [ ] Save and restore all special phases specified in the human QA matrix, comparing the board, turn and legal actions.
+- [ ] Export/import backup on two devices; confirm profile, cosmetics, match and history (back up target data before replacing it).
+- [ ] Accessibility: contrast, reduced motion, keyboard focus, screen-reader labels and small-screen layout.
+
+No release gate is waived. Do not promote to stable until these manual checks are recorded and the stable build passes CI.
