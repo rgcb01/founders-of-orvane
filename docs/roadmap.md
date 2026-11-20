@@ -97,3 +97,6 @@ Automated full-match audit covers 3–6 seats, up to five local human-seat proxi
 
 ## 0.9.7 stabilization
 Fix local pass-and-play turn handoff privacy so a different human hand is never rendered before explicit confirmation. Keep solo unchanged; prevent keyboard shortcuts while awaiting ready. Add functional browser and unit regression coverage, plus manual QA acceptance notes. No new gameplay features. Device-specific physical touch/privacy QA is still required for 1.0 RC.
+
+## v0.9.8 mobile release blocker
+Physical iPhone 15 Pro Max feedback reported web-like density and unreliable touch. Introduce anchored pinch/drag camera controls, touch hit zones, reduced phone chrome, safe-area/landscape layout and in-menu pace access. Automated WebKit viewport tests are not physical Safari verification. Keep 1.0 RC manual acceptance open until device retest.

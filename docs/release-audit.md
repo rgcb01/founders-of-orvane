@@ -36,3 +36,6 @@ Do not tag `1.0.0` or claim physical-device compatibility until all automated ga
 
 ## 0.9.7 privacy fix
 Local pass-and-play now gates every human actor change with a confirm-to-reveal screen. The prior player's hand and hidden victory points are removed from rendered private controls while awaiting confirmation. Verify manually in multiplayer after setup, trade offers and returning to an earlier human seat. Local JSON backups and browser storage remain readable to device owners; do not treat screen privacy as encryption.
+
+## iPhone 15 Pro Max retest (v0.9.8)
+Observed issue: match feels like a web page and map gestures unreliable on physical iPhone. Fixed in candidate: single-finger pan, two-finger zoom, larger road/vertex hit targets, compact portrait and landscape layouts and PWA safe areas. **Needs physical device verification** in both Safari tab and home-screen standalone mode, including board tap vs drag, pinch focal stability, accidental placement prevention, turnbar/dock obstruction, small text, and bottom safe area. Automated simulated WebKit checks are supporting evidence only.

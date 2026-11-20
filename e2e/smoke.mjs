@@ -55,6 +55,50 @@ async function exerciseWorker(page){
  await button(page,'Save & exit').click();
  return workers[0];
 }
+async function iphoneTouch(browser){
+ const device=devices['iPhone 15 Pro Max']??devices['iPhone 13'];
+ const ctx=await browser.newContext({...device}),page=await ctx.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ try{
+  await page.goto(url);await start(page);
+  const coach=page.getByRole('complementary',{name:'Interactive tutorial'});
+  if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
+  const svg=page.locator('.board-panel svg'),box=await page.locator('.board-panel').boundingBox();
+  assert.ok(box&&box.height>280,'portrait island must have ample playing space');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,'portrait has no horizontal document overflow');
+  const initial=Number((await svg.getAttribute('viewBox')).split(' ')[2]);
+  // Real app PointerEvent handlers: two simultaneous pointers for zoom,
+  // then single-pointer movement to pan without scrolling the document.
+  await page.evaluate(()=>{
+   const el=document.querySelector('.board-panel svg'),r=el.getBoundingClientRect();
+   const cx=r.left+r.width/2,cy=r.top+r.height/2;
+   const ptr=(type,id,x,y)=>el.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:id,pointerType:'touch',isPrimary:id===11,button:0,buttons:1,clientX:x,clientY:y}));
+   ptr('pointerdown',11,cx-60,cy);ptr('pointerdown',12,cx+60,cy);
+   ptr('pointermove',11,cx-115,cy);ptr('pointermove',12,cx+115,cy);
+   ptr('pointerup',11,cx-115,cy);ptr('pointerup',12,cx+115,cy);
+  });
+  await page.waitForFunction(initial=>Number(document.querySelector('.board-panel svg').getAttribute('viewBox').split(' ')[2])<initial*.8,initial);
+  const before=(await svg.getAttribute('viewBox')).split(' ').map(Number);
+  await page.evaluate(()=>{
+   const el=document.querySelector('.board-panel svg'),r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+   const ptr=(type,x,y)=>el.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:33,pointerType:'touch',isPrimary:true,button:0,buttons:1,clientX:x,clientY:y}));
+   ptr('pointerdown',cx,cy);ptr('pointermove',cx+60,cy+16);ptr('pointerup',cx+60,cy+16);
+  });
+  await page.waitForFunction(before=>Math.abs(Number(document.querySelector('.board-panel svg').getAttribute('viewBox').split(' ')[0])-before)>5,before[0]);
+  await page.getByRole('button',{name:'Reset view'}).click();
+  await page.waitForTimeout(400);
+  const site=page.locator('g.vertex.legal-site, g.edge.legal-site').first();
+  await site.waitFor({timeout:30000});
+  await site.tap();
+  assert.ok(await button(page,'Confirm placement').isEnabled(),'real touchscreen tap selects a legal site');
+  await page.setViewportSize({width:932,height:430});
+  const landscape=await page.locator('.board-panel').boundingBox();
+  assert.ok(landscape&&landscape.height>=130,'landscape keeps the board usable');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,'landscape has no horizontal overflow');
+  assert.deepEqual(errors,[]);
+  console.log('WebKit iPhone 15 Pro Max: portrait HUD, pinch, pan, touch selection and landscape layout passed');
+ }finally{await ctx.close();}
+}
 async function passAndPlay(browser,mobile=false){
  const ctx=await browser.newContext(mobile?{...devices['iPhone 13']}:{viewport:{width:1366,height:768}}),page=await ctx.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
@@ -115,7 +159,7 @@ async function run(){
  try{
   const ctx=await mobile.newContext({...devices['iPhone 13']});const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url);
   await exerciseWorker(page);await page.getByRole('button',{name:/Continue/}).first().click();await page.getByRole('button',{name:'▶ Resume bots'}).waitFor();
-  assert.deepEqual(errors,[]);await ctx.close();await passAndPlay(mobile,true);console.log('WebKit iPhone viewport: HUD, handoff, drawer, pause, worker and save/resume passed');
+  assert.deepEqual(errors,[]);await ctx.close();await passAndPlay(mobile,true);await iphoneTouch(mobile);console.log('WebKit iPhone viewport: HUD, touch gestures, handoff, drawer, pause, worker and save/resume passed');
  }finally{await mobile.close();}
 }
 try{await run();}finally{server.kill();}
