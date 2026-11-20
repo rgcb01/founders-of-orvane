@@ -279,3 +279,6 @@ main.front-menu{max-width:none;width:100%;min-height:100dvh;margin:0;padding:0;g
  .front-menu>.install-bar{display:none}
 }
 @media(max-height:680px) and (max-width:850px){.front-menu>.home-screen{padding:58px 16px 20px}.home-content h2{font-size:clamp(2.2rem,9vw,3.4rem)}.home-emblem{display:none}.home-content .hero-play{min-height:54px!important}.home-bottom{display:none}}
+
+/* Explicitly outrank the legacy mobile .layout aside display rule. */
+@media(max-width:900px){.in-match .immersive-layout:not(.drawer-active) > .game-sidebar{display:none}.in-match .immersive-layout.drawer-active > .game-sidebar{display:flex}}
