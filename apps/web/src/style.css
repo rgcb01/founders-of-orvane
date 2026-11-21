@@ -500,3 +500,23 @@ html:has(main.in-match),body:has(main.in-match){height:100%;overflow:hidden;over
 
 /* Root map must occupy the remaining flex space, not overlap the toolbar. */
 .in-match .board-panel svg[data-board-root]{position:relative!important;inset:auto!important;flex:1 1 0;min-height:0;height:0!important;width:100%;display:block}.in-match .board-panel .map-top{flex:0 0 auto}.in-match .board-panel .map-top>div{flex-shrink:0}.in-match .board-panel .map-top>span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.in-match .ambient-active .sea-texture{animation:none;opacity:.65}
+
+/* Phone portrait: a single flex column, no double reservation for the hand. */
+@media(max-width:600px) and (orientation:portrait){
+ main.in-match{padding:0!important;height:100dvh;min-height:0;gap:0}
+ .in-match .immersive-layout{padding:0!important;flex:1 1 0;min-height:0;grid-template-rows:minmax(0,1fr)}
+ .in-match .board-panel{height:auto;min-height:0;display:flex;flex-direction:column}
+ .in-match .board-panel svg[data-board-root]{flex:1 1 0;height:0!important;min-height:0;max-height:none}
+ .in-match .match-dock{position:relative;inset:auto;flex:0 0 auto;min-height:0;max-height:none;padding:3px 8px calc(5px + env(safe-area-inset-bottom));gap:2px}
+ .in-match .map-help,.in-match .event-idle{display:none}
+ .in-match .board-event-slot{top:48px;width:min(92%,330px);min-height:0}
+ .in-match .map-top{padding:2px 8px;min-height:44px}
+ .in-match .map-top button{min-width:44px;min-height:40px}
+ .in-match .game-players{flex-basis:46px;min-height:46px;padding:2px 5px}
+ .in-match .game-players .player-seat{min-height:40px;min-width:94px;flex-basis:94px}
+ .in-match .match-dock .resource-hand{min-height:0}
+ .in-match .match-dock .fan-hand{height:96px}
+ .in-match .map-confirm{bottom:5px}
+ .in-match .build-menu{bottom:54px}
+ .in-match .game-sidebar{bottom:calc(150px + env(safe-area-inset-bottom))}
+}
