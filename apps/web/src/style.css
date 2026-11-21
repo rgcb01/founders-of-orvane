@@ -520,3 +520,5 @@ html:has(main.in-match),body:has(main.in-match){height:100%;overflow:hidden;over
  .in-match .build-menu{bottom:54px}
  .in-match .game-sidebar{bottom:calc(150px + env(safe-area-inset-bottom))}
 }
+
+@media(max-width:600px) and (orientation:portrait){.in-match .match-dock .fan-hand{height:112px}.in-match .match-dock .fan-card{width:61px;height:82px;top:22px}.in-match .match-dock .fan-card:hover{top:22px}.in-match .fan-hand .resource-face small{font-size:10px}.in-match .match-dock .fan-card .resource-card-icon{font-size:1.35rem!important}.in-match .fan-card:focus-visible{z-index:301!important}.in-match .game-sidebar{bottom:calc(166px + env(safe-area-inset-bottom))}}
