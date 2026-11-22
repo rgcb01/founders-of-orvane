@@ -16,10 +16,21 @@ export function BoardScene3D({board,onUnavailable}:{board:Board;onUnavailable:()
   const bounds=new THREE.Box3();
   const geometry=new THREE.CylinderGeometry(.98,.98,.24,6);
   const materials=new Map<string,THREE.MeshStandardMaterial>();
+  const details:THREE.BufferGeometry[]=[];const detailMaterials:THREE.Material[]=[];
+  const add=(g:THREE.BufferGeometry,color:string,x:number,y:number,z:number)=>{details.push(g);const m=new THREE.MeshStandardMaterial({color,flatShading:true,roughness:1});detailMaterials.push(m);const mesh=new THREE.Mesh(g,m);mesh.position.set(x,y,z);scene.add(mesh);return mesh;};
   for(const {tile,p} of positions){
    const color=TERRAIN_COLORS[tile.terrain];
    let mat=materials.get(color);if(!mat){mat=new THREE.MeshStandardMaterial({color,roughness:1,flatShading:true});materials.set(color,mat);}
    const mesh=new THREE.Mesh(geometry,mat);mesh.position.set(p.x,0,p.y);scene.add(mesh);bounds.expandByObject(mesh);
+   const x=p.x,z=p.y;
+   switch(tile.terrain){
+    case 'forest': for(const [dx,dz,h] of [[-.38,-.22,.58],[.24,-.34,.45],[.32,.24,.62],[-.25,.35,.4]]){add(new THREE.CylinderGeometry(.045,.06,.19,5),'#795740',x+dx,.21,z+dz);add(new THREE.ConeGeometry(.19,h,5),'#315d45',x+dx,.3+h/2,z+dz);}break;
+    case 'pasture': for(const [dx,dz] of [[-.32,-.22],[.27,.15],[-.12,.38]]){add(new THREE.IcosahedronGeometry(.13,0),'#e0d9bd',x+dx,.24,z+dz).scale.set(1.4,.8,1);add(new THREE.IcosahedronGeometry(.055,0),'#665e50',x+dx+.14,.24,z+dz);}break;
+    case 'field': for(let i=0;i<5;i++){add(new THREE.BoxGeometry(.09,.12,.8),'#d8b35e',x+(i-2)*.18,.18,z);}break;
+    case 'hill': for(const [dx,dz,h] of [[-.25,-.15,.27],[.28,.22,.36]]){add(new THREE.IcosahedronGeometry(.35,0),'#b67d55',x+dx,.12+h*.3,z+dz).scale.set(1,h/.35,1);}break;
+    case 'mountain': for(const [dx,dz,h] of [[-.28,-.13,.85],[.30,.14,.62]]){add(new THREE.ConeGeometry(.36,h,5),'#697b85',x+dx,.12+h/2,z+dz);add(new THREE.ConeGeometry(.13,h*.35,5),'#e2e6df',x+dx,.12+h*.825,z+dz);}break;
+    case 'desert': add(new THREE.SphereGeometry(.5,6,3),'#e2c18a',x,.12,z).scale.set(1,.24,.65);break;
+   }
   }
   const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
   const span=Math.max(size.x,size.z)+3;
@@ -33,7 +44,7 @@ export function BoardScene3D({board,onUnavailable}:{board:Board;onUnavailable:()
   const draw=()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;const aspect=w/h,half=span*.65*Math.max(1,1/aspect);camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;camera.updateProjectionMatrix();renderer.setSize(w,h,false);renderer.render(scene,camera);};
   const observer=new ResizeObserver(draw);observer.observe(el);draw();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
-  return()=>{observer.disconnect();renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
+  return()=>{observer.disconnect();renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
  },[board]);
  return <div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/>;
 }
