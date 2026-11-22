@@ -2,6 +2,7 @@ import {StrictMode,useMemo,useRef,useState,useEffect,useLayoutEffect,type Keyboa
 import {createRoot} from 'react-dom/client';
 import {generateBoard,tilePosition,vertexPosition,type BoardSize,type Terrain,createSetup,activePlayer,legalSettlements,legalRoads,applySetup,type PlayerCount,type SetupState,startGame,applyGame,legalBuilds,rollDice,RESOURCES,type GameState,type BuildKind,freeRoadSites,playerScore,chooseFirstPlayer,decisionPlayer,type Difficulty} from '@orvane/engine';
 import './style.css';
+import {BoardScene3D} from './BoardScene3D';
 import {DevelopmentPanel} from './DevelopmentPanel';
 import {TradePanel} from './TradePanel';
 import {resourceEmoji} from './resources';
@@ -43,6 +44,7 @@ type Selection={kind:'tile'|'vertex'|'edge';id:string};
 const R=49;
 const CONTROL_PATHS={"journal":"M5 3h12l2 2v16H7V3 M5 3v18 M10 8h6 M10 12h6","follow":"M3 7h12v10H3z M15 10l6-4v12l-6-4","minus":"M5 12h14","plus":"M5 12h14 M12 5v14","fit":"M8 3H3v5 M16 3h5v5 M3 16v5h5 M21 16v5h-5","map":"M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z M9 3v16 M15 5v16","build":"M4 20l12-12 M12 4l4-2 6 6-4 4z","trade":"M3 7h17l-4-4 M20 7l-4 4 M21 17H4l4-4 M4 17l4 4","cards":"M4 5l12-2 3 16-12 2z M8 6h12v15H8","roll":"M4 4h16v16H4z M8 8h.1 M16 8h.1 M12 12h.1 M8 16h.1 M16 16h.1","end":"M4 12h15 M13 6l6 6-6 6","menu":"M4 6h16 M4 12h16 M4 18h16","play":"M7 4l14 8-14 8z","check":"M4 12l5 5L20 6"};
 function ControlIcon({name}:{name:keyof typeof CONTROL_PATHS}){return <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,pointerEvents:'none'}}><path d={CONTROL_PATHS[name]}/></svg>}
+function Preview3D(){const board=useMemo(()=>generateBoard('orvane-3d-preview','standard'),[]);const [failed,setFailed]=useState(false);return <main style={{height:'100dvh',display:'flex',flexDirection:'column'}}><header><h1>Orvane · Experimental 3D</h1><a href={window.location.pathname}>Return to game</a></header>{failed?<p>WebGL unavailable. Return to the SVG game.</p>:<div style={{flex:1,minHeight:0}}><BoardScene3D board={board} onUnavailable={()=>setFailed(true)}/></div>}</main>}
 function App(){
  const pwa=usePwa();
  const [prefs]=useState(()=>{try{return readPreferences(localStorage);}catch{return DEFAULT_PREFS;}});
@@ -425,4 +427,4 @@ function App(){
   {!view&&<footer>Local base game · Autosave · Offline play · Online optional.</footer>}
  </main>;
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><App/></StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode>{new URLSearchParams(window.location.search).get('preview')==='3d'?<Preview3D/>:<App/>}</StrictMode>);
