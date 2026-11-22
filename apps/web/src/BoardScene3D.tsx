@@ -1,9 +1,10 @@
 import {useEffect,useRef} from 'react';
 import * as THREE from 'three';
-import {tilePosition,type Board} from '@orvane/engine';
+import {tilePosition,vertexPosition,type Board} from '@orvane/engine';
 import {TERRAIN_COLORS} from './TerrainArt';
 
-export function BoardScene3D({board,onUnavailable}:{board:Board;onUnavailable:()=>void}){
+type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
+export function BoardScene3D({board,onUnavailable,pieces}:{board:Board;onUnavailable:()=>void;pieces?:Pieces}){
  const host=useRef<HTMLDivElement>(null);
  const fallback=useRef(onUnavailable);fallback.current=onUnavailable;
  useEffect(()=>{
@@ -32,6 +33,27 @@ export function BoardScene3D({board,onUnavailable}:{board:Board;onUnavailable:()
     case 'desert': add(new THREE.SphereGeometry(.5,6,3),'#e2c18a',x,.12,z).scale.set(1,.24,.65);break;
    }
   }
+  const vertices=new Map(board.vertices.map(v=>[v.id,vertexPosition(v,1)]));
+  // Preview samples only; real matches will supply their own piece data.
+  const sample:Pieces={roads:[],buildings:[]};
+  const colors=['#bd5145','#4189b8','#e9d8b4','#de963f'];
+  const occupied=new Set<string>();
+  for(const [i,color] of colors.entries()){
+   const edge=board.edges.find((e,j)=>j>=Math.floor(i*board.edges.length/4)&&!occupied.has(e.a)&&!occupied.has(e.b));
+   if(!edge)continue;occupied.add(edge.a);occupied.add(edge.b);
+   sample.roads.push({edgeId:edge.id,color});sample.buildings.push({vertexId:edge.a,color,kind:i%2?'city':'settlement'});
+  }
+  const display=pieces??sample;
+  for(const road of display.roads){const edge=board.edges.find(e=>e.id===road.edgeId);if(!edge)continue;const a=vertices.get(edge.a),b=vertices.get(edge.b);if(!a||!b)continue;
+   const length=Math.hypot(b.x-a.x,b.y-a.y),angle=Math.atan2(b.y-a.y,b.x-a.x);
+   add(new THREE.BoxGeometry(length*.92,.11,.13),'#52463e',(a.x+b.x)/2,.17,(a.y+b.y)/2).rotation.y=-angle;
+   add(new THREE.BoxGeometry(length*.9,.07,.10),road.color,(a.x+b.x)/2,.25,(a.y+b.y)/2).rotation.y=-angle;
+  }
+  for(const building of display.buildings){const p=vertices.get(building.vertexId);if(!p)continue;
+   add(new THREE.BoxGeometry(.49,.07,.43),'#746656',p.x,.17,p.y);
+   const house=(x:number,z:number,w:number,h:number)=>{add(new THREE.BoxGeometry(w,h,w*.85),building.color,x,.21+h/2,z);const roof=add(new THREE.CylinderGeometry(0,w*.77,w*.48,4),building.color,x,.21+h+w*.24,z);roof.rotation.y=Math.PI/4;add(new THREE.BoxGeometry(w*.22,h*.6,.025),'#443e37',x,.21+h*.3,z+w*.43);};
+   if(building.kind==='city'){house(p.x-.12,p.y,.26,.36);house(p.x+.15,p.y+.04,.21,.24);}else house(p.x,p.y,.30,.23);
+  }
   scene.updateMatrixWorld(true);bounds.setFromObject(scene);
   const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
   const span=Math.max(size.x,size.z)+3;
@@ -48,6 +70,6 @@ export function BoardScene3D({board,onUnavailable}:{board:Board;onUnavailable:()
   const observer=new ResizeObserver(draw);observer.observe(el);draw();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
   return()=>{observer.disconnect();renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
- },[board]);
+ },[board,pieces]);
  return <div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/>;
 }
