@@ -11,10 +11,12 @@
   "dependencies": {
     "@orvane/engine": "workspace:*",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "three": "0.180.0"
   },
   "devDependencies": {
     "vite": "^6.3.6",
-    "@vitejs/plugin-react": "^4.7.0"
+    "@vitejs/plugin-react": "^4.7.0",
+    "@types/three": "0.180.0"
   }
 }
