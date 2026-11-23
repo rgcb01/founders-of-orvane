@@ -54,6 +54,25 @@ export function BoardScene3D({board,onUnavailable,pieces}:{board:Board;onUnavail
    const house=(x:number,z:number,w:number,h:number)=>{add(new THREE.BoxGeometry(w,h,w*.85),building.color,x,.21+h/2,z);const roof=add(new THREE.CylinderGeometry(0,w*.77,w*.48,4),building.color,x,.21+h+w*.24,z);roof.rotation.y=Math.PI/4;add(new THREE.BoxGeometry(w*.22,h*.6,.025),'#443e37',x,.21+h*.3,z+w*.43);};
    if(building.kind==='city'){house(p.x-.12,p.y,.26,.36);house(p.x+.15,p.y+.04,.21,.24);}else house(p.x,p.y,.30,.23);
   }
+  // Number tokens use canvas textures, independent of the UI font.
+  const textures:THREE.Texture[]=[];
+  for(const {tile,p} of positions){
+   if(!('number' in tile)||typeof tile.number!=='number'||tile.number<2)continue;
+   const canvas=document.createElement('canvas');canvas.width=128;canvas.height=128;const ctx=canvas.getContext('2d');if(!ctx)continue;
+   ctx.fillStyle='#f3e6c8';ctx.fillRect(0,0,128,128);ctx.fillStyle=tile.number===6||tile.number===8?'#a43e32':'#39352e';ctx.font='bold 76px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(tile.number),64,68);
+   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;textures.push(texture);
+   add(new THREE.CylinderGeometry(.23,.23,.06,32),'#cbbd9f',p.x,.18,p.y+.62);
+   const g=new THREE.CircleGeometry(.21,32);details.push(g);const m=new THREE.MeshBasicMaterial({map:texture});detailMaterials.set('token-'+tile.id,m as unknown as THREE.MeshStandardMaterial);const token=new THREE.Mesh(g,m);token.rotation.x=-Math.PI/2;token.position.set(p.x,.215,p.y+.62);scene.add(token);
+  }
+  for(const harbor of board.harbors){
+   const edge=board.edges.find(e=>e.id===harbor.edgeId);if(!edge)continue;const a=vertices.get(edge.a),b=vertices.get(edge.b),t=positions.find(t=>t.tile.id===edge.tiles[0]);if(!a||!b||!t)continue;
+   const x=(a.x+b.x)/2,z=(a.y+b.y)/2,dx=x-t.p.x,dz=z-t.p.y,len=Math.hypot(dx,dz);if(!len)continue;const ux=dx/len,uz=dz/len,angle=Math.atan2(uz,ux);
+   add(new THREE.BoxGeometry(.65,.1,.27),'#a7855c',x+ux*.24,.03,z+uz*.24).rotation.y=-angle;
+   const sx=x+ux*.78,sz=z+uz*.78;
+   add(new THREE.SphereGeometry(.29,6,4),'#624b38',sx,-.03,sz).scale.set(1.5,.5,.65);
+   add(new THREE.CylinderGeometry(.025,.025,.45,6),'#825d40',sx,.23,sz);
+   add(new THREE.ConeGeometry(.23,.42,3),'#e9dfbe',sx,.35,sz).scale.set(1,1,.28);
+  }
   scene.updateMatrixWorld(true);bounds.setFromObject(scene);
   const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
   const span=Math.max(size.x,size.z)+3;
@@ -69,7 +88,7 @@ export function BoardScene3D({board,onUnavailable,pieces}:{board:Board;onUnavail
   const draw=()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;const aspect=w/h,half=Math.max(fit.y/2,fit.x/(2*aspect))*1.08;camera.left=mid.x-half*aspect;camera.right=mid.x+half*aspect;camera.top=mid.y+half;camera.bottom=mid.y-half;camera.updateProjectionMatrix();renderer.setSize(w,h,false);renderer.render(scene,camera);};
   const observer=new ResizeObserver(draw);observer.observe(el);draw();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
-  return()=>{observer.disconnect();renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
+  return()=>{observer.disconnect();renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
  },[board,pieces]);
  return <div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/>;
 }
