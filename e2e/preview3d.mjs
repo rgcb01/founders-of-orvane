@@ -22,4 +22,20 @@ try{
  if(await page.getByText(/^Selected (tile|edge|vertex):/).textContent()!==label)throw Error('Dragging unexpectedly changed selection');
  if(errors.length)throw Error(errors.join('\n'));await page.close();
  }
+ // Live match smoke: opt in during setup, verify WebGL canvas, then return to SVG.
+ const live=await browser.newPage({viewport:{width:1280,height:800}});
+ const liveErrors=[];live.on('pageerror',e=>liveErrors.push(e.message));
+ await live.goto(url);
+ await live.getByRole('button',{name:/New game/}).click();
+ await live.getByRole('button',{name:'Start setup'}).click();
+ const toggle=live.getByRole('button',{name:'Toggle experimental 3D board'});
+ await toggle.click();
+ await live.locator('canvas').waitFor({timeout:15000});
+ if(await toggle.getAttribute('aria-pressed')!=='true')throw Error('3D toggle failed to activate');
+ await live.screenshot({path:'artifacts/preview3d/live-setup.png'});
+ await toggle.click();
+ await live.locator('[data-board-root="true"]').waitFor({timeout:5000});
+ if(await toggle.getAttribute('aria-pressed')!=='false')throw Error('SVG fallback toggle failed');
+ if(liveErrors.length)throw Error(liveErrors.join('\\n'));
+ await live.close();
 }finally{await browser?.close();server.kill();}
