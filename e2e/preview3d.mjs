@@ -27,6 +27,7 @@ try{
  const liveErrors=[];live.on('pageerror',e=>liveErrors.push(e.message));
  await live.goto(url);
  await live.getByRole('button',{name:/New game/}).click();
+ await live.getByLabel('Bot pace').first().selectOption('turbo');
  await live.getByRole('button',{name:'Start setup'}).click();
  const toggle=live.getByRole('button',{name:'Toggle experimental 3D board'});
  await toggle.click();
@@ -40,6 +41,7 @@ try{
  const confirm=live.getByRole('button',{name:'Confirm placement'}).first();
  const rect=await live.locator('canvas').boundingBox();
  if(!rect)throw Error('Live 3D board has no canvas bounds');
+ await live.waitForFunction(()=>{const el=document.querySelector('canvas');return el&&JSON.parse(el.dataset.legalVertices??'[]').length>0;},null,{timeout:30000});
  const sites=await live.locator('canvas').evaluate(el=>JSON.parse(el.dataset.legalVertices??'[]'));
  if(!sites.length)throw Error('No projected legal settlement sites available');
  let found=false;
