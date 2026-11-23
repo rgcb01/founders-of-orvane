@@ -40,11 +40,12 @@ try{
  const confirm=live.getByRole('button',{name:'Confirm placement'}).first();
  const rect=await live.locator('canvas').boundingBox();
  if(!rect)throw Error('Live 3D board has no canvas bounds');
+ const sites=await live.locator('canvas').evaluate(el=>JSON.parse(el.dataset.legalVertices??'[]'));
+ if(!sites.length)throw Error('No projected legal settlement sites available');
  let found=false;
- for(let yi=0;yi<16&&!found;yi++)for(let xi=0;xi<25&&!found;xi++){
-   const x=rect.x+rect.width*(xi+.5)/25,y=rect.y+rect.height*(yi+.5)/16;
-   await live.mouse.click(x,y);
-   if(await confirm.isEnabled()){found=true;await confirm.click();}
+ for(const site of sites){
+   await live.mouse.click(rect.x+site.x,rect.y+site.y);
+   if(await confirm.isEnabled()){found=true;await confirm.click();break;}
  }
  if(!found)throw Error('Could not select any legal settlement through the 3D canvas');
  await live.waitForFunction(step=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step>step,before,{timeout:10000});
