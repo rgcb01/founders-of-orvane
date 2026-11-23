@@ -33,6 +33,22 @@ try{
  await live.locator('canvas').waitFor({timeout:15000});
  if(await toggle.getAttribute('aria-pressed')!=='true')throw Error('3D toggle failed to activate');
  await live.screenshot({path:'artifacts/preview3d/live-setup.png'});
+ // Find a legal settlement by actual WebGL raycasting; confirm it through the live engine.
+ const coach=live.getByRole('complementary',{name:'Interactive tutorial'});
+ if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
+ const before=await live.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step);
+ const confirm=live.getByRole('button',{name:'Confirm placement'}).first();
+ const rect=await live.locator('canvas').boundingBox();
+ if(!rect)throw Error('Live 3D board has no canvas bounds');
+ let found=false;
+ for(let yi=0;yi<16&&!found;yi++)for(let xi=0;xi<25&&!found;xi++){
+   const x=rect.x+rect.width*(xi+.5)/25,y=rect.y+rect.height*(yi+.5)/16;
+   await live.mouse.click(x,y);
+   if(await confirm.isEnabled()){found=true;await confirm.click();}
+ }
+ if(!found)throw Error('Could not select any legal settlement through the 3D canvas');
+ await live.waitForFunction(step=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step>step,before,{timeout:10000});
+ await live.screenshot({path:'artifacts/preview3d/live-after-placement.png'});
  await toggle.click();
  await live.locator('[data-board-root="true"]').waitFor({timeout:5000});
  if(await toggle.getAttribute('aria-pressed')!=='false')throw Error('SVG fallback toggle failed');
