@@ -1,11 +1,14 @@
-import {useEffect,useRef} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import * as THREE from 'three';
 import {tilePosition,vertexPosition,type Board} from '@orvane/engine';
 import {TERRAIN_COLORS} from './TerrainArt';
 
+type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
-export function BoardScene3D({board,onUnavailable,pieces}:{board:Board;onUnavailable:()=>void;pieces?:Pieces}){
+export function BoardScene3D({board,onUnavailable,pieces,onSelect}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void}){
  const host=useRef<HTMLDivElement>(null);
+ const [selected,setSelected]=useState<BoardSelection|null>(null);
+ const selectionCallback=useRef(onSelect);selectionCallback.current=onSelect;
  const fallback=useRef(onUnavailable);fallback.current=onUnavailable;
  useEffect(()=>{
   const el=host.current;if(!el)return;
@@ -13,6 +16,7 @@ export function BoardScene3D({board,onUnavailable,pieces}:{board:Board;onUnavail
   try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});}catch{fallback.current();return;}
   const scene=new THREE.Scene();scene.background=new THREE.Color('#183e49');
   const camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,500);
+  const selectable:THREE.Object3D[]=[];
   const positions=board.tiles.map(t=>({tile:t,p:tilePosition(t,1)}));
   const bounds=new THREE.Box3();
   const geometry=new THREE.CylinderGeometry(.98,.98,.24,6);
@@ -22,7 +26,7 @@ export function BoardScene3D({board,onUnavailable,pieces}:{board:Board;onUnavail
   for(const {tile,p} of positions){
    const color=TERRAIN_COLORS[tile.terrain];
    let mat=materials.get(color);if(!mat){mat=new THREE.MeshStandardMaterial({color,roughness:1,flatShading:true});materials.set(color,mat);}
-   const mesh=new THREE.Mesh(geometry,mat);mesh.position.set(p.x,0,p.y);scene.add(mesh);bounds.expandByObject(mesh);
+   const mesh=new THREE.Mesh(geometry,mat);mesh.position.set(p.x,0,p.y);scene.add(mesh);mesh.userData={selection:{kind:'tile',id:tile.id}};selectable.push(mesh);bounds.expandByObject(mesh);
    const x=p.x,z=p.y;
    switch(tile.terrain){
     case 'forest': for(const [dx,dz,h] of [[-.38,-.22,.58],[.24,-.34,.45],[.32,.24,.62],[-.25,.35,.4]]){add(new THREE.CylinderGeometry(.045,.06,.19,5),'#795740',x+dx,.21,z+dz);add(new THREE.ConeGeometry(.23,h*.7,5),'#315d45',x+dx,.26+h*.35,z+dz);add(new THREE.ConeGeometry(.16,h*.65,5),'#497458',x+dx,.35+h*.65,z+dz);}break;
@@ -47,10 +51,10 @@ export function BoardScene3D({board,onUnavailable,pieces}:{board:Board;onUnavail
   for(const road of display.roads){const edge=board.edges.find(e=>e.id===road.edgeId);if(!edge)continue;const a=vertices.get(edge.a),b=vertices.get(edge.b);if(!a||!b)continue;
    const length=Math.hypot(b.x-a.x,b.y-a.y),angle=Math.atan2(b.y-a.y,b.x-a.x);
    add(new THREE.BoxGeometry(length*.92,.11,.13),'#52463e',(a.x+b.x)/2,.17,(a.y+b.y)/2).rotation.y=-angle;
-   add(new THREE.BoxGeometry(length*.9,.07,.10),road.color,(a.x+b.x)/2,.25,(a.y+b.y)/2).rotation.y=-angle;
+   const pick=add(new THREE.BoxGeometry(length*.9,.07,.18),road.color,(a.x+b.x)/2,.25,(a.y+b.y)/2);pick.rotation.y=-angle;pick.userData={selection:{kind:'edge',id:edge.id}};selectable.push(pick);
   }
   for(const building of display.buildings){const p=vertices.get(building.vertexId);if(!p)continue;
-   add(new THREE.BoxGeometry(.49,.07,.43),'#746656',p.x,.17,p.y);
+   const pick=add(new THREE.BoxGeometry(.49,.07,.43),'#746656',p.x,.17,p.y);pick.userData={selection:{kind:'vertex',id:building.vertexId}};selectable.push(pick);
    const house=(x:number,z:number,w:number,h:number)=>{add(new THREE.BoxGeometry(w,h,w*.85),building.color,x,.21+h/2,z);const roof=add(new THREE.CylinderGeometry(0,w*.77,w*.48,4),building.color,x,.21+h+w*.24,z);roof.rotation.y=Math.PI/4;add(new THREE.BoxGeometry(w*.22,h*.6,.025),'#443e37',x,.21+h*.3,z+w*.43);};
    if(building.kind==='city'){house(p.x-.12,p.y,.26,.36);house(p.x+.15,p.y+.04,.21,.24);}else house(p.x,p.y,.30,.23);
   }
@@ -87,15 +91,17 @@ export function BoardScene3D({board,onUnavailable,pieces}:{board:Board;onUnavail
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));el.appendChild(renderer.domElement);
   const draw=()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;camera.position.set(target.x+Math.sin(azimuth)*span,target.y+span*1.3,target.z+Math.cos(azimuth)*span);camera.lookAt(target);camera.updateMatrixWorld(true);const projected=new THREE.Box3();for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])projected.expandByPoint(new THREE.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse));const fit=projected.getSize(new THREE.Vector3()),mid=projected.getCenter(new THREE.Vector3());const aspect=w/h,half=Math.max(fit.y/2,fit.x/(2*aspect))*1.08/zoom;camera.left=mid.x-half*aspect;camera.right=mid.x+half*aspect;camera.top=mid.y+half;camera.bottom=mid.y-half;camera.updateProjectionMatrix();renderer.setSize(w,h,false);renderer.render(scene,camera);};
   const canvas=renderer.domElement;canvas.style.touchAction='none';
+  const raycaster=new THREE.Raycaster();const ndc=new THREE.Vector2();let start:{x:number;y:number}|null=null;let moved=false;
+  const selectAt=(x:number,y:number)=>{const rect=canvas.getBoundingClientRect();ndc.set((x-rect.left)/rect.width*2-1,-((y-rect.top)/rect.height*2-1));raycaster.setFromCamera(ndc,camera);const hit=raycaster.intersectObjects(selectable,false)[0];const selection=hit?.object.userData.selection as BoardSelection|undefined;if(selection){setSelected(selection);selectionCallback.current?.(selection);}};
   const distance=()=>{const a=[...pointers.values()];return a.length===2?Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y):0;};
-  const down=(e:PointerEvent)=>{canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});pinchDistance=distance();};
-  const move=(e:PointerEvent)=>{const prev=pointers.get(e.pointerId);if(!prev)return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const d=distance();if(pinchDistance>0)zoom=Math.max(.65,Math.min(3,zoom*d/pinchDistance));pinchDistance=d;}else if(pointers.size===1){azimuth+=(e.clientX-prev.x)*.008;}draw();};
-  const up=(e:PointerEvent)=>{pointers.delete(e.pointerId);pinchDistance=distance();};
+  const down=(e:PointerEvent)=>{canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1){start={x:e.clientX,y:e.clientY};moved=false;}else moved=true;pinchDistance=distance();};
+  const move=(e:PointerEvent)=>{const prev=pointers.get(e.pointerId);if(!prev)return;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)>8)moved=true;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const d=distance();if(pinchDistance>0)zoom=Math.max(.65,Math.min(3,zoom*d/pinchDistance));pinchDistance=d;}else if(pointers.size===1){azimuth+=(e.clientX-prev.x)*.008;}draw();};
+  const up=(e:PointerEvent)=>{if(e.type==='pointerup'&&pointers.size===1&&!moved)selectAt(e.clientX,e.clientY);pointers.delete(e.pointerId);pinchDistance=distance();if(!pointers.size)start=null;};
   const wheel=(e:WheelEvent)=>{e.preventDefault();zoom=Math.max(.65,Math.min(3,zoom*Math.exp(-e.deltaY*.001)));draw();};
   canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);canvas.addEventListener('wheel',wheel,{passive:false});
   const observer=new ResizeObserver(draw);observer.observe(el);draw();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
   return()=>{observer.disconnect();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
  },[board,pieces]);
- return <div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/>;
+ return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/>{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
 }
