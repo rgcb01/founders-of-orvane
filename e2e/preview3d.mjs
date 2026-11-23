@@ -36,7 +36,7 @@ try{
  // Find a legal settlement by actual WebGL raycasting; confirm it through the live engine.
  const coach=live.getByRole('complementary',{name:'Interactive tutorial'});
  if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
- const before=await live.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step);
+ const before=await live.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.settlements.length);
  const confirm=live.getByRole('button',{name:'Confirm placement'}).first();
  const rect=await live.locator('canvas').boundingBox();
  if(!rect)throw Error('Live 3D board has no canvas bounds');
@@ -48,7 +48,8 @@ try{
    if(await confirm.isEnabled()){found=true;await confirm.click();break;}
  }
  if(!found)throw Error('Could not select any legal settlement through the 3D canvas');
- await live.waitForFunction(step=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step>step,before,{timeout:10000});
+ await live.waitForFunction(count=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.settlements.length>count,before,{timeout:10000});
+ await live.getByText(/Place its road/).first().waitFor({timeout:5000});
  await live.screenshot({path:'artifacts/preview3d/live-after-placement.png'});
  await toggle.click();
  await live.locator('[data-board-root="true"]').waitFor({timeout:5000});
