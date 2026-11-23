@@ -12,6 +12,14 @@ try{
  const page=await browser.newPage(options);const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(url+'?preview=3d');const canvas=page.locator('canvas');await canvas.waitFor({timeout:15000});await page.waitForTimeout(500);
  await page.screenshot({path:'artifacts/preview3d/'+name+'.png'});
+ // A tap should select a graph location, while a drag must not accidentally select.
+ const bounds=await canvas.boundingBox();if(!bounds)throw Error('3D canvas has no bounds');
+ const x=bounds.x+bounds.width/2,y=bounds.y+bounds.height/2;
+ await page.mouse.click(x,y);
+ await page.getByText(/^Selected (tile|edge|vertex):/).waitFor({timeout:5000});
+ const label=await page.getByText(/^Selected (tile|edge|vertex):/).textContent();
+ await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+55,y+12,{steps:8});await page.mouse.up();
+ if(await page.getByText(/^Selected (tile|edge|vertex):/).textContent()!==label)throw Error('Dragging unexpectedly changed selection');
  if(errors.length)throw Error(errors.join('\n'));await page.close();
  }
 }finally{await browser?.close();server.kill();}
