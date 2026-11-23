@@ -52,6 +52,18 @@ try{
  if(!found)throw Error('Could not select any legal settlement through the 3D canvas');
  await live.waitForFunction(count=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.settlements.length>count,before,{timeout:10000});
  await live.getByText(/Place its road/).first().waitFor({timeout:5000});
+ // Finish the same setup turn by placing its road through the 3D canvas.
+ await live.waitForFunction(()=>{const el=document.querySelector('canvas');return el&&JSON.parse(el.dataset.legalEdges??'[]').length>0;},null,{timeout:10000});
+ const roadSites=await live.locator('canvas').evaluate(el=>JSON.parse(el.dataset.legalEdges??'[]'));
+ const roadRect=await live.locator('canvas').boundingBox();
+ if(!roadRect)throw Error('3D road canvas has no bounds');
+ let roadPlaced=false;
+ for(const site of roadSites){
+   await live.mouse.click(roadRect.x+site.x,roadRect.y+site.y);
+   if(await confirm.isEnabled()){await confirm.click();roadPlaced=true;break;}
+ }
+ if(!roadPlaced)throw Error('Could not place a legal road through the 3D canvas');
+ await live.waitForFunction(step=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step>step,before,{timeout:10000});
  await live.screenshot({path:'artifacts/preview3d/live-after-placement.png'});
  await toggle.click();
  await live.locator('[data-board-root="true"]').waitFor({timeout:5000});
