@@ -7,6 +7,10 @@ type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
 export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[]}){
  const host=useRef<HTMLDivElement>(null);
+ // Parent game UI creates fresh arrays on every render; only rebuild WebGL when their content changes.
+ const piecesKey=JSON.stringify(pieces??null);
+ const legalVerticesKey=(legalVertices??[]).join('|');
+ const legalEdgesKey=(legalEdges??[]).join('|');
  const [selected,setSelected]=useState<BoardSelection|null>(null);
  const selectionCallback=useRef(onSelect);selectionCallback.current=onSelect;
  const fallback=useRef(onUnavailable);fallback.current=onUnavailable;
@@ -122,6 +126,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const observer=new ResizeObserver(draw);observer.observe(el);draw();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
   return()=>{observer.disconnect();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
- },[board,pieces,legalVertices,legalEdges]);
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[board,piecesKey,legalVerticesKey,legalEdgesKey]);
  return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/>{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
 }
