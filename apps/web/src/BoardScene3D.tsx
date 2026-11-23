@@ -7,6 +7,7 @@ type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
 export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[]}){
  const host=useRef<HTMLDivElement>(null);
+ const cameraPose=useRef({zoom:1,azimuth:0});
  // Parent game UI creates fresh arrays on every render; only rebuild WebGL when their content changes.
  const piecesKey=JSON.stringify(pieces??null);
  const legalVerticesKey=(legalVertices??[]).join('|');
@@ -111,7 +112,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const sun=new THREE.DirectionalLight('#fff0d0',2);sun.position.set(-5,12,6);scene.add(sun);
   camera.position.set(center.x,span*1.3,center.z+span);camera.lookAt(center);camera.updateMatrixWorld(true);
   const projected=new THREE.Box3();for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])projected.expandByPoint(new THREE.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse));
-  let zoom=1,azimuth=0;const pointers=new Map<number,{x:number;y:number}>();let pinchDistance=0;const target=center.clone();
+  let {zoom,azimuth}=cameraPose.current;const pointers=new Map<number,{x:number;y:number}>();let pinchDistance=0;const target=center.clone();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));el.appendChild(renderer.domElement);
   const draw=()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;camera.position.set(target.x+Math.sin(azimuth)*span,target.y+span*1.3,target.z+Math.cos(azimuth)*span);camera.lookAt(target);camera.updateMatrixWorld(true);const projected=new THREE.Box3();for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])projected.expandByPoint(new THREE.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse));const fit=projected.getSize(new THREE.Vector3()),mid=projected.getCenter(new THREE.Vector3());const aspect=w/h,half=Math.max(fit.y/2,fit.x/(2*aspect))*1.08/zoom;camera.left=mid.x-half*aspect;camera.right=mid.x+half*aspect;camera.top=mid.y+half;camera.bottom=mid.y-half;camera.updateProjectionMatrix();renderer.setSize(w,h,false);renderer.render(scene,camera);};
   const canvas=renderer.domElement;canvas.style.touchAction='none';
@@ -119,9 +120,9 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const selectAt=(x:number,y:number)=>{const rect=canvas.getBoundingClientRect();ndc.set((x-rect.left)/rect.width*2-1,-((y-rect.top)/rect.height*2-1));raycaster.setFromCamera(ndc,camera);const hit=raycaster.intersectObjects([...pickObjects,...selectable],false)[0];const selection=hit?.object.userData.selection as BoardSelection|undefined;if(selection){setSelected(selection);selectionCallback.current?.(selection);}};
   const distance=()=>{const a=[...pointers.values()];return a.length===2?Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y):0;};
   const down=(e:PointerEvent)=>{canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1){start={x:e.clientX,y:e.clientY};moved=false;}else moved=true;pinchDistance=distance();};
-  const move=(e:PointerEvent)=>{const prev=pointers.get(e.pointerId);if(!prev)return;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)>8)moved=true;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const d=distance();if(pinchDistance>0)zoom=Math.max(.65,Math.min(3,zoom*d/pinchDistance));pinchDistance=d;}else if(pointers.size===1){azimuth+=(e.clientX-prev.x)*.008;}draw();};
+  const move=(e:PointerEvent)=>{const prev=pointers.get(e.pointerId);if(!prev)return;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)>8)moved=true;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const d=distance();if(pinchDistance>0)zoom=Math.max(.65,Math.min(3,zoom*d/pinchDistance));pinchDistance=d;}else if(pointers.size===1){azimuth+=(e.clientX-prev.x)*.008;}cameraPose.current={zoom,azimuth};draw();};
   const up=(e:PointerEvent)=>{if(e.type==='pointerup'&&pointers.size===1&&!moved)selectAt(e.clientX,e.clientY);pointers.delete(e.pointerId);pinchDistance=distance();if(!pointers.size)start=null;};
-  const wheel=(e:WheelEvent)=>{e.preventDefault();zoom=Math.max(.65,Math.min(3,zoom*Math.exp(-e.deltaY*.001)));draw();};
+  const wheel=(e:WheelEvent)=>{e.preventDefault();zoom=Math.max(.65,Math.min(3,zoom*Math.exp(-e.deltaY*.001)));cameraPose.current={zoom,azimuth};draw();};
   canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);canvas.addEventListener('wheel',wheel,{passive:false});
   const observer=new ResizeObserver(draw);observer.observe(el);draw();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
