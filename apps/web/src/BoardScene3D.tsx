@@ -5,7 +5,7 @@ import {TERRAIN_COLORS} from './TerrainArt';
 
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
-export function BoardScene3D({board,onUnavailable,pieces,onSelect}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void}){
+export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[]}){
  const host=useRef<HTMLDivElement>(null);
  const [selected,setSelected]=useState<BoardSelection|null>(null);
  const selectionCallback=useRef(onSelect);selectionCallback.current=onSelect;
@@ -60,6 +60,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect}:{board:Board;
   }
   // Invisible selection volumes cover every buildable graph location, including empty sites.
   // Keep them separate from visible meshes so construction remains possible before ownership.
+  const legalVertexSet=new Set(legalVertices??[]),legalEdgeSet=new Set(legalEdges??[]);
   const pickGeometry:THREE.BufferGeometry[]=[];
   const pickMaterial=new THREE.MeshBasicMaterial({visible:false,depthWrite:false});
   const pickObjects:THREE.Object3D[]=[];
@@ -67,6 +68,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect}:{board:Board;
    const p=vertices.get(vertex.id);if(!p)continue;
    const g=new THREE.SphereGeometry(.20,8,6);pickGeometry.push(g);
    const mesh=new THREE.Mesh(g,pickMaterial);mesh.position.set(p.x,.32,p.y);mesh.userData={selection:{kind:'vertex',id:vertex.id}};scene.add(mesh);pickObjects.push(mesh);
+   if(legalVertexSet.has(vertex.id))add(new THREE.TorusGeometry(.19,.035,6,12),'#f5d784',p.x,.20,p.y).rotation.x=-Math.PI/2;
   }
   for(const edge of board.edges){
    const a=vertices.get(edge.a),b=vertices.get(edge.b);if(!a||!b)continue;
@@ -74,6 +76,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect}:{board:Board;
    const g=new THREE.BoxGeometry(length*.68,.13,.16);pickGeometry.push(g);
    const mesh=new THREE.Mesh(g,pickMaterial);mesh.position.set((a.x+b.x)/2,.29,(a.y+b.y)/2);
    mesh.rotation.y=-Math.atan2(b.y-a.y,b.x-a.x);mesh.userData={selection:{kind:'edge',id:edge.id}};scene.add(mesh);pickObjects.push(mesh);
+   if(legalEdgeSet.has(edge.id)){const marker=add(new THREE.BoxGeometry(length*.65,.045,.065),'#f5d784',(a.x+b.x)/2,.23,(a.y+b.y)/2);marker.rotation.y=mesh.rotation.y;}
   }
   // Number tokens use canvas textures, independent of the UI font.
   const textures:THREE.Texture[]=[];
@@ -119,6 +122,6 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect}:{board:Board;
   const observer=new ResizeObserver(draw);observer.observe(el);draw();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
   return()=>{observer.disconnect();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
- },[board,pieces]);
+ },[board,pieces,legalVertices,legalEdges]);
  return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/>{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
 }
