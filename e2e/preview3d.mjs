@@ -38,6 +38,7 @@ try{
  const coach=live.getByRole('complementary',{name:'Interactive tutorial'});
  if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
  const before=await live.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.settlements.length);
+ const turnBefore=await live.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step);
  const confirm=live.getByRole('button',{name:'Confirm placement'}).first();
  const rect=await live.locator('canvas').boundingBox();
  if(!rect)throw Error('Live 3D board has no canvas bounds');
@@ -63,7 +64,7 @@ try{
    if(await confirm.isEnabled()){await confirm.click();roadPlaced=true;break;}
  }
  if(!roadPlaced)throw Error('Could not place a legal road through the 3D canvas');
- await live.waitForFunction(step=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step>step,before,{timeout:10000});
+ await live.waitForFunction(step=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step>step,turnBefore,{timeout:10000});
  await live.screenshot({path:'artifacts/preview3d/live-after-placement.png'});
  await toggle.click();
  await live.locator('[data-board-root="true"]').waitFor({timeout:5000});
