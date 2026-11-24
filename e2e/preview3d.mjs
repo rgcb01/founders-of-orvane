@@ -1,6 +1,6 @@
 import {chromium,devices} from 'playwright';
 import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
+import {mkdir,writeFile} from 'node:fs/promises';
 const url='http://127.0.0.1:4174/';
 const server=spawn('pnpm',['--filter','@orvane/web','exec','vite','preview','--host','127.0.0.1','--port','4174','--strictPort'],{stdio:'inherit'});
 let browser;
@@ -8,10 +8,13 @@ try{
  for(let i=0;i<100;i++){try{if((await fetch(url)).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
  browser=await chromium.launch({args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  await mkdir('artifacts/preview3d',{recursive:true});
+ const metrics=[];
  for(const [name,options] of [['desktop',{viewport:{width:1440,height:900}}],['phone-portrait',{...devices['iPhone 13 Pro Max']}],['phone-landscape',{...devices['iPhone 13 Pro Max landscape']}]]){
  const page=await browser.newPage(options);const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(url+'?preview=3d');const canvas=page.locator('canvas');await canvas.waitFor({timeout:15000});await page.waitForTimeout(500);
  await page.screenshot({path:'artifacts/preview3d/'+name+'.png'});
+ for(const quality of ['low','medium','high','auto']){await page.getByLabel('Graphics quality').selectOption(quality);await page.waitForTimeout(200);if(quality!=='low'){await page.waitForFunction(()=>!!document.querySelector('canvas')?.dataset.renderMetrics,null,{timeout:30000});}metrics.push({name,quality,metrics:await canvas.evaluate(el=>JSON.parse(el.dataset.renderMetrics??'null'))});}
+ await page.getByLabel('Graphics quality').selectOption('auto');
  // A tap should select a graph location, while a drag must not accidentally select.
  const bounds=await canvas.boundingBox();if(!bounds)throw Error('3D canvas has no bounds');
  const x=bounds.x+bounds.width/2,y=bounds.y+bounds.height/2;
@@ -22,6 +25,7 @@ try{
  if(await page.getByText(/^Selected (tile|edge|vertex):/).textContent()!==label)throw Error('Dragging unexpectedly changed selection');
  if(errors.length)throw Error(errors.join('\n'));await page.close();
  }
+ await writeFile('artifacts/preview3d/render-metrics.json',JSON.stringify(metrics,null,2));
  // Live match smoke: default WebGL board during setup, then verify technical SVG fallback.
  const live=await browser.newPage({viewport:{width:1280,height:800}});
  const liveErrors=[];live.on('pageerror',e=>liveErrors.push(e.message));
