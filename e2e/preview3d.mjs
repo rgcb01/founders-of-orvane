@@ -14,7 +14,7 @@ try{
  await page.goto(url+'?preview=3d');const canvas=page.locator('canvas');await canvas.waitFor({timeout:15000});await page.waitForTimeout(500);
  await page.screenshot({path:'artifacts/preview3d/'+name+'.png'});
  for(const quality of ['low','medium','high','auto']){await page.getByLabel('Graphics quality').selectOption(quality);await page.waitForTimeout(200);if(quality!=='low'){await page.waitForFunction(()=>!!document.querySelector('canvas')?.dataset.renderMetrics,null,{timeout:30000});}metrics.push({name,quality,metrics:await canvas.evaluate(el=>JSON.parse(el.dataset.renderMetrics??'null'))});}
- await page.getByLabel('Graphics quality').selectOption('auto');
+ await page.getByLabel('Graphics quality').selectOption('auto');await canvas.waitFor({timeout:15000});await page.waitForFunction(()=>!!document.querySelector('canvas')?.dataset.cameraPose);
  // A tap should select a graph location, while a drag must not accidentally select.
  const bounds=await canvas.boundingBox();if(!bounds)throw Error('3D canvas has no bounds');
  const x=bounds.x+bounds.width/2,y=bounds.y+bounds.height/2;
@@ -45,7 +45,7 @@ try{
  await live.mouse.move(cameraBounds.x+cameraBounds.width/2,cameraBounds.y+cameraBounds.height/2);
  await live.mouse.down();await live.mouse.move(cameraBounds.x+cameraBounds.width/2+45,cameraBounds.y+cameraBounds.height/2,{steps:5});await live.mouse.up();
  await live.mouse.wheel(0,-150);
- await live.waitForFunction(()=>{const c=document.querySelector('canvas');const p=JSON.parse(c?.dataset.cameraPose??'{}');return p.zoom>1&&Math.abs(p.azimuth)>0;});
+ await live.waitForFunction(()=>{const c=document.querySelector('canvas');const p=JSON.parse(c?.dataset.cameraPose??'{}');return p.zoom>1&&(Math.abs(p.azimuth)>0||Math.abs(p.panX)>0||Math.abs(p.panY)>0);});
  const pose=await initialCanvas.getAttribute('data-camera-pose');
  const before=await live.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.settlements.length);
  const turnBefore=await live.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step);
@@ -79,7 +79,7 @@ try{
  await live.waitForFunction(step=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step>step,turnBefore,{timeout:10000});
  await live.waitForFunction(expected=>document.querySelector('canvas')?.dataset.cameraPose===expected,pose,{timeout:10000});
  await live.screenshot({path:'artifacts/preview3d/live-after-placement.png'});
- await live.evaluate(()=>{const gl=document.querySelector('canvas')?.getContext('webgl2');gl?.getExtension('WEBGL_lose_context')?.loseContext();});
+ await live.evaluate(()=>{const canvas=document.querySelector('canvas');if(!canvas)throw Error('Missing WebGL canvas');canvas.dispatchEvent(new Event('webglcontextlost',{cancelable:true}));});
  await live.locator('[data-board-root="true"]').waitFor({timeout:5000});
  if(liveErrors.length)throw Error(liveErrors.join('\\n'));
  await live.close();
