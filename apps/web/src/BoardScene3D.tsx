@@ -5,13 +5,14 @@ import {TERRAIN_COLORS} from './TerrainArt';
 
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
-export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges,robberTile}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[];robberTile?:string}){
+export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges,robberTile,producingTiles}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[];robberTile?:string;producingTiles?:readonly string[]}){
  const host=useRef<HTMLDivElement>(null);
  const resetCamera=useRef(()=>{});
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
  const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
  const cameraPose=useRef({zoom:1,azimuth:0,panX:0,panY:0});
  // Parent game UI creates fresh arrays on every render; only rebuild WebGL when their content changes.
+ const productionKey=(producingTiles??[]).join('|');
  const piecesKey=JSON.stringify(pieces??null);
  const legalVerticesKey=(legalVertices??[]).join('|');
  const legalEdgesKey=(legalEdges??[]).join('|');
@@ -138,6 +139,9 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   let {zoom,azimuth,panX,panY}=cameraPose.current;const pointers=new Map<number,{x:number;y:number}>();let pinchDistance=0;const target=center.clone();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));el.appendChild(renderer.domElement);
   const draw=()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;camera.position.set(target.x+Math.sin(azimuth)*span,target.y+span*1.3,target.z+Math.cos(azimuth)*span);camera.lookAt(target);camera.updateMatrixWorld(true);const projected=new THREE.Box3();for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])projected.expandByPoint(new THREE.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse));const fit=projected.getSize(new THREE.Vector3()),mid=projected.getCenter(new THREE.Vector3());const aspect=w/h,half=Math.max(fit.y/2,fit.x/(2*aspect))*1.08/zoom;camera.left=mid.x+panX-half*aspect;camera.right=mid.x+panX+half*aspect;camera.top=mid.y+panY+half;camera.bottom=mid.y+panY-half;camera.updateProjectionMatrix();renderer.setSize(w,h,false);renderer.render(scene,camera);const canvas=renderer.domElement;canvas.dataset.cameraPose=JSON.stringify({zoom,azimuth,panX,panY});canvas.dataset.legalVertices=JSON.stringify([...legalVertexSet].flatMap(id=>{const p=vertices.get(id);if(!p)return [];const q=new THREE.Vector3(p.x,.32,p.y).project(camera);return [{id,x:(q.x+1)*w/2,y:(1-q.y)*h/2}]}));canvas.dataset.legalEdges=JSON.stringify([...legalEdgeSet].flatMap(id=>{const edge=board.edges.find(e=>e.id===id);if(!edge)return [];const a=vertices.get(edge.a),b=vertices.get(edge.b);if(!a||!b)return [];const q=new THREE.Vector3((a.x+b.x)/2,.29,(a.y+b.y)/2).project(camera);return [{id,x:(q.x+1)*w/2,y:(1-q.y)*h/2}]}));};
+  const productionGeometry=new THREE.TorusGeometry(.78,.045,8,48);
+  const productionMaterial=new THREE.MeshBasicMaterial({color:'#ffe39b',transparent:true,opacity:.85,depthTest:false});
+  const productionRings=positions.filter(({tile})=>producingTiles?.includes(tile.id)).map(({p})=>{const ring=new THREE.Mesh(productionGeometry,productionMaterial);ring.rotation.x=-Math.PI/2;ring.position.set(p.x,.28,p.y);ring.renderOrder=8;scene.add(ring);return ring;});
   const markerGeometry=new THREE.TorusGeometry(.23,.035,8,32);
   const markerMaterial=new THREE.MeshBasicMaterial({color:'#fff2a8',depthTest:false});
   const marker=new THREE.Mesh(markerGeometry,markerMaterial);marker.rotation.x=-Math.PI/2;marker.visible=false;marker.renderOrder=10;scene.add(marker);
@@ -157,11 +161,11 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const tick=(now:number)=>{const elapsed=now-started,t=Math.min(1,elapsed/380),ease=1-Math.pow(1-t,3);for(const group of animated)group.scale.set(1,Math.max(.05,ease),1);
    const u=Math.min(1,elapsed/520),smooth=u*u*(3-2*u);
    if(movingRobber&&origin&&robber){robberMeshes.forEach((mesh,i)=>{const dest=robberTargets[i];mesh.position.set(dest.x+(origin.p.x-robber.p.x)*(1-smooth),dest.y+Math.sin(Math.PI*u)*.48,dest.z+(origin.p.y-robber.p.y)*(1-smooth));});}
-   scene.updateMatrixWorld(true);draw();if((animated.length>0&&t<1)||(movingRobber&&u<1))frame=requestAnimationFrame(tick);};
-  if(animated.length||movingRobber)tick(started);else draw();
+   const pulse=Math.min(1,elapsed/650);for(const ring of productionRings)ring.scale.setScalar(.85+.15*Math.sin(Math.PI*pulse));productionMaterial.opacity=.85*(1-pulse);scene.updateMatrixWorld(true);draw();if((animated.length>0&&t<1)||(movingRobber&&u<1)||(productionRings.length>0&&pulse<1))frame=requestAnimationFrame(tick);};
+  if(animated.length||movingRobber||productionRings.length)tick(started);else draw();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
-  return()=>{observer.disconnect();cancelAnimationFrame(frame);markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
+  return()=>{observer.disconnect();cancelAnimationFrame(frame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
  // eslint-disable-next-line react-hooks/exhaustive-deps
- },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile]);
+ },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile,productionKey]);
  return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/><button type="button" aria-label="Reset 3D camera" onClick={()=>resetCamera.current()} style={{position:'absolute',right:12,bottom:12,zIndex:2}}>⌂</button>{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
 }
