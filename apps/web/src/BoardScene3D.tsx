@@ -117,19 +117,22 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    add(new THREE.CylinderGeometry(.23,.23,.06,32),'#cbbd9f',p.x,.18,p.y+.62);
    const g=new THREE.CircleGeometry(.21,32);details.push(g);const m=new THREE.MeshBasicMaterial({map:texture});detailMaterials.set('token-'+tile.id,m as unknown as THREE.MeshStandardMaterial);const token=new THREE.Mesh(g,m);token.rotation.x=-Math.PI/2;token.position.set(p.x,.215,p.y+.62);scene.add(token);
   }
+  const boats:THREE.Group[]=[];
   for(const harbor of board.harbors){
    const edge=board.edges.find(e=>e.id===harbor.edgeId);if(!edge)continue;const a=vertices.get(edge.a),b=vertices.get(edge.b),t=positions.find(t=>t.tile.id===edge.tiles[0]);if(!a||!b||!t)continue;
    const x=(a.x+b.x)/2,z=(a.y+b.y)/2,dx=x-t.p.x,dz=z-t.p.y,len=Math.hypot(dx,dz);if(!len)continue;const ux=dx/len,uz=dz/len,angle=Math.atan2(uz,ux);
    add(new THREE.BoxGeometry(.65,.1,.27),'#a7855c',x+ux*.24,.03,z+uz*.24).rotation.y=-angle;
    const sx=x+ux*.78,sz=z+uz*.78;
+   const boatStart=scene.children.length;
    add(new THREE.SphereGeometry(.29,6,4),'#624b38',sx,-.03,sz).scale.set(1.5,.5,.65);
    add(new THREE.CylinderGeometry(.025,.025,.45,6),'#825d40',sx,.23,sz);
    add(new THREE.ConeGeometry(.23,.42,3),'#e9dfbe',sx,.35,sz).scale.set(1,1,.28);
+   const boat=new THREE.Group();boat.position.set(sx,0,sz);scene.add(boat);for(const mesh of scene.children.slice(boatStart,-1))boat.attach(mesh);boats.push(boat);
   }
   scene.updateMatrixWorld(true);bounds.setFromObject(scene);
   const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
   const span=Math.max(size.x,size.z)+3;
-  const waterGeometry=new THREE.PlaneGeometry(span*8,span*8);
+  const waterGeometry=new THREE.PlaneGeometry(span*8,span*8,24,24);
   const waterMaterial=new THREE.MeshStandardMaterial({color:'#285963',roughness:.85});
   const water=new THREE.Mesh(waterGeometry,waterMaterial);water.rotation.x=-Math.PI/2;water.position.set(center.x,-.15,center.z);scene.add(water);
   scene.add(new THREE.HemisphereLight('#fff1d8','#526b72',2));
@@ -155,6 +158,9 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const wheel=(e:WheelEvent)=>{e.preventDefault();zoom=Math.max(.65,Math.min(3,zoom*Math.exp(-e.deltaY*.001)));cameraPose.current={zoom,azimuth,panX,panY};draw();};
   canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);canvas.addEventListener('wheel',wheel,{passive:false});
   resetCamera.current=()=>{zoom=1;azimuth=0;panX=0;panY=0;cameraPose.current={zoom,azimuth,panX,panY};draw();};
+  const ambientEnabled=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let ambientTimer=0;const ambientStart=performance.now();
+  const ambient=()=>{if(document.hidden||!el.clientWidth||!el.clientHeight)return;const t=(performance.now()-ambientStart)/1000;boats.forEach((boat,i)=>{boat.position.y=.035*Math.sin(t*1.7+i);boat.rotation.z=.045*Math.sin(t*1.3+i);});const pos=waterGeometry.attributes.position;for(let i=0;i<pos.count;i++)pos.setZ(i,.035*Math.sin(pos.getX(i)*.8+t)+.025*Math.cos(pos.getY(i)*.9-t*.8));pos.needsUpdate=true;waterGeometry.computeVertexNormals();renderer.render(scene,camera);};
   const observer=new ResizeObserver(draw);observer.observe(el);let frame=0;const started=performance.now();
   const robberTargets=robberMeshes.map(mesh=>mesh.position.clone());
   const movingRobber=!!origin&&!!robber&&robberMeshes.length>0;
@@ -163,8 +169,9 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    if(movingRobber&&origin&&robber){robberMeshes.forEach((mesh,i)=>{const dest=robberTargets[i];mesh.position.set(dest.x+(origin.p.x-robber.p.x)*(1-smooth),dest.y+Math.sin(Math.PI*u)*.48,dest.z+(origin.p.y-robber.p.y)*(1-smooth));});}
    const pulse=Math.min(1,elapsed/650);for(const ring of productionRings)ring.scale.setScalar(.85+.15*Math.sin(Math.PI*pulse));productionMaterial.opacity=.85*(1-pulse);scene.updateMatrixWorld(true);draw();if((animated.length>0&&t<1)||(movingRobber&&u<1)||(productionRings.length>0&&pulse<1))frame=requestAnimationFrame(tick);};
   if(animated.length||movingRobber||productionRings.length)tick(started);else draw();
+  if(ambientEnabled)ambientTimer=window.setInterval(ambient,1000/24);
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
-  return()=>{observer.disconnect();cancelAnimationFrame(frame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
+  return()=>{observer.disconnect();window.clearInterval(ambientTimer);cancelAnimationFrame(frame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile,productionKey]);
  return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/><button type="button" aria-label="Reset 3D camera" onClick={()=>resetCamera.current()} style={{position:'absolute',right:12,bottom:12,zIndex:2}}>⌂</button>{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
