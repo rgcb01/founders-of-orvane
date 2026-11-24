@@ -2,6 +2,7 @@ import {StrictMode,useMemo,useRef,useState,useEffect,useLayoutEffect,type Keyboa
 import {createRoot} from 'react-dom/client';
 import {generateBoard,tilePosition,vertexPosition,type BoardSize,type Terrain,createSetup,activePlayer,legalSettlements,legalRoads,applySetup,type PlayerCount,type SetupState,startGame,applyGame,legalBuilds,rollDice,RESOURCES,type GameState,type BuildKind,freeRoadSites,playerScore,chooseFirstPlayer,decisionPlayer,type Difficulty} from '@orvane/engine';
 import './style.css';
+
 import {BoardScene3D} from './BoardScene3D';
 import {DevelopmentPanel} from './DevelopmentPanel';
 import {TradePanel} from './TradePanel';
@@ -43,6 +44,11 @@ const terrain:Record<Terrain,{name:string;icon:string;color:string;resource:stri
 type Selection={kind:'tile'|'vertex'|'edge';id:string};
 const R=49;
 const CONTROL_PATHS={"journal":"M5 3h12l2 2v16H7V3 M5 3v18 M10 8h6 M10 12h6","follow":"M3 7h12v10H3z M15 10l6-4v12l-6-4","minus":"M5 12h14","plus":"M5 12h14 M12 5v14","fit":"M8 3H3v5 M16 3h5v5 M3 16v5h5 M21 16v5h-5","map":"M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z M9 3v16 M15 5v16","build":"M4 20l12-12 M12 4l4-2 6 6-4 4z","trade":"M3 7h17l-4-4 M20 7l-4 4 M21 17H4l4-4 M4 17l4 4","cards":"M4 5l12-2 3 16-12 2z M8 6h12v15H8","roll":"M4 4h16v16H4z M8 8h.1 M16 8h.1 M12 12h.1 M8 16h.1 M16 16h.1","end":"M4 12h15 M13 6l6 6-6 6","menu":"M4 6h16 M4 12h16 M4 18h16","play":"M7 4l14 8-14 8z","check":"M4 12l5 5L20 6"};
+function Die3D({value,rolling,index}:{value:number;rolling:boolean;index:number}){
+ const faces=[value,...[1,2,3,4,5,6].filter(n=>n!==value)];
+ const transforms=['translateZ(15px)','rotateY(90deg) translateZ(15px)','rotateY(180deg) translateZ(15px)','rotateY(-90deg) translateZ(15px)','rotateX(90deg) translateZ(15px)','rotateX(-90deg) translateZ(15px)'];
+ return <span aria-label={'Die '+value} role="img" style={{display:'inline-block',width:36,height:36,perspective:160,flexShrink:0}}><span className={rolling?'orvane-die-roll':''} style={{display:'block',position:'relative',width:30,height:30,margin:3,transformStyle:'preserve-3d',transform:'rotateX(-18deg) rotateY(22deg)',animationDelay:rolling?index*45+'ms':undefined}}>{faces.map((n,i)=><span key={i} aria-hidden="true" style={{position:'absolute',inset:0,display:'grid',placeItems:'center',background:'#f5e8cf',color:'#26343a',border:'1px solid #b9a98d',borderRadius:4,fontSize:26,lineHeight:1,backfaceVisibility:'hidden',transform:transforms[i]}}>{['⚀','⚁','⚂','⚃','⚄','⚅'][n-1]}</span>)}</span></span>;
+}
 function ControlIcon({name}:{name:keyof typeof CONTROL_PATHS}){return <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,pointerEvents:'none'}}><path d={CONTROL_PATHS[name]}/></svg>}
 function Preview3D(){const board=useMemo(()=>generateBoard('orvane-3d-preview','standard'),[]);const [failed,setFailed]=useState(false);return <main style={{height:'100dvh',display:'flex',flexDirection:'column'}}><header><h1>Orvane · Experimental 3D</h1><a href={window.location.pathname}>Return to game</a></header>{failed?<p>WebGL unavailable. Return to the SVG game.</p>:<div style={{flex:1,minHeight:0}}><BoardScene3D board={board} onUnavailable={()=>setFailed(true)}/></div>}</main>}
 function App(){
@@ -406,7 +412,7 @@ function App(){
       {visual&&duration>0&&!reduced&&<BoardEffects key={visualQueue.length+":"+visual.kind+":"+(game?.turn??setup?.step)} event={visual} loadout={humans===1&&visual.playerId===0?loadout:{...DEFAULT_LOADOUT,robber:loadout.robber}} board={board} points={points} r={R} duration={duration} color={view?.players.find(p=>p.id===visual.playerId)?.color??"#ffe39b"}/>}
     </svg></>}
 
-    {game?.dice&&<div className="dice-display" aria-label={'Dice total '+(game.dice[0]+game.dice[1])}><span>🎲</span>{game.dice.map((n,i)=><span className="die" key={i} aria-label={'Die '+n}>{['⚀','⚁','⚂','⚃','⚄','⚅'][n-1]}</span>)}<strong>{game.dice[0]+game.dice[1]}</strong><span className="muted">{game.paired?'Paired action':'Last roll'}</span></div>}
+    {game?.dice&&<div className="dice-display" aria-label={'Dice total '+(game.dice[0]+game.dice[1])}><span>🎲</span>{game.dice.map((n,i)=><Die3D key={i+':'+(game.turn??0)+':'+(visual?.kind==='dice'?'roll':'rest')} value={n} index={i} rolling={visual?.kind==='dice'&&duration>0&&!reduced}/>)}<strong>{game.dice[0]+game.dice[1]}</strong><span className="muted">{game.paired?'Paired action':'Last roll'}</span></div>}
     <p className="map-help">{setup&&!game&&humanDecision&&setup.phase!=='complete'?(setup.phase==='settlement'?'🏠 Tap a highlighted junction':'🛤️ Tap a highlighted road'):game&&humanActive&&game.phase==='action'?(legal.length?'Tap a highlighted site to build':'Not enough resources or no legal sites for '+build):'Drag to move · pinch to zoom · tap a highlighted site'}</p>
     {setup&&!game&&humanDecision&&setup.phase!=='complete'&&<div className="map-confirm"><button disabled={!selectionLegal} onClick={confirmPlacement}>{selectionLegal?'✓ Confirm '+setup.phase:'Select a highlighted '+(setup.phase==='road'?'road':'junction')}</button></div>}
     {game&&humanActive&&game.phase==='action'&&<div className="map-confirm"><button disabled={!selectionLegal} onClick={confirmBuild}>{selectionLegal?'✓ Build '+build:legal.length?'Select a highlighted site':'No legal sites / check resources'}</button></div>}
