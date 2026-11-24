@@ -17,6 +17,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const sharedMaterials=useRef(new Map<string,THREE.MeshStandardMaterial>());
  useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;harborCache.current=null;waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
+ const pieceCache=useRef<{board:Board;entries:Map<string,{objects:THREE.Object3D[];pick:THREE.Object3D}>}|null>(null);
  const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
  const cameraPose=useRef({zoom:1,azimuth:0,panX:0,panY:0});
  // Parent game UI creates fresh arrays on every render; only rebuild WebGL when their content changes.
@@ -91,19 +92,26 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const keys=new Set([...display.roads.map(r=>'road:'+r.edgeId),...display.buildings.map(b=>b.kind+':'+b.vertexId)]);
   const prior=previousPieces.current;previousPieces.current={board,keys};
   const animate=!!pieces&&prior?.board===board&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(pieceCache.current?.board!==board)pieceCache.current={board,entries:new Map()};
+  const entries=pieceCache.current.entries;
+  const activeKeys=new Set([...display.roads.map(r=>'road:'+r.edgeId+':'+r.color),...display.buildings.map(b=>b.kind+':'+b.vertexId+':'+b.color)]);
+  for(const key of entries.keys())if(!activeKeys.has(key))entries.delete(key);
+  const reuse=(key:string)=>{const entry=entries.get(key);if(!entry)return false;for(const object of entry.objects){object.scale.y=object instanceof THREE.Group?1:object.scale.y;scene.add(object);}selectable.push(entry.pick);return true;};
   const animated:THREE.Group[]=[];
   const groupNew=(key:string,start:number,x:number,z:number)=>{if(!animate||prior?.keys.has(key))return;const group=new THREE.Group();group.position.set(x,.12,z);scene.add(group);for(const mesh of scene.children.slice(start,-1)){if(mesh instanceof THREE.Mesh)group.attach(mesh);}animated.push(group);};
   for(const road of display.roads){const edge=board.edges.find(e=>e.id===road.edgeId);if(!edge)continue;const a=vertices.get(edge.a),b=vertices.get(edge.b);if(!a||!b)continue;
+   const cacheKey='road:'+road.edgeId+':'+road.color;if(reuse(cacheKey))continue;
    const start=scene.children.length;
    const length=Math.hypot(b.x-a.x,b.y-a.y),angle=Math.atan2(b.y-a.y,b.x-a.x);
    add(new THREE.BoxGeometry(length*.92,.11,.13),'#52463e',(a.x+b.x)/2,.17,(a.y+b.y)/2).rotation.y=-angle;
-   const pick=add(new THREE.BoxGeometry(length*.9,.07,.18),road.color,(a.x+b.x)/2,.25,(a.y+b.y)/2);pick.rotation.y=-angle;pick.userData={selection:{kind:'edge',id:edge.id}};selectable.push(pick);groupNew('road:'+road.edgeId,start,(a.x+b.x)/2,(a.y+b.y)/2);
+   const pick=add(new THREE.BoxGeometry(length*.9,.07,.18),road.color,(a.x+b.x)/2,.25,(a.y+b.y)/2);pick.rotation.y=-angle;pick.userData={selection:{kind:'edge',id:edge.id}};selectable.push(pick);groupNew('road:'+road.edgeId,start,(a.x+b.x)/2,(a.y+b.y)/2);entries.set(cacheKey,{objects:scene.children.slice(start),pick});
   }
   for(const building of display.buildings){const p=vertices.get(building.vertexId);if(!p)continue;
+   const cacheKey=building.kind+':'+building.vertexId+':'+building.color;if(reuse(cacheKey))continue;
    const start=scene.children.length;
    const pick=add(new THREE.BoxGeometry(.49,.07,.43),'#746656',p.x,.17,p.y);pick.userData={selection:{kind:'vertex',id:building.vertexId}};selectable.push(pick);
    const house=(x:number,z:number,w:number,h:number)=>{add(new THREE.BoxGeometry(w,h,w*.85),building.color,x,.21+h/2,z);const roof=add(new THREE.CylinderGeometry(0,w*.77,w*.48,4),building.color,x,.21+h+w*.24,z);roof.rotation.y=Math.PI/4;add(new THREE.BoxGeometry(w*.22,h*.6,.025),'#443e37',x,.21+h*.3,z+w*.43);};
-   if(building.kind==='city'){house(p.x-.12,p.y,.26,.36);house(p.x+.15,p.y+.04,.21,.24);}else house(p.x,p.y,.30,.23);groupNew(building.kind+':'+building.vertexId,start,p.x,p.y);
+   if(building.kind==='city'){house(p.x-.12,p.y,.26,.36);house(p.x+.15,p.y+.04,.21,.24);}else house(p.x,p.y,.30,.23);groupNew(building.kind+':'+building.vertexId,start,p.x,p.y);entries.set(cacheKey,{objects:scene.children.slice(start),pick});
   }
   // Invisible selection volumes cover every buildable graph location, including empty sites.
   // Keep them separate from visible meshes so construction remains possible before ownership.
