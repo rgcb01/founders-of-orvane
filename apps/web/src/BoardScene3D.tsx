@@ -10,7 +10,8 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const host=useRef<HTMLDivElement>(null);
  const resetCamera=useRef(()=>{});
  const rendererRef=useRef<THREE.WebGLRenderer|null>(null);
- useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;};},[]);
+ const sharedGeometry=useRef(new Map<string,THREE.BufferGeometry>());
+ useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();};},[]);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
  const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
  const cameraPose=useRef({zoom:1,azimuth:0,panX:0,panY:0});
@@ -34,9 +35,9 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const bounds=new THREE.Box3();
   const geometry=new THREE.CylinderGeometry(.98,.98,.24,6);
   const materials=new Map<string,THREE.MeshStandardMaterial>();
-  const geometryCache=new Map<string,THREE.BufferGeometry>();
+  const geometryCache=sharedGeometry.current;
   const details:THREE.BufferGeometry[]=[];const detailMaterials=new Map<string,THREE.MeshStandardMaterial>();
-  const add=(g:THREE.BufferGeometry,color:string,x:number,y:number,z:number)=>{const key=g.type+JSON.stringify((g as THREE.BoxGeometry).parameters);const cached=geometryCache.get(key);if(cached){g.dispose();g=cached;}else{geometryCache.set(key,g);details.push(g);}let m=detailMaterials.get(color);if(!m){m=new THREE.MeshStandardMaterial({color,flatShading:true,roughness:1});detailMaterials.set(color,m);}const mesh=new THREE.Mesh(g,m);mesh.position.set(x,y,z);scene.add(mesh);return mesh;};
+  const add=(g:THREE.BufferGeometry,color:string,x:number,y:number,z:number)=>{const key=g.type+JSON.stringify((g as THREE.BoxGeometry).parameters);const cached=geometryCache.get(key);if(cached){g.dispose();g=cached;}else{geometryCache.set(key,g);}let m=detailMaterials.get(color);if(!m){m=new THREE.MeshStandardMaterial({color,flatShading:true,roughness:1});detailMaterials.set(color,m);}const mesh=new THREE.Mesh(g,m);mesh.position.set(x,y,z);scene.add(mesh);return mesh;};
   const vegetation: {mesh:THREE.Mesh;phase:number}[]=[];
   for(const {tile,p} of positions){
    const color=TERRAIN_COLORS[tile.terrain];
