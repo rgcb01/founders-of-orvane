@@ -12,9 +12,10 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const rendererRef=useRef<THREE.WebGLRenderer|null>(null);
  const sharedGeometry=useRef(new Map<string,THREE.BufferGeometry>());
  const staticTerrain=useRef<{board:Board;objects:THREE.Object3D[];vegetation:{mesh:THREE.Mesh;phase:number}[];batches:Map<string,{mesh:THREE.InstancedMesh;items:{mesh:THREE.Mesh;phase:number}[]}>;selectable:THREE.Object3D[];geometry:THREE.CylinderGeometry;materials:Map<string,THREE.MeshStandardMaterial>}|null>(null);
+ const harborCache=useRef<{board:Board;objects:THREE.Object3D[];boats:THREE.Group[]}|null>(null);
  const waterCache=useRef<{board:Board;mesh:THREE.Mesh<THREE.PlaneGeometry,THREE.MeshStandardMaterial>}|null>(null);
  const sharedMaterials=useRef(new Map<string,THREE.MeshStandardMaterial>());
- useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
+ useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;harborCache.current=null;waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
  const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
  const cameraPose=useRef({zoom:1,azimuth:0,panX:0,panY:0});
@@ -134,8 +135,10 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    add(new THREE.CylinderGeometry(.23,.23,.06,32),'#cbbd9f',p.x,.18,p.y+.62);
    const g=new THREE.CircleGeometry(.21,32);details.push(g);const m=new THREE.MeshBasicMaterial({map:texture});detailMaterials.set('token-'+tile.id,m as unknown as THREE.MeshStandardMaterial);const token=new THREE.Mesh(g,m);token.rotation.x=-Math.PI/2;token.position.set(p.x,.215,p.y+.62);scene.add(token);
   }
-  const boats:THREE.Group[]=[];
-  for(const harbor of board.harbors){
+  const cachedHarbors=harborCache.current?.board===board?harborCache.current:null;
+  const boats:THREE.Group[]=cachedHarbors?.boats??[];
+  const harborStart=scene.children.length;
+  if(cachedHarbors){scene.add(...cachedHarbors.objects);}else for(const harbor of board.harbors){
    const edge=board.edges.find(e=>e.id===harbor.edgeId);if(!edge)continue;const a=vertices.get(edge.a),b=vertices.get(edge.b),t=positions.find(t=>t.tile.id===edge.tiles[0]);if(!a||!b||!t)continue;
    const x=(a.x+b.x)/2,z=(a.y+b.y)/2,dx=x-t.p.x,dz=z-t.p.y,len=Math.hypot(dx,dz);if(!len)continue;const ux=dx/len,uz=dz/len,angle=Math.atan2(uz,ux);
    add(new THREE.BoxGeometry(.65,.1,.27),'#a7855c',x+ux*.24,.03,z+uz*.24).rotation.y=-angle;
@@ -146,6 +149,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    add(new THREE.ConeGeometry(.23,.42,3),'#e9dfbe',sx,.35,sz).scale.set(1,1,.28);
    const boat=new THREE.Group();boat.position.set(sx,0,sz);scene.add(boat);for(const mesh of scene.children.slice(boatStart,-1))boat.attach(mesh);boats.push(boat);
   }
+  if(!cachedHarbors)harborCache.current={board,objects:scene.children.slice(harborStart),boats};
   scene.updateMatrixWorld(true);bounds.setFromObject(scene);
   const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
   const span=Math.max(size.x,size.z)+3;
