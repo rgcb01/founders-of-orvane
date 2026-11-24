@@ -9,6 +9,8 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const [quality,setQuality]=useState<'auto'|'low'|'medium'|'high'>(()=>{try{const q=localStorage.getItem('orvane.graphics');return q==='low'||q==='medium'||q==='high'?q:'auto';}catch{return 'auto';}});
  const host=useRef<HTMLDivElement>(null);
  const resetCamera=useRef(()=>{});
+ const rendererRef=useRef<THREE.WebGLRenderer|null>(null);
+ useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;};},[]);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
  const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
  const cameraPose=useRef({zoom:1,azimuth:0,panX:0,panY:0});
@@ -23,7 +25,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  useEffect(()=>{
   const el=host.current;if(!el)return;
   let renderer:THREE.WebGLRenderer;
-  try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});}catch{fallback.current();return;}
+  try{renderer=rendererRef.current??new THREE.WebGLRenderer({antialias:true,alpha:false});rendererRef.current=renderer;renderer.shadowMap.autoUpdate=true;}catch{fallback.current();return;}
   const tier=quality==='auto'?(window.matchMedia('(pointer: coarse)').matches?'medium':'high'):quality;
   const scene=new THREE.Scene();scene.background=new THREE.Color('#183e49');
   const camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,500);
@@ -182,7 +184,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   if(animated.length||movingRobber||productionRings.length)tick(started);else draw();
   if(ambientEnabled&&tier!=='low')ambientTimer=window.setInterval(ambient,1000/(tier==='high'?30:20));
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
-  return()=>{observer.disconnect();window.clearInterval(ambientTimer);cancelAnimationFrame(frame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());sun.shadow.dispose();for(const {mesh} of batches.values())mesh.dispose();renderer.dispose();renderer.domElement.remove();};
+  return()=>{observer.disconnect();window.clearInterval(ambientTimer);cancelAnimationFrame(frame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());sun.shadow.dispose();for(const {mesh} of batches.values())mesh.dispose();renderer.renderLists.dispose();};
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile,productionKey,quality]);
  return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/><select aria-label="Graphics quality" value={quality} onChange={e=>{const q=e.target.value as typeof quality;setQuality(q);try{localStorage.setItem('orvane.graphics',q);}catch{}}} style={{position:'absolute',right:12,top:12,zIndex:2,maxWidth:115}}><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select><button type="button" aria-label="Reset 3D camera" onClick={()=>resetCamera.current()} style={{position:'absolute',right:12,bottom:12,zIndex:2}}>⌂</button>{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
