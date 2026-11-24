@@ -22,17 +22,14 @@ try{
  if(await page.getByText(/^Selected (tile|edge|vertex):/).textContent()!==label)throw Error('Dragging unexpectedly changed selection');
  if(errors.length)throw Error(errors.join('\n'));await page.close();
  }
- // Live match smoke: opt in during setup, verify WebGL canvas, then return to SVG.
+ // Live match smoke: default WebGL board during setup, then verify technical SVG fallback.
  const live=await browser.newPage({viewport:{width:1280,height:800}});
  const liveErrors=[];live.on('pageerror',e=>liveErrors.push(e.message));
  await live.goto(url);
  await live.getByRole('button',{name:/New game/}).click();
  await live.getByLabel('Bot pace').first().selectOption('turbo');
  await live.getByRole('button',{name:'Start setup'}).click();
- const toggle=live.getByRole('button',{name:'Toggle experimental 3D board'});
- await toggle.click();
  await live.locator('canvas').waitFor({timeout:15000});
- if(await toggle.getAttribute('aria-pressed')!=='true')throw Error('3D toggle failed to activate');
  await live.screenshot({path:'artifacts/preview3d/live-setup.png'});
  // Find a legal settlement by actual WebGL raycasting; confirm it through the live engine.
  const coach=live.getByRole('complementary',{name:'Interactive tutorial'});
@@ -78,9 +75,8 @@ try{
  await live.waitForFunction(step=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step>step,turnBefore,{timeout:10000});
  await live.waitForFunction(expected=>document.querySelector('canvas')?.dataset.cameraPose===expected,pose,{timeout:10000});
  await live.screenshot({path:'artifacts/preview3d/live-after-placement.png'});
- await toggle.click();
+ await live.evaluate(()=>{const gl=document.querySelector('canvas')?.getContext('webgl2');gl?.getExtension('WEBGL_lose_context')?.loseContext();});
  await live.locator('[data-board-root="true"]').waitFor({timeout:5000});
- if(await toggle.getAttribute('aria-pressed')!=='false')throw Error('SVG fallback toggle failed');
  if(liveErrors.length)throw Error(liveErrors.join('\\n'));
  await live.close();
 }finally{await browser?.close();server.kill();}
