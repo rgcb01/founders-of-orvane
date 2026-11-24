@@ -32,15 +32,16 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const materials=new Map<string,THREE.MeshStandardMaterial>();
   const details:THREE.BufferGeometry[]=[];const detailMaterials=new Map<string,THREE.MeshStandardMaterial>();
   const add=(g:THREE.BufferGeometry,color:string,x:number,y:number,z:number)=>{details.push(g);let m=detailMaterials.get(color);if(!m){m=new THREE.MeshStandardMaterial({color,flatShading:true,roughness:1});detailMaterials.set(color,m);}const mesh=new THREE.Mesh(g,m);mesh.position.set(x,y,z);scene.add(mesh);return mesh;};
+  const vegetation: {mesh:THREE.Mesh;phase:number}[]=[];
   for(const {tile,p} of positions){
    const color=TERRAIN_COLORS[tile.terrain];
    let mat=materials.get(color);if(!mat){mat=new THREE.MeshStandardMaterial({color,roughness:1,flatShading:true});materials.set(color,mat);}
    const mesh=new THREE.Mesh(geometry,mat);mesh.position.set(p.x,0,p.y);scene.add(mesh);mesh.userData={selection:{kind:'tile',id:tile.id}};selectable.push(mesh);bounds.expandByObject(mesh);
    const x=p.x,z=p.y;
    switch(tile.terrain){
-    case 'forest': for(const [dx,dz,h] of [[-.38,-.22,.58],[.24,-.34,.45],[.32,.24,.62],[-.25,.35,.4]]){add(new THREE.CylinderGeometry(.045,.06,.19,5),'#795740',x+dx,.21,z+dz);add(new THREE.ConeGeometry(.23,h*.7,5),'#315d45',x+dx,.26+h*.35,z+dz);add(new THREE.ConeGeometry(.16,h*.65,5),'#497458',x+dx,.35+h*.65,z+dz);}break;
+    case 'forest': for(const [dx,dz,h] of [[-.38,-.22,.58],[.24,-.34,.45],[.32,.24,.62],[-.25,.35,.4]]){add(new THREE.CylinderGeometry(.045,.06,.19,5),'#795740',x+dx,.21,z+dz);vegetation.push({mesh:add(new THREE.ConeGeometry(.23,h*.7,5),'#315d45',x+dx,.26+h*.35,z+dz),phase:x+z+dx});vegetation.push({mesh:add(new THREE.ConeGeometry(.16,h*.65,5),'#497458',x+dx,.35+h*.65,z+dz),phase:x+z+dx});}break;
     case 'pasture': for(const [dx,dz] of [[-.32,-.22],[.27,.15],[-.12,.38]]){add(new THREE.IcosahedronGeometry(.13,0),'#e0d9bd',x+dx,.24,z+dz).scale.set(1.4,.8,1);add(new THREE.IcosahedronGeometry(.055,0),'#665e50',x+dx+.14,.24,z+dz);}break;
-    case 'field': for(let i=0;i<5;i++){add(new THREE.BoxGeometry(.13,.035,.85),'#8f713e',x+(i-2)*.18,.14,z);for(let j=0;j<5;j++)add(new THREE.ConeGeometry(.055,.15,4),'#e3bf65',x+(i-2)*.18,.22,z+(j-2)*.16);}break;
+    case 'field': for(let i=0;i<5;i++){add(new THREE.BoxGeometry(.13,.035,.85),'#8f713e',x+(i-2)*.18,.14,z);for(let j=0;j<5;j++)vegetation.push({mesh:add(new THREE.ConeGeometry(.055,.15,4),'#e3bf65',x+(i-2)*.18,.22,z+(j-2)*.16),phase:x+z+i*.3+j*.2});}break;
     case 'hill': for(const [dx,dz,h] of [[-.25,-.15,.27],[.28,.22,.36]]){add(new THREE.IcosahedronGeometry(.35,0),'#b67d55',x+dx,.12+h*.3,z+dz).scale.set(1,h/.35,1);}break;
     case 'mountain': for(const [dx,dz,h] of [[-.28,-.13,.85],[.30,.14,.62]]){add(new THREE.ConeGeometry(.36,h,5),'#697b85',x+dx,.12+h/2,z+dz);add(new THREE.ConeGeometry(.13,h*.35,5),'#e2e6df',x+dx,.12+h*.825,z+dz);}break;
     case 'desert': add(new THREE.SphereGeometry(.5,6,3),'#e2c18a',x,.12,z).scale.set(1,.24,.65);break;
@@ -160,7 +161,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   resetCamera.current=()=>{zoom=1;azimuth=0;panX=0;panY=0;cameraPose.current={zoom,azimuth,panX,panY};draw();};
   const ambientEnabled=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let ambientTimer=0;const ambientStart=performance.now();
-  const ambient=()=>{if(document.hidden||!el.clientWidth||!el.clientHeight)return;const t=(performance.now()-ambientStart)/1000;boats.forEach((boat,i)=>{boat.position.y=.035*Math.sin(t*1.7+i);boat.rotation.z=.045*Math.sin(t*1.3+i);});const pos=waterGeometry.attributes.position;for(let i=0;i<pos.count;i++)pos.setZ(i,.035*Math.sin(pos.getX(i)*.8+t)+.025*Math.cos(pos.getY(i)*.9-t*.8));pos.needsUpdate=true;waterGeometry.computeVertexNormals();renderer.render(scene,camera);};
+  const ambient=()=>{if(document.hidden||!el.clientWidth||!el.clientHeight)return;const t=(performance.now()-ambientStart)/1000;for(const {mesh,phase} of vegetation){mesh.rotation.z=.055*Math.sin(t*1.6+phase);mesh.rotation.x=.025*Math.cos(t*1.2+phase);}boats.forEach((boat,i)=>{boat.position.y=.035*Math.sin(t*1.7+i);boat.rotation.z=.045*Math.sin(t*1.3+i);});const pos=waterGeometry.attributes.position;for(let i=0;i<pos.count;i++)pos.setZ(i,.035*Math.sin(pos.getX(i)*.8+t)+.025*Math.cos(pos.getY(i)*.9-t*.8));pos.needsUpdate=true;waterGeometry.computeVertexNormals();renderer.render(scene,camera);};
   const observer=new ResizeObserver(draw);observer.observe(el);let frame=0;const started=performance.now();
   const robberTargets=robberMeshes.map(mesh=>mesh.position.clone());
   const movingRobber=!!origin&&!!robber&&robberMeshes.length>0;
