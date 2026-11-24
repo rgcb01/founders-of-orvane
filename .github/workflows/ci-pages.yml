@@ -19,9 +19,9 @@ jobs:
       - run: pnpm check
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium webkit
-      - if: github.head_ref == 'visual/1.2-three-foundation'
+      - if: github.ref == 'refs/heads/main' || github.head_ref == 'visual/1.2-three-foundation'
         run: node e2e/preview3d.mjs
-      - if: always() && github.head_ref == 'visual/1.2-three-foundation'
+      - if: always() && (github.ref == 'refs/heads/main' || github.head_ref == 'visual/1.2-three-foundation')
         uses: actions/upload-artifact@v4
         with:
           name: orvane-3d-screenshots
