@@ -38,6 +38,14 @@ try{
  const coach=live.getByRole('complementary',{name:'Interactive tutorial'});
  if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
  await live.waitForFunction(()=>{const el=document.querySelector('canvas');return el&&JSON.parse(el.dataset.legalVertices??'[]').length>0;},null,{timeout:30000});
+ const initialCanvas=live.locator('canvas');
+ const cameraBounds=await initialCanvas.boundingBox();
+ if(!cameraBounds)throw Error('Missing camera canvas');
+ await live.mouse.move(cameraBounds.x+cameraBounds.width/2,cameraBounds.y+cameraBounds.height/2);
+ await live.mouse.down();await live.mouse.move(cameraBounds.x+cameraBounds.width/2+45,cameraBounds.y+cameraBounds.height/2,{steps:5});await live.mouse.up();
+ await live.mouse.wheel(0,-150);
+ await live.waitForFunction(()=>{const c=document.querySelector('canvas');const p=JSON.parse(c?.dataset.cameraPose??'{}');return p.zoom>1&&Math.abs(p.azimuth)>0;});
+ const pose=await initialCanvas.getAttribute('data-camera-pose');
  const before=await live.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.settlements.length);
  const turnBefore=await live.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step);
  const confirm=live.getByRole('button',{name:'Confirm placement'}).first();
@@ -68,6 +76,7 @@ try{
  if(!roadPlaced)throw Error('Could not place a legal road through the 3D canvas');
  await live.waitForFunction(count=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.roads.length>count,roadsBefore,{timeout:10000});
  await live.waitForFunction(step=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step>step,turnBefore,{timeout:10000});
+ await live.waitForFunction(expected=>document.querySelector('canvas')?.dataset.cameraPose===expected,pose,{timeout:10000});
  await live.screenshot({path:'artifacts/preview3d/live-after-placement.png'});
  await toggle.click();
  await live.locator('[data-board-root="true"]').waitFor({timeout:5000});
