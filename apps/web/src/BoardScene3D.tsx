@@ -5,7 +5,7 @@ import {TERRAIN_COLORS} from './TerrainArt';
 
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
-export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[]}){
+export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges,robberTile}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[];robberTile?:string}){
  const host=useRef<HTMLDivElement>(null);
  const cameraPose=useRef({zoom:1,azimuth:0});
  // Parent game UI creates fresh arrays on every render; only rebuild WebGL when their content changes.
@@ -41,6 +41,16 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
     case 'mountain': for(const [dx,dz,h] of [[-.28,-.13,.85],[.30,.14,.62]]){add(new THREE.ConeGeometry(.36,h,5),'#697b85',x+dx,.12+h/2,z+dz);add(new THREE.ConeGeometry(.13,h*.35,5),'#e2e6df',x+dx,.12+h*.825,z+dz);}break;
     case 'desert': add(new THREE.SphereGeometry(.5,6,3),'#e2c18a',x,.12,z).scale.set(1,.24,.65);break;
    }
+  }
+  const robber=positions.find(({tile})=>tile.id===robberTile);
+  if(robber){
+   const {x,y:z}=robber.p;
+   const base=add(new THREE.CylinderGeometry(.19,.24,.09,8),'#292e35',x,.18,z+.40);
+   base.userData={selection:{kind:'tile',id:robber.tile.id}};selectable.push(base);
+   const body=add(new THREE.CylinderGeometry(.10,.17,.38,6),'#343942',x,.40,z+.40);
+   body.userData=base.userData;selectable.push(body);
+   const head=add(new THREE.IcosahedronGeometry(.12,0),'#252a31',x,.66,z+.40);
+   head.userData=base.userData;selectable.push(head);
   }
   const vertices=new Map(board.vertices.map(v=>[v.id,vertexPosition(v,1)]));
   // Preview samples only; real matches will supply their own piece data.
@@ -128,6 +138,6 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
   return()=>{observer.disconnect();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
  // eslint-disable-next-line react-hooks/exhaustive-deps
- },[board,piecesKey,legalVerticesKey,legalEdgesKey]);
+ },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile]);
  return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/>{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
 }
