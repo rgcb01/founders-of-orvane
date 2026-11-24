@@ -50,7 +50,7 @@ async function exerciseWorker(page){
  await coach.waitFor();
  assert.ok(await coach.getByRole('button',{name:'Hide tutorial'}).isVisible());
  await coach.getByRole('button',{name:'Hide tutorial'}).click();
- assert.equal(await coach.count(),0);
+ await coach.waitFor({state:'detached',timeout:5000});
  await tutorialToggle(page);
  await coach.waitFor();
  await coach.getByRole('button',{name:'Hide tutorial'}).click();

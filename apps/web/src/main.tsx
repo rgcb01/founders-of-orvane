@@ -2,6 +2,7 @@ import {StrictMode,useMemo,useRef,useState,useEffect,useLayoutEffect,type Keyboa
 import {createRoot} from 'react-dom/client';
 import {generateBoard,tilePosition,vertexPosition,type BoardSize,type Terrain,createSetup,activePlayer,legalSettlements,legalRoads,applySetup,type PlayerCount,type SetupState,startGame,applyGame,legalBuilds,rollDice,RESOURCES,type GameState,type BuildKind,freeRoadSites,playerScore,chooseFirstPlayer,decisionPlayer,type Difficulty} from '@orvane/engine';
 import './style.css';
+import {BoardScene3D} from './BoardScene3D';
 import {DevelopmentPanel} from './DevelopmentPanel';
 import {TradePanel} from './TradePanel';
 import {resourceEmoji} from './resources';
@@ -43,6 +44,7 @@ type Selection={kind:'tile'|'vertex'|'edge';id:string};
 const R=49;
 const CONTROL_PATHS={"journal":"M5 3h12l2 2v16H7V3 M5 3v18 M10 8h6 M10 12h6","follow":"M3 7h12v10H3z M15 10l6-4v12l-6-4","minus":"M5 12h14","plus":"M5 12h14 M12 5v14","fit":"M8 3H3v5 M16 3h5v5 M3 16v5h5 M21 16v5h-5","map":"M3 5l6-2 6 2 6-2v16l-6 2-6-2-6 2z M9 3v16 M15 5v16","build":"M4 20l12-12 M12 4l4-2 6 6-4 4z","trade":"M3 7h17l-4-4 M20 7l-4 4 M21 17H4l4-4 M4 17l4 4","cards":"M4 5l12-2 3 16-12 2z M8 6h12v15H8","roll":"M4 4h16v16H4z M8 8h.1 M16 8h.1 M12 12h.1 M8 16h.1 M16 16h.1","end":"M4 12h15 M13 6l6 6-6 6","menu":"M4 6h16 M4 12h16 M4 18h16","play":"M7 4l14 8-14 8z","check":"M4 12l5 5L20 6"};
 function ControlIcon({name}:{name:keyof typeof CONTROL_PATHS}){return <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,pointerEvents:'none'}}><path d={CONTROL_PATHS[name]}/></svg>}
+function Preview3D(){const board=useMemo(()=>generateBoard('orvane-3d-preview','standard'),[]);const [failed,setFailed]=useState(false);return <main style={{height:'100dvh',display:'flex',flexDirection:'column'}}><header><h1>Orvane · Experimental 3D</h1><a href={window.location.pathname}>Return to game</a></header>{failed?<p>WebGL unavailable. Return to the SVG game.</p>:<div style={{flex:1,minHeight:0}}><BoardScene3D board={board} onUnavailable={()=>setFailed(true)}/></div>}</main>}
 function App(){
  const pwa=usePwa();
  const [prefs]=useState(()=>{try{return readPreferences(localStorage);}catch{return DEFAULT_PREFS;}});
@@ -92,6 +94,8 @@ function App(){
  const [seed,setSeed]=useState('orvane-001');
  const [draft,setDraft]=useState(seed);
  const [selection,setSelection]=useState<Selection|null>(null);
+ const [experimental3D,setExperimental3D]=useState(false);
+ const [webglFailed,setWebglFailed]=useState(false);
  const [zoom,setZoom]=useState(1);
  const [pan,setPan]=useState({x:0,y:0});
  const svg=useRef<SVGSVGElement>(null);
@@ -378,6 +382,8 @@ function App(){
     {view&&coachOpen&&tutorial.enabled&&<TutorialCoach progress={tutorial} lesson={tutorLesson} tip={coachFocus===tutorLesson?.target&&tutorLesson?tutorialTip(tutorLesson):"Try the highlighted action. Your real moves advance the lesson."} onShow={showTutorTarget} onHide={()=>{setCoachOpen(false);setCoachFocus(null);}} onSkip={skipTutorial}/>}
      {view&&<div className="board-event-slot">{view&&visual&&duration>0&&<EventStage key={visualQueue.length+':'+visual.kind+':'+(game?.turn??setup?.step)} event={visual} effectId={loadout.effects} celebrate={visual.playerId<humans&&!reduced} name={view.players.find(p=>p.id===visual.playerId)?.name??'Player'} other={'other' in visual&&visual.other!==null?view.players.find(p=>p.id===visual.other)?.name??'Player':'🏦 Bank'} duration={duration} color={view.players.find(p=>p.id===visual.playerId)?.color??'#ffe39b'}/>}{(!visual||duration===0)&&<div className="event-idle"><span>{humanDecision?'👤':'🎲'}</span><strong>{view.players.find(p=>p.id===(decision??playerId))?.name??'Match'} </strong><span className="muted">{humanDecision?'Your action':paused?'Paused':'Watching the board'}</span></div>}</div>}
     {game&&humanActive&&game.phase==='action'&&<BuildMenu board={board} game={game} build={build} onSelect={k=>{setBuild(k);setSelection(null);}}/>}
+    <button type="button" aria-label="Toggle experimental 3D board" aria-pressed={experimental3D} onClick={()=>setExperimental3D(v=>!v)} style={{position:'absolute',top:54,right:12,zIndex:5}}>{experimental3D?'2D map':'3D preview'}</button>
+    {experimental3D&&!webglFailed?<div style={{position:'absolute',inset:0,top:94,bottom:45,zIndex:1}}><BoardScene3D board={board} robberTile={game?.development.robber} pieces={{roads:(view?.roads??[]).map(r=>({edgeId:r.edgeId,color:view?.players.find(p=>p.id===r.playerId)?.color??'#ffffff'})),buildings:(view?.settlements??[]).map(v=>({vertexId:v.vertexId,kind:game?.settlements.some(s=>s.vertexId===v.vertexId&&s.kind==='city')?'city' as const:'settlement' as const,color:view?.players.find(p=>p.id===v.playerId)?.color??'#ffffff'}))}} legalVertices={[...validVertices]} legalEdges={[...validEdges]} onSelect={v=>setSelection(v)} onUnavailable={()=>{setWebglFailed(true);setExperimental3D(false);}}/></div>:<>
     <svg ref={svg} data-board-root="true" viewBox={[bounds.x+(bounds.w-viewW)/2+pan.x,bounds.y+(bounds.h-viewH)/2+pan.y,viewW,viewH].join(' ')} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onClickCapture={e=>{
          if(performance.now()-lastGestureEnd.current<320){e.preventDefault();e.stopPropagation();return;}
          if(!e.detail||!window.matchMedia('(pointer:coarse)').matches||(!vertexMode&&!roadMode)||!svg.current)return;
@@ -399,7 +405,8 @@ function App(){
       {board.edges.map(e=>{const a=points.get(e.a)!,b=points.get(e.b)!;const owner=view?.roads.find(x=>x.edgeId===e.id);const revealing=visualQueue.some(v=>(v.kind==='road'||v.kind==='spend'&&v.build==='road')&&v.id===e.id)&&duration>0&&!reduced;const color=revealing?undefined:view?.players.find(p=>p.id===owner?.playerId)?.color;return <g key={e.id} role="button" tabIndex={0} aria-label={'Road edge '+e.id} aria-pressed={activeEdge?.id===e.id} onClick={()=>select('edge',e.id)} onKeyDown={ev=>keySelect(ev,'edge',e.id)} className={"edge"+(validEdges.has(e.id)?" legal-site":"")}><line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={34}/>{color?<RoadArt a={a} b={b} color={color} styleId={humans===1&&owner?.playerId===0?loadout.road:DEFAULT_LOADOUT.road}/>:<line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={activeEdge?.id===e.id?'#ffffff':color??(validEdges.has(e.id)?'#ffe39b':'#e4d7af')} opacity={color||activeEdge?.id===e.id||validEdges.has(e.id)?1:.55} strokeWidth={activeEdge?.id===e.id||validEdges.has(e.id)?5:1.5}/>}</g>;})}
       {board.vertices.map(v=>{const p=points.get(v.id)!;const owner=view?.settlements.find(x=>x.vertexId===v.id);const revealing=visualQueue.some(e=>(e.kind==='settlement'||e.kind==='spend'&&e.build==='settlement')&&e.id===v.id)&&duration>0&&!reduced;const upgrading=visual?.kind==='city'&&visual.id===v.id&&duration>0&&!reduced;const color=revealing||upgrading?undefined:view?.players.find(x=>x.id===owner?.playerId)?.color;const city=game?.settlements.some(s=>s.vertexId===v.id&&s.kind==='city')&&!(visualQueue.some(e=>(e.kind==='city'||e.kind==='spend'&&e.build==='city')&&e.id===v.id)&&duration>0&&!reduced);return <g key={v.id} role="button" tabIndex={0} aria-label={'Building vertex '+v.id} aria-pressed={activeVertex?.id===v.id} onClick={()=>select('vertex',v.id)} onKeyDown={e=>keySelect(e,'vertex',v.id)} className={"vertex"+(validVertices.has(v.id)?" legal-site":"")}><circle cx={p.x} cy={p.y} r={20} fill="transparent"/>{validVertices.has(v.id)&&<circle cx={p.x} cy={p.y} r={12} fill="none" stroke={activeVertex?.id===v.id?"#ffffff":"#ffe39b"} strokeWidth={2.5} pointerEvents="none"/>}{color?<BuildingArt p={p} city={!!city} color={color} styleId={humans===1&&owner?.playerId===0?(city?loadout.city:loadout.settlement):(city?DEFAULT_LOADOUT.city:DEFAULT_LOADOUT.settlement)}/>:<circle cx={p.x} cy={p.y} r={activeVertex?.id===v.id?8:validVertices.has(v.id)?6:3.5} fill={activeVertex?.id===v.id||validVertices.has(v.id)?'#ffe39b':'#e4d7af'} stroke="#24434a" strokeWidth={1}/>}</g>;})}
       {visual&&duration>0&&!reduced&&<BoardEffects key={visualQueue.length+":"+visual.kind+":"+(game?.turn??setup?.step)} event={visual} loadout={humans===1&&visual.playerId===0?loadout:{...DEFAULT_LOADOUT,robber:loadout.robber}} board={board} points={points} r={R} duration={duration} color={view?.players.find(p=>p.id===visual.playerId)?.color??"#ffe39b"}/>}
-    </svg>
+    </svg></>}
+
     {game?.dice&&<div className="dice-display" aria-label={'Dice total '+(game.dice[0]+game.dice[1])}><span>🎲</span>{game.dice.map((n,i)=><span className="die" key={i} aria-label={'Die '+n}>{['⚀','⚁','⚂','⚃','⚄','⚅'][n-1]}</span>)}<strong>{game.dice[0]+game.dice[1]}</strong><span className="muted">{game.paired?'Paired action':'Last roll'}</span></div>}
     <p className="map-help">{setup&&!game&&humanDecision&&setup.phase!=='complete'?(setup.phase==='settlement'?'🏠 Tap a highlighted junction':'🛤️ Tap a highlighted road'):game&&humanActive&&game.phase==='action'?(legal.length?'Tap a highlighted site to build':'Not enough resources or no legal sites for '+build):'Drag to move · pinch to zoom · tap a highlighted site'}</p>
     {setup&&!game&&humanDecision&&setup.phase!=='complete'&&<div className="map-confirm"><button disabled={!selectionLegal} onClick={confirmPlacement}>{selectionLegal?'✓ Confirm '+setup.phase:'Select a highlighted '+(setup.phase==='road'?'road':'junction')}</button></div>}
@@ -425,4 +432,4 @@ function App(){
   {!view&&<footer>Local base game · Autosave · Offline play · Online optional.</footer>}
  </main>;
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><App/></StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode>{new URLSearchParams(window.location.search).get('preview')==='3d'?<Preview3D/>:<App/>}</StrictMode>);
