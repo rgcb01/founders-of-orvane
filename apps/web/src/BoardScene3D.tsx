@@ -8,6 +8,7 @@ type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;col
 export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges,robberTile}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[];robberTile?:string}){
  const host=useRef<HTMLDivElement>(null);
  const resetCamera=useRef(()=>{});
+ const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
  const cameraPose=useRef({zoom:1,azimuth:0,panX:0,panY:0});
  // Parent game UI creates fresh arrays on every render; only rebuild WebGL when their content changes.
  const piecesKey=JSON.stringify(pieces??null);
@@ -64,15 +65,22 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    sample.roads.push({edgeId:edge.id,color});sample.buildings.push({vertexId:edge.a,color,kind:i%2?'city':'settlement'});
   }
   const display=pieces??sample;
+  const keys=new Set([...display.roads.map(r=>'road:'+r.edgeId),...display.buildings.map(b=>b.kind+':'+b.vertexId)]);
+  const prior=previousPieces.current;previousPieces.current={board,keys};
+  const animate=!!pieces&&prior?.board===board&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const animated:THREE.Group[]=[];
+  const groupNew=(key:string,start:number,x:number,z:number)=>{if(!animate||prior?.keys.has(key))return;const group=new THREE.Group();group.position.set(x,.12,z);scene.add(group);for(const mesh of scene.children.slice(start,-1)){if(mesh instanceof THREE.Mesh)group.attach(mesh);}animated.push(group);};
   for(const road of display.roads){const edge=board.edges.find(e=>e.id===road.edgeId);if(!edge)continue;const a=vertices.get(edge.a),b=vertices.get(edge.b);if(!a||!b)continue;
+   const start=scene.children.length;
    const length=Math.hypot(b.x-a.x,b.y-a.y),angle=Math.atan2(b.y-a.y,b.x-a.x);
    add(new THREE.BoxGeometry(length*.92,.11,.13),'#52463e',(a.x+b.x)/2,.17,(a.y+b.y)/2).rotation.y=-angle;
-   const pick=add(new THREE.BoxGeometry(length*.9,.07,.18),road.color,(a.x+b.x)/2,.25,(a.y+b.y)/2);pick.rotation.y=-angle;pick.userData={selection:{kind:'edge',id:edge.id}};selectable.push(pick);
+   const pick=add(new THREE.BoxGeometry(length*.9,.07,.18),road.color,(a.x+b.x)/2,.25,(a.y+b.y)/2);pick.rotation.y=-angle;pick.userData={selection:{kind:'edge',id:edge.id}};selectable.push(pick);groupNew('road:'+road.edgeId,start,(a.x+b.x)/2,(a.y+b.y)/2);
   }
   for(const building of display.buildings){const p=vertices.get(building.vertexId);if(!p)continue;
+   const start=scene.children.length;
    const pick=add(new THREE.BoxGeometry(.49,.07,.43),'#746656',p.x,.17,p.y);pick.userData={selection:{kind:'vertex',id:building.vertexId}};selectable.push(pick);
    const house=(x:number,z:number,w:number,h:number)=>{add(new THREE.BoxGeometry(w,h,w*.85),building.color,x,.21+h/2,z);const roof=add(new THREE.CylinderGeometry(0,w*.77,w*.48,4),building.color,x,.21+h+w*.24,z);roof.rotation.y=Math.PI/4;add(new THREE.BoxGeometry(w*.22,h*.6,.025),'#443e37',x,.21+h*.3,z+w*.43);};
-   if(building.kind==='city'){house(p.x-.12,p.y,.26,.36);house(p.x+.15,p.y+.04,.21,.24);}else house(p.x,p.y,.30,.23);
+   if(building.kind==='city'){house(p.x-.12,p.y,.26,.36);house(p.x+.15,p.y+.04,.21,.24);}else house(p.x,p.y,.30,.23);groupNew(building.kind+':'+building.vertexId,start,p.x,p.y);
   }
   // Invisible selection volumes cover every buildable graph location, including empty sites.
   // Keep them separate from visible meshes so construction remains possible before ownership.
@@ -139,9 +147,11 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const wheel=(e:WheelEvent)=>{e.preventDefault();zoom=Math.max(.65,Math.min(3,zoom*Math.exp(-e.deltaY*.001)));cameraPose.current={zoom,azimuth,panX,panY};draw();};
   canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);canvas.addEventListener('wheel',wheel,{passive:false});
   resetCamera.current=()=>{zoom=1;azimuth=0;panX=0;panY=0;cameraPose.current={zoom,azimuth,panX,panY};draw();};
-  const observer=new ResizeObserver(draw);observer.observe(el);draw();
+  const observer=new ResizeObserver(draw);observer.observe(el);let frame=0;const started=performance.now();
+  const tick=(now:number)=>{const t=Math.min(1,(now-started)/380),ease=1-Math.pow(1-t,3);for(const group of animated)group.scale.set(1,Math.max(.05,ease),1);scene.updateMatrixWorld(true);draw();if(t<1)frame=requestAnimationFrame(tick);};
+  if(animated.length)tick(started);else draw();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
-  return()=>{observer.disconnect();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
+  return()=>{observer.disconnect();cancelAnimationFrame(frame);markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile]);
  return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/><button type="button" aria-label="Reset 3D camera" onClick={()=>resetCamera.current()} style={{position:'absolute',right:12,bottom:12,zIndex:2}}>⌂</button>{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
