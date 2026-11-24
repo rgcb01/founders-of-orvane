@@ -88,7 +88,7 @@ async function iphoneTouch(browser){
  const ctx=await browser.newContext({...device}),page=await ctx.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  try{
-  await page.goto(url);await start(page);
+  await page.goto(url+'?renderer=2d');await start(page);
   const coach=page.getByRole('complementary',{name:'Interactive tutorial'});
   if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
   const svg=page.locator('.board-panel [data-board-root]'),box=await page.locator('.board-panel').boundingBox();
@@ -131,7 +131,7 @@ async function passAndPlay(browser,mobile=false){
  const ctx=await browser.newContext(mobile?{...devices['iPhone 13']}:{viewport:{width:1366,height:768}}),page=await ctx.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  try{
-  await page.goto(url);
+  await page.goto(url+'?renderer=2d');
   await page.getByRole('button',{name:/New game/}).first().click();
   await page.getByRole('button',{name:'6 players',exact:true}).click();
   await page.getByLabel('Humans').selectOption('2');
@@ -166,7 +166,7 @@ async function run(){
  try{
   const ctx=await browser.newContext({acceptDownloads:true,viewport:{width:1366,height:768}});
   const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(url);
+  await page.goto(url+'?renderer=2d');
   await page.waitForFunction(()=>navigator.serviceWorker.controller!==null);
   const workerUrl=await exerciseWorker(page);
   assert.ok(await page.evaluate(async u=>!!(await caches.match(u)),workerUrl),'worker included in offline cache');
@@ -175,7 +175,7 @@ async function run(){
   const backup=await readFile(await download.path(),'utf8');const parsed=JSON.parse(backup);assert.equal(parsed.format,'orvane-backup');assert.equal(parsed.library.matches.length,1);assert.ok(parsed.profile.id);assert.equal(parsed.library.matches[0].tutorial.version,1);
   await ctx.setOffline(true);await page.reload();await page.getByRole('button',{name:/Continue/}).first().click();await botsResumeControl(page);await saveAndExit(page);
   assert.deepEqual(errors,[]);await ctx.close();
-  const target=await browser.newContext(),p=await target.newPage();await p.goto(url);await p.getByRole('button',{name:/Saved games & statistics/}).click();
+  const target=await browser.newContext(),p=await target.newPage();await p.goto(url+'?renderer=2d');await p.getByRole('button',{name:/Saved games & statistics/}).click();
   await p.getByLabel('Backup JSON file').setInputFiles({name:'orvane.json',mimeType:'application/json',buffer:Buffer.from(backup)});
   await button(p,'Replace local data').click();await p.getByText('Backup restored.',{exact:true}).waitFor();
   assert.equal(await p.evaluate(()=>JSON.parse(localStorage.getItem('orvane.profile.v1')).id),parsed.profile.id);
@@ -185,7 +185,7 @@ async function run(){
  }finally{await browser.close();}
  const mobile=await webkit.launch();
  try{
-  const ctx=await mobile.newContext({...devices['iPhone 13']});const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url);
+  const ctx=await mobile.newContext({...devices['iPhone 13']});const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(url+'?renderer=2d');
   await exerciseWorker(page);await page.getByRole('button',{name:/Continue/}).first().click();await botsResumeControl(page);
   assert.deepEqual(errors,[]);await ctx.close();await passAndPlay(mobile,true);await iphoneTouch(mobile);console.log('WebKit iPhone viewport: HUD, touch gestures, handoff, drawer, pause, worker and save/resume passed');
  }finally{await mobile.close();}
