@@ -6,6 +6,7 @@ import {TERRAIN_COLORS} from './TerrainArt';
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
 export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges,robberTile,producingTiles}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[];robberTile?:string;producingTiles?:readonly string[]}){
+ const [quality,setQuality]=useState<'auto'|'low'|'medium'|'high'>(()=>{try{const q=localStorage.getItem('orvane.graphics');return q==='low'||q==='medium'||q==='high'?q:'auto';}catch{return 'auto';}});
  const host=useRef<HTMLDivElement>(null);
  const resetCamera=useRef(()=>{});
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
@@ -23,6 +24,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const el=host.current;if(!el)return;
   let renderer:THREE.WebGLRenderer;
   try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});}catch{fallback.current();return;}
+  const tier=quality==='auto'?(window.matchMedia('(pointer: coarse)').matches?'medium':'high'):quality;
   const scene=new THREE.Scene();scene.background=new THREE.Color('#183e49');
   const camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,500);
   const selectable:THREE.Object3D[]=[];
@@ -138,13 +140,13 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const water=new THREE.Mesh(waterGeometry,waterMaterial);water.rotation.x=-Math.PI/2;water.position.set(center.x,-.15,center.z);scene.add(water);water.receiveShadow=true;
   scene.add(new THREE.HemisphereLight('#fff1d8','#526b72',1.65));
   const sun=new THREE.DirectionalLight('#fff0d0',2.2);sun.position.set(center.x-5,12,center.z+6);sun.target.position.copy(center);scene.add(sun,sun.target);
-  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-  sun.castShadow=true;const shadowSize=window.matchMedia('(pointer: coarse)').matches?512:1024;sun.shadow.mapSize.set(shadowSize,shadowSize);sun.shadow.camera.left=-span;sun.shadow.camera.right=span;sun.shadow.camera.top=span;sun.shadow.camera.bottom=-span;sun.shadow.camera.near=.5;sun.shadow.camera.far=span*4+20;sun.shadow.normalBias=.025;sun.shadow.bias=-.0002;sun.shadow.camera.updateProjectionMatrix();
+  renderer.shadowMap.enabled=tier!=='low';renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  sun.castShadow=true;const shadowSize=tier==='high'?1024:512;sun.shadow.mapSize.set(shadowSize,shadowSize);sun.shadow.camera.left=-span;sun.shadow.camera.right=span;sun.shadow.camera.top=span;sun.shadow.camera.bottom=-span;sun.shadow.camera.near=.5;sun.shadow.camera.far=span*4+20;sun.shadow.normalBias=.025;sun.shadow.bias=-.0002;sun.shadow.camera.updateProjectionMatrix();
   scene.traverse(object=>{if(object instanceof THREE.Mesh&&object!==water&&object.material instanceof THREE.MeshStandardMaterial){object.castShadow=true;object.receiveShadow=true;}});
   camera.position.set(center.x,span*1.3,center.z+span);camera.lookAt(center);camera.updateMatrixWorld(true);
   const projected=new THREE.Box3();for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])projected.expandByPoint(new THREE.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse));
   let {zoom,azimuth,panX,panY}=cameraPose.current;const pointers=new Map<number,{x:number;y:number}>();let pinchDistance=0;const target=center.clone();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));el.appendChild(renderer.domElement);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,tier==='high'?2:tier==='medium'?1.5:1));el.appendChild(renderer.domElement);
   const draw=()=>{const w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;camera.position.set(target.x+Math.sin(azimuth)*span,target.y+span*1.3,target.z+Math.cos(azimuth)*span);camera.lookAt(target);camera.updateMatrixWorld(true);const projected=new THREE.Box3();for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])projected.expandByPoint(new THREE.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse));const fit=projected.getSize(new THREE.Vector3()),mid=projected.getCenter(new THREE.Vector3());const aspect=w/h,half=Math.max(fit.y/2,fit.x/(2*aspect))*1.08/zoom;camera.left=mid.x+panX-half*aspect;camera.right=mid.x+panX+half*aspect;camera.top=mid.y+panY+half;camera.bottom=mid.y+panY-half;camera.updateProjectionMatrix();renderer.setSize(w,h,false);renderer.render(scene,camera);const canvas=renderer.domElement;canvas.dataset.cameraPose=JSON.stringify({zoom,azimuth,panX,panY});canvas.dataset.legalVertices=JSON.stringify([...legalVertexSet].flatMap(id=>{const p=vertices.get(id);if(!p)return [];const q=new THREE.Vector3(p.x,.32,p.y).project(camera);return [{id,x:(q.x+1)*w/2,y:(1-q.y)*h/2}]}));canvas.dataset.legalEdges=JSON.stringify([...legalEdgeSet].flatMap(id=>{const edge=board.edges.find(e=>e.id===id);if(!edge)return [];const a=vertices.get(edge.a),b=vertices.get(edge.b);if(!a||!b)return [];const q=new THREE.Vector3((a.x+b.x)/2,.29,(a.y+b.y)/2).project(camera);return [{id,x:(q.x+1)*w/2,y:(1-q.y)*h/2}]}));};
   const productionGeometry=new THREE.TorusGeometry(.78,.045,8,48);
   const productionMaterial=new THREE.MeshBasicMaterial({color:'#ffe39b',transparent:true,opacity:.85,depthTest:false});
@@ -173,10 +175,10 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    if(movingRobber&&origin&&robber){robberMeshes.forEach((mesh,i)=>{const dest=robberTargets[i];mesh.position.set(dest.x+(origin.p.x-robber.p.x)*(1-smooth),dest.y+Math.sin(Math.PI*u)*.48,dest.z+(origin.p.y-robber.p.y)*(1-smooth));});}
    const pulse=Math.min(1,elapsed/650);for(const ring of productionRings)ring.scale.setScalar(.85+.15*Math.sin(Math.PI*pulse));productionMaterial.opacity=.85*(1-pulse);scene.updateMatrixWorld(true);draw();if((animated.length>0&&t<1)||(movingRobber&&u<1)||(productionRings.length>0&&pulse<1))frame=requestAnimationFrame(tick);};
   if(animated.length||movingRobber||productionRings.length)tick(started);else draw();
-  if(ambientEnabled)ambientTimer=window.setInterval(ambient,1000/24);
+  if(ambientEnabled&&tier!=='low')ambientTimer=window.setInterval(ambient,1000/(tier==='high'?30:20));
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
   return()=>{observer.disconnect();window.clearInterval(ambientTimer);cancelAnimationFrame(frame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());sun.shadow.dispose();renderer.dispose();renderer.domElement.remove();};
  // eslint-disable-next-line react-hooks/exhaustive-deps
- },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile,productionKey]);
- return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/><button type="button" aria-label="Reset 3D camera" onClick={()=>resetCamera.current()} style={{position:'absolute',right:12,bottom:12,zIndex:2}}>⌂</button>{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
+ },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile,productionKey,quality]);
+ return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/><select aria-label="Graphics quality" value={quality} onChange={e=>{const q=e.target.value as typeof quality;setQuality(q);try{localStorage.setItem('orvane.graphics',q);}catch{}}} style={{position:'absolute',right:12,top:12,zIndex:2,maxWidth:115}}><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select><button type="button" aria-label="Reset 3D camera" onClick={()=>resetCamera.current()} style={{position:'absolute',right:12,bottom:12,zIndex:2}}>⌂</button>{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
 }
