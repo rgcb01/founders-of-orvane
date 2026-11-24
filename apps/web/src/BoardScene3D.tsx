@@ -11,8 +11,9 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const resetCamera=useRef(()=>{});
  const rendererRef=useRef<THREE.WebGLRenderer|null>(null);
  const sharedGeometry=useRef(new Map<string,THREE.BufferGeometry>());
+ const staticTerrain=useRef<{board:Board;objects:THREE.Object3D[];vegetation:{mesh:THREE.Mesh;phase:number}[];batches:Map<string,{mesh:THREE.InstancedMesh;items:{mesh:THREE.Mesh;phase:number}[]}>;selectable:THREE.Object3D[];geometry:THREE.CylinderGeometry;materials:Map<string,THREE.MeshStandardMaterial>}|null>(null);
  const sharedMaterials=useRef(new Map<string,THREE.MeshStandardMaterial>());
- useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
+ useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
  const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
  const cameraPose=useRef({zoom:1,azimuth:0,panX:0,panY:0});
@@ -34,13 +35,15 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const selectable:THREE.Object3D[]=[];
   const positions=board.tiles.map(t=>({tile:t,p:tilePosition(t,1)}));
   const bounds=new THREE.Box3();
-  const geometry=new THREE.CylinderGeometry(.98,.98,.24,6);
-  const materials=new Map<string,THREE.MeshStandardMaterial>();
+  if(staticTerrain.current&&staticTerrain.current.board!==board){const old=staticTerrain.current;old.geometry.dispose();old.materials.forEach(m=>m.dispose());old.batches.forEach(b=>b.mesh.dispose());staticTerrain.current=null;}
+  const cachedTerrain=staticTerrain.current;
+  const geometry=cachedTerrain?.geometry??new THREE.CylinderGeometry(.98,.98,.24,6);
+  const materials=cachedTerrain?.materials??new Map<string,THREE.MeshStandardMaterial>();
   const geometryCache=sharedGeometry.current;
   const details:THREE.BufferGeometry[]=[];const detailMaterials=new Map<string,THREE.MeshStandardMaterial>();
   const add=(g:THREE.BufferGeometry,color:string,x:number,y:number,z:number)=>{const key=g.type+JSON.stringify((g as THREE.BoxGeometry).parameters);const cached=geometryCache.get(key);if(cached){g.dispose();g=cached;}else{geometryCache.set(key,g);}let m=sharedMaterials.current.get(color);if(!m){m=new THREE.MeshStandardMaterial({color,flatShading:true,roughness:1});sharedMaterials.current.set(color,m);}const mesh=new THREE.Mesh(g,m);mesh.position.set(x,y,z);scene.add(mesh);return mesh;};
-  const vegetation: {mesh:THREE.Mesh;phase:number}[]=[];
-  for(const {tile,p} of positions){
+  const vegetation: {mesh:THREE.Mesh;phase:number}[]=cachedTerrain?.vegetation??[];
+  if(cachedTerrain){scene.add(...cachedTerrain.objects);selectable.push(...cachedTerrain.selectable);}else for(const {tile,p} of positions){
    const color=TERRAIN_COLORS[tile.terrain];
    let mat=materials.get(color);if(!mat){mat=new THREE.MeshStandardMaterial({color,roughness:1,flatShading:true});materials.set(color,mat);}
    const mesh=new THREE.Mesh(geometry,mat);mesh.position.set(p.x,0,p.y);scene.add(mesh);mesh.userData={selection:{kind:'tile',id:tile.id}};selectable.push(mesh);bounds.expandByObject(mesh);
@@ -57,9 +60,11 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const oldRobber=previousRobber.current;previousRobber.current={board,tile:robberTile};
   const origin=oldRobber?.board===board&&oldRobber.tile!==robberTile&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches?positions.find(({tile})=>tile.id===oldRobber.tile):undefined;
   const robberMeshes:THREE.Mesh[]=[];
-  const batches=new Map<string,{mesh:THREE.InstancedMesh;items:typeof vegetation}>();
+  const batches=cachedTerrain?.batches??new Map<string,{mesh:THREE.InstancedMesh;items:typeof vegetation}>();
+  if(!cachedTerrain){
   const grouped=new Map<string,typeof vegetation>();for(const item of vegetation){const key=item.mesh.geometry.uuid+':'+(item.mesh.material as THREE.Material).uuid;const list=grouped.get(key)??[];list.push(item);grouped.set(key,list);}
   for(const [key,items] of grouped){const first=items[0].mesh;const mesh=new THREE.InstancedMesh(first.geometry,first.material,items.length);mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);items.forEach((item,i)=>{item.mesh.updateMatrix();mesh.setMatrixAt(i,item.mesh.matrix);scene.remove(item.mesh);});mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();scene.add(mesh);batches.set(key,{mesh,items});}
+  staticTerrain.current={board,objects:[...scene.children],vegetation,batches,selectable:[...selectable],geometry,materials};}
   const robber=positions.find(({tile})=>tile.id===robberTile);
   if(robber){
    const {x,y:z}=robber.p;
@@ -186,7 +191,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   if(animated.length||movingRobber||productionRings.length)tick(started);else draw();
   if(ambientEnabled&&tier!=='low')ambientTimer=window.setInterval(ambient,1000/(tier==='high'?30:20));
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
-  return()=>{observer.disconnect();window.clearInterval(ambientTimer);cancelAnimationFrame(frame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());sun.shadow.dispose();for(const {mesh} of batches.values())mesh.dispose();renderer.renderLists.dispose();};
+  return()=>{observer.disconnect();window.clearInterval(ambientTimer);cancelAnimationFrame(frame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();sun.shadow.dispose();renderer.renderLists.dispose();};
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile,productionKey,quality]);
  return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/><select aria-label="Graphics quality" value={quality} onChange={e=>{const q=e.target.value as typeof quality;setQuality(q);try{localStorage.setItem('orvane.graphics',q);}catch{}}} style={{position:'absolute',right:12,top:12,zIndex:2,maxWidth:115}}><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select><button type="button" aria-label="Reset 3D camera" onClick={()=>resetCamera.current()} style={{position:'absolute',right:12,bottom:12,zIndex:2}}>⌂</button>{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
