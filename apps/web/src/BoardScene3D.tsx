@@ -8,6 +8,7 @@ type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;col
 export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges,robberTile}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[];robberTile?:string}){
  const host=useRef<HTMLDivElement>(null);
  const resetCamera=useRef(()=>{});
+ const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
  const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
  const cameraPose=useRef({zoom:1,azimuth:0,panX:0,panY:0});
  // Parent game UI creates fresh arrays on every render; only rebuild WebGL when their content changes.
@@ -44,6 +45,9 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
     case 'desert': add(new THREE.SphereGeometry(.5,6,3),'#e2c18a',x,.12,z).scale.set(1,.24,.65);break;
    }
   }
+  const oldRobber=previousRobber.current;previousRobber.current={board,tile:robberTile};
+  const origin=oldRobber?.board===board&&oldRobber.tile!==robberTile&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches?positions.find(({tile})=>tile.id===oldRobber.tile):undefined;
+  const robberMeshes:THREE.Mesh[]=[];
   const robber=positions.find(({tile})=>tile.id===robberTile);
   if(robber){
    const {x,y:z}=robber.p;
@@ -52,7 +56,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    const body=add(new THREE.CylinderGeometry(.10,.17,.38,6),'#343942',x,.40,z+.40);
    body.userData=base.userData;selectable.push(body);
    const head=add(new THREE.IcosahedronGeometry(.12,0),'#252a31',x,.66,z+.40);
-   head.userData=base.userData;selectable.push(head);
+   head.userData=base.userData;selectable.push(head);robberMeshes.push(base,body,head);
   }
   const vertices=new Map(board.vertices.map(v=>[v.id,vertexPosition(v,1)]));
   // Preview samples only; real matches will supply their own piece data.
@@ -148,8 +152,13 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);canvas.addEventListener('wheel',wheel,{passive:false});
   resetCamera.current=()=>{zoom=1;azimuth=0;panX=0;panY=0;cameraPose.current={zoom,azimuth,panX,panY};draw();};
   const observer=new ResizeObserver(draw);observer.observe(el);let frame=0;const started=performance.now();
-  const tick=(now:number)=>{const t=Math.min(1,(now-started)/380),ease=1-Math.pow(1-t,3);for(const group of animated)group.scale.set(1,Math.max(.05,ease),1);scene.updateMatrixWorld(true);draw();if(t<1)frame=requestAnimationFrame(tick);};
-  if(animated.length)tick(started);else draw();
+  const robberTargets=robberMeshes.map(mesh=>mesh.position.clone());
+  const movingRobber=!!origin&&!!robber&&robberMeshes.length>0;
+  const tick=(now:number)=>{const elapsed=now-started,t=Math.min(1,elapsed/380),ease=1-Math.pow(1-t,3);for(const group of animated)group.scale.set(1,Math.max(.05,ease),1);
+   const u=Math.min(1,elapsed/520),smooth=u*u*(3-2*u);
+   if(movingRobber&&origin&&robber){robberMeshes.forEach((mesh,i)=>{const dest=robberTargets[i];mesh.position.set(dest.x+(origin.p.x-robber.p.x)*(1-smooth),dest.y+Math.sin(Math.PI*u)*.48,dest.z+(origin.p.y-robber.p.y)*(1-smooth));});}
+   scene.updateMatrixWorld(true);draw();if((animated.length>0&&t<1)||(movingRobber&&u<1))frame=requestAnimationFrame(tick);};
+  if(animated.length||movingRobber)tick(started);else draw();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
   return()=>{observer.disconnect();cancelAnimationFrame(frame);markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);geometry.dispose();pickGeometry.forEach(g=>g.dispose());pickMaterial.dispose();textures.forEach(t=>t.dispose());details.forEach(g=>g.dispose());detailMaterials.forEach(m=>m.dispose());waterGeometry.dispose();waterMaterial.dispose();materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
  // eslint-disable-next-line react-hooks/exhaustive-deps
