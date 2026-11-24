@@ -537,3 +537,7 @@ html:has(main.in-match),body:has(main.in-match){height:100%;overflow:hidden;over
 .in-match .map-confirm{animation:orvane-feedback-in .14s ease-out}
 @keyframes orvane-feedback-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.in-match :is(.dock-actions,.map-top,.map-confirm,.build-menu,.trade-panel) button{transition:none}.in-match :is(.dock-actions,.map-top,.map-confirm,.build-menu,.trade-panel) button:active{scale:1}.in-match :is(.game-sidebar,.map-confirm,.trade-error){animation:none}}
+
+@keyframes orvane-dice-tumble{0%{transform:translateY(-12px) rotateX(0deg) rotateY(0deg)}45%{transform:translateY(-5px) rotateX(410deg) rotateY(280deg)}72%{transform:translateY(2px) rotateX(700deg) rotateY(370deg)}85%{transform:translateY(-4px) rotateX(710deg) rotateY(382deg)}100%{transform:translateY(0) rotateX(702deg) rotateY(382deg)}}
+.orvane-die-roll{animation:orvane-dice-tumble 520ms ease-out both}
+@media(prefers-reduced-motion:reduce){.orvane-die-roll{animation:none}}
