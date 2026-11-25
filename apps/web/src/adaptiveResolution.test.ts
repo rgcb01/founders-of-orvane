@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {adaptResolution,resolutionCap,resolutionStart,type ResolutionState} from './adaptiveResolution';
+import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,FRAME_MS,type ResolutionState} from './adaptiveResolution';
 const repeat=(s:ResolutionState,n:number,ms:number,fps:number,target=30)=>{for(let i=0;i<n;i++)s=adaptResolution(s,ms,fps,target);return s;};
 describe('adaptive 3D resolution',()=>{
  it('honors device pixel ratio and manual quality caps',()=>{
@@ -30,5 +30,23 @@ describe('adaptive 3D resolution',()=>{
   const prior=repeat(resolutionStart(2),4,20,20);
   expect(resolutionStart(2,prior).ratio).toBe(1.5);
   expect(resolutionStart(1,prior)).toEqual({cap:1,ratio:1,slow:0,fast:0});
+ });
+});
+
+describe('60 FPS display cadence',()=>{
+ const submissions=(hz:number)=>{let due=0,count=0;for(let i=0;i<hz*5;i++){const now=i*1000/hz;const next=nextFrameDeadline(now,due);if(next!==null){due=next;count++;}}return count;};
+ it('targets a 16.67ms frame budget on 60Hz and 120Hz displays',()=>{
+  expect(TARGET_FPS).toBe(60);expect(FRAME_MS).toBeCloseTo(16.667,2);
+  expect(submissions(60)).toBe(300);expect(submissions(120)).toBe(300);
+ });
+ it('does not try to catch up with multiple frames on a slower display',()=>{
+  expect(submissions(30)).toBe(150);
+  expect(nextFrameDeadline(500,10)).toBeGreaterThan(500);
+ });
+ it('reduces resolution when 60 FPS is not sustained',()=>{
+  const initial=resolutionStart(1.5);
+  expect(repeat(initial,2,13,60,60).ratio).toBe(1.25);
+  expect(repeat(initial,2,5,48,60).ratio).toBe(1.25);
+  expect(repeat(initial,10,5,59,60).ratio).toBe(1.5);
  });
 });
