@@ -3,7 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {generateBoard,tilePosition,vertexPosition,type BoardSize,type Terrain,createSetup,activePlayer,legalSettlements,legalRoads,applySetup,type PlayerCount,type SetupState,startGame,applyGame,legalBuilds,rollDice,RESOURCES,type GameState,type BuildKind,freeRoadSites,playerScore,chooseFirstPlayer,decisionPlayer,type Difficulty} from '@orvane/engine';
 import './style.css';
 
-import {BoardScene3D} from './BoardScene3D';
+import {BoardScene3D,type BoardCameraControls} from './BoardScene3D';
 import {DevelopmentPanel} from './DevelopmentPanel';
 import {TradePanel} from './TradePanel';
 import {resourceEmoji} from './resources';
@@ -102,6 +102,7 @@ function App(){
  const [selection,setSelection]=useState<Selection|null>(null);
  const [experimental3D,setExperimental3D]=useState(()=>new URLSearchParams(window.location.search).get('renderer')!=='2d');
  const [webglFailed,setWebglFailed]=useState(false);
+ const camera3D=useRef<BoardCameraControls|null>(null);
  const [zoom,setZoom]=useState(1);
  const [pan,setPan]=useState({x:0,y:0});
  const svg=useRef<SVGSVGElement>(null);
@@ -114,6 +115,7 @@ function App(){
  useLayoutEffect(()=>{cameraState.current={zoom,pan};},[zoom,pan]);
  const board=useMemo(()=>generateBoard(seed,size),[seed,size]);
  const view=game??setup;
+ const active3D=!!view&&experimental3D&&!webglFailed;
  const previous=useRef<{game:GameState|null;setup:SetupState|null}>({game:null,setup:null});
  const playerId=game?game.active:setup?activePlayer(setup):null;
  const decision=game?decisionPlayer(game):setup?activePlayer(setup):null;
@@ -384,11 +386,11 @@ function App(){
   {view&&<PlayerStrip seed={seed} view={view} game={game} active={visual?.playerId??playerId} humans={humans} showHand={showHand} soloAvatar={profile&&progress?avatarIcon(profile.avatar,progress.level):undefined} soloTitle={cosmetic(loadout.title).name}/> }
   <div className={"layout immersive-layout"+(drawerOpen?" drawer-active":"")}>
    <section className="board-panel" id="board" data-coach-target="board" tabIndex={-1} aria-label="Interactive island map">
-    <div className="map-top"><span>ORVANE · {board.tiles.length}</span><div>{view&&<button aria-label="Open journal" aria-expanded={drawerOpen&&activePanel==="info"} onClick={()=>drawerOpen&&activePanel==="info"?setDrawerOpen(false):openPanel("info")}><ControlIcon name="journal"/> <span className="toolbar-label">Journal</span></button>}<button aria-label="Follow board events" aria-pressed={follow} onClick={()=>setFollow(f=>!f)}><ControlIcon name="follow"/></button><button aria-label="Zoom out" disabled={zoom<=.75} onClick={()=>setZoom(z=>Math.max(.75,z-.25))}><ControlIcon name="minus"/></button><button aria-label="Reset view" onClick={()=>{setZoom(1);setPan({x:0,y:0});}}><ControlIcon name="fit"/></button><button aria-label="Zoom in" disabled={zoom>=2.5} onClick={()=>setZoom(z=>Math.min(2.5,z+.25))}><ControlIcon name="plus"/></button></div></div>
+    <div className="map-top"><span>ORVANE · {board.tiles.length}</span><div>{view&&<button aria-label="Open journal" aria-expanded={drawerOpen&&activePanel==="info"} onClick={()=>drawerOpen&&activePanel==="info"?setDrawerOpen(false):openPanel("info")}><ControlIcon name="journal"/> <span className="toolbar-label">Journal</span></button>}<button aria-label="Follow board events" aria-pressed={follow} onClick={()=>setFollow(f=>!f)}><ControlIcon name="follow"/></button><button aria-label="Zoom out" disabled={!active3D&&zoom<=.75} onClick={()=>{if(active3D)camera3D.current?.zoomBy(-.25);else setZoom(z=>Math.max(.75,z-.25));}}><ControlIcon name="minus"/></button><button aria-label="Reset view" onClick={()=>{if(active3D)camera3D.current?.reset();else{setZoom(1);setPan({x:0,y:0});}}}><ControlIcon name="fit"/></button><button aria-label="Zoom in" disabled={!active3D&&zoom>=2.5} onClick={()=>{if(active3D)camera3D.current?.zoomBy(.25);else setZoom(z=>Math.min(2.5,z+.25));}}><ControlIcon name="plus"/></button></div></div>
     {view&&coachOpen&&tutorial.enabled&&<TutorialCoach progress={tutorial} lesson={tutorLesson} tip={coachFocus===tutorLesson?.target&&tutorLesson?tutorialTip(tutorLesson):"Try the highlighted action. Your real moves advance the lesson."} onShow={showTutorTarget} onHide={()=>{setCoachOpen(false);setCoachFocus(null);}} onSkip={skipTutorial}/>}
      {view&&<div className="board-event-slot">{view&&visual&&duration>0&&<EventStage key={visualQueue.length+':'+visual.kind+':'+(game?.turn??setup?.step)} event={visual} effectId={loadout.effects} celebrate={visual.playerId<humans&&!reduced} name={view.players.find(p=>p.id===visual.playerId)?.name??'Player'} other={'other' in visual&&visual.other!==null?view.players.find(p=>p.id===visual.other)?.name??'Player':'🏦 Bank'} duration={duration} color={view.players.find(p=>p.id===visual.playerId)?.color??'#ffe39b'}/>}{(!visual||duration===0)&&<div className="event-idle"><span>{humanDecision?'👤':'🎲'}</span><strong>{view.players.find(p=>p.id===(decision??playerId))?.name??'Match'} </strong><span className="muted">{humanDecision?'Your action':paused?'Paused':'Watching the board'}</span></div>}</div>}
     {game&&humanActive&&game.phase==='action'&&<BuildMenu board={board} game={game} build={build} onSelect={k=>{setBuild(k);setSelection(null);}}/>}
-    {view&&experimental3D&&!webglFailed?<div style={{position:'absolute',inset:0,top:54,bottom:45,zIndex:0}}><BoardScene3D board={board} robberTile={game?.development.robber} producingTiles={visual?.kind==='production'&&duration>0&&!reduced?visual.tiles:undefined} pieces={{roads:(view?.roads??[]).map(r=>({edgeId:r.edgeId,color:view?.players.find(p=>p.id===r.playerId)?.color??'#ffffff'})),buildings:(view?.settlements??[]).map(v=>({vertexId:v.vertexId,kind:game?.settlements.some(s=>s.vertexId===v.vertexId&&s.kind==='city')?'city' as const:'settlement' as const,color:view?.players.find(p=>p.id===v.playerId)?.color??'#ffffff'}))}} legalVertices={[...validVertices]} legalEdges={[...validEdges]} onSelect={v=>setSelection(v)} onUnavailable={()=>{setWebglFailed(true);setExperimental3D(false);}}/></div>:<>
+    {active3D?<div style={{position:'absolute',inset:0,top:54,bottom:45,zIndex:0}}><BoardScene3D board={board} cameraControls={camera3D} robberTile={game?.development.robber} producingTiles={visual?.kind==='production'&&duration>0&&!reduced?visual.tiles:undefined} pieces={{roads:(view?.roads??[]).map(r=>({edgeId:r.edgeId,color:view?.players.find(p=>p.id===r.playerId)?.color??'#ffffff'})),buildings:(view?.settlements??[]).map(v=>({vertexId:v.vertexId,kind:game?.settlements.some(s=>s.vertexId===v.vertexId&&s.kind==='city')?'city' as const:'settlement' as const,color:view?.players.find(p=>p.id===v.playerId)?.color??'#ffffff'}))}} legalVertices={[...validVertices]} legalEdges={[...validEdges]} onSelect={v=>setSelection(v)} onUnavailable={()=>{setWebglFailed(true);setExperimental3D(false);}}/></div>:<>
     <svg ref={svg} data-board-root="true" viewBox={[bounds.x+(bounds.w-viewW)/2+pan.x,bounds.y+(bounds.h-viewH)/2+pan.y,viewW,viewH].join(' ')} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onClickCapture={e=>{
          if(performance.now()-lastGestureEnd.current<320){e.preventDefault();e.stopPropagation();return;}
          if(!e.detail||!window.matchMedia('(pointer:coarse)').matches||(!vertexMode&&!roadMode)||!svg.current)return;

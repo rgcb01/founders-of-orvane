@@ -160,9 +160,37 @@ async function passAndPlay(browser,mobile=false){
   assert.deepEqual(errors,[]);console.log((mobile?'WebKit iPhone':'Chromium desktop')+' six-player pass-and-play: private seat handoff, legal placement and tutorial checkpoints passed');
  }finally{await ctx.close();}
 }
+async function live3DCameraAndHarbors(browser){
+ const ctx=await browser.newContext({viewport:{width:1366,height:768}}),page=await ctx.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ try{
+  await page.goto(url);
+  await start(page);
+  const canvas=page.locator('canvas[data-camera-pose]');
+  await canvas.waitFor({timeout:30000});
+  const coach=page.getByRole('complementary',{name:'Interactive tutorial'});
+  if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
+  const labels=page.locator('[data-harbor-edge]');
+  assert.ok(await labels.count()>0,'3D board displays exchange-rate labels');
+  const texts=await labels.allTextContents();
+  assert.ok(texts.some(t=>/Any 3:1/.test(t)),'generic port has 3:1 rate');
+  assert.ok(texts.some(t=>/\w+ 2:1/.test(t)),'resource port has 2:1 rate');
+  const pose=()=>canvas.evaluate(c=>JSON.parse(c.dataset.cameraPose));
+  const initial=await pose();
+  await button(page,'Zoom in').click();
+  assert.ok((await pose()).zoom>initial.zoom,'toolbar zooms actual 3D camera');
+  await button(page,'Zoom out').click();
+  assert.ok(Math.abs((await pose()).zoom-initial.zoom)<1e-6,'toolbar zoom out reverses zoom in');
+  await button(page,'Zoom in').click();
+  await button(page,'Reset view').click();
+  assert.deepEqual(await pose(),{zoom:1,azimuth:0,panX:0,panY:0});
+  assert.deepEqual(errors,[]);
+  console.log('Chromium live 3D: shared map toolbar and harbor exchange labels passed');
+ }finally{await ctx.close();}
+}
 async function run(){
  await ready();
- const browser=await chromium.launch();
+ const browser=await chromium.launch({args:['--enable-unsafe-swiftshader','--use-angle=swiftshader']});
  try{
   const ctx=await browser.newContext({acceptDownloads:true,viewport:{width:1366,height:768}});
   const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -182,6 +210,7 @@ async function run(){
   await button(p,'← Main menu').click();await p.getByRole('button',{name:/Continue/}).first().click();await botsResumeControl(p);
   await target.close();console.log('Chromium desktop: full-viewport HUD, drawers, pause, worker, offline, save/resume and backups passed');
  await passAndPlay(browser);
+ await live3DCameraAndHarbors(browser);
  }finally{await browser.close();}
  const mobile=await webkit.launch();
  try{
