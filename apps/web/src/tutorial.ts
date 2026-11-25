@@ -55,7 +55,7 @@ export function currentLesson(progress:TutorialProgress,setup:SetupState|null,ga
  if(!game){
   if(setup.phase==='settlement')return {id:'settlement',icon:'🏠',title:'Find your first home',body:'Pick a glowing vertex between resource hexes, then confirm. Aim for different resources and strong numbers (6 or 8). You will place two homes.',target:'board',action:'Highlight legal sites'};
   if(setup.phase==='road')return {id:'road',icon:'🛤️',title:'Connect your settlement',body:'Choose a glowing edge beside the settlement you just placed, then confirm. Roads let you expand later.',target:'board',action:'Highlight legal roads'};
-  return {id:'begin',icon:'🎲',title:'The island is ready',body:'All players have placed two settlements and roads. Begin the match to roll for resource production.',target:'launch',action:'Find Begin game'};
+  return {id:'begin',icon:'🎲',title:'The island is ready',body:'All players have placed two settlements and roads. The first turn starts automatically.',target:'board',action:'View board'};
  }
  if(game.phase==='finished')return {id:'victory',icon:'🏆',title:'The match is over',body:'Ten victory points wins. Buildings, the longest road, largest army and hidden development cards contribute.',target:'info',action:'Review results'};
  if(!humanDecision)return {id:'watch',icon:'👀',title:'Watch the other founder',body:'The bots take their actions with the same rules. Watch their routes, production and trades.',target:'info',action:'View turn'};
@@ -65,7 +65,7 @@ export function currentLesson(progress:TutorialProgress,setup:SetupState|null,ga
  if(game.phase==='freeRoad')return {id:'cards',icon:'🛤️',title:'Road Building card',body:'Place the glowing free roads, one at a time. There is no lumber or brick cost for these placements.',target:'cards',action:'Open card actions'};
  if(game.phase==='roll')return {id:'roll',icon:'🎲',title:'Roll to produce resources',body:'Matching number tokens pay nearby settlements one card and cities two. A seven activates the robber.',target:'roll',action:'Find Roll dice'};
  if(game.phase==='action'){
-  if(!progress.done.includes('build'))return {id:'build',icon:'🏗️',title:'Build your network',body:'Select Road, Settlement or City on the left. Costs show the needed cards; glowing sites are legal. Tap a site, then confirm.',target:'build',action:'Show construction'};
+  if(!progress.done.includes('build'))return {id:'build',icon:'🏗️',title:'Build your network',body:'Open Build and select Road, Settlement or City. Costs show the needed cards; glowing sites are legal. Tap a site, then confirm.',target:'build',action:'Show construction'};
   if(!progress.done.includes('trade'))return {id:'trade',icon:'⚓',title:'Visit the trading post',body:'Trade with the bank at 4:1, or better at a harbor. You can also offer resources to other players. Only completed trades earn this milestone.',target:'trade',action:'Open trading post'};
   if(!progress.done.includes('cards'))return {id:'cards',icon:'🃏',title:'Explore development cards',body:'A development card costs wool, grain and ore. Hidden victory points stay secret; action cards cannot be played on the turn bought.',target:'cards',action:'Open development'};
   return {id:'explore',icon:'🧭',title:'Play your strategy',body:'You know the basics. Keep expanding, trade when it helps, and race to ten victory points.',target:'info',action:'Open journal'};
@@ -76,7 +76,7 @@ export function tutorialTip(lesson:Lesson):string{
  return lesson.target==='board'?'Golden rings mark legal places. Select one to inspect, then Confirm placement.':
  lesson.target==='build'?'Choose a construction, select a glowing road or vertex, then confirm.':
  lesson.target==='roll'?'Use the Roll button beside your hand.':
- lesson.target==='launch'?'Use Begin game in the turn bar.':
+ lesson.target==='launch'?'The first turn starts automatically after placement.':
  lesson.target==='trade'?'The trading post opens in the right panel or mobile bottom sheet.':
  lesson.target==='cards'?'Cards, robber actions and discards open together in the actions panel.':'Public moves and scores are visible in the field journal.';
 }

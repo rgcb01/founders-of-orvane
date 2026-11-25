@@ -1,0 +1,120 @@
+/* Floating match HUD. No interface row reserves space around the world. */
+.in-match .pace-bar,
+.in-match .map-help,
+.in-match > header .version,
+.in-match > header button[aria-label="Guided tutorial"],
+.in-match > header button[aria-label="Game guide"],
+.in-match > header button[aria-label="Mute sound"],
+.in-match > header button[aria-label="Enable sound"],
+.in-match > .turn-bar .muted { display: none; }
+.in-match .tabletop-pause-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.in-match > header { max-width: none; }
+.in-match > header .header-actions { flex-wrap: nowrap; }
+.in-match > .turn-bar { text-align: center; }
+.in-match > .turn-bar strong { font-size: .8rem; }
+.in-match .board-panel .map-top { top: 50%; transform: translateY(-50%); }
+.in-match .map-top > div { display: flex; flex-direction: column; gap: 6px; }
+.in-match .map-top button { width: 40px; height: 40px; }
+.in-match .board-panel .dice-display { top: 80px; background: transparent; }
+.in-match .dice-display > strong,
+.in-match .dice-display > .muted { display: none; }
+.in-match .player-strip .player-seat { display: grid; grid-template-columns: 32px minmax(0,1fr); }
+.in-match .player-strip .seat-avatar { grid-row: 1 / 3; }
+.in-match .player-strip .seat-score { grid-column: 2; font-size: .7rem; }
+.in-match .player-strip .seat-score small { display: none; }
+.in-match .player-strip .seat-main strong { display: block; }
+.in-match .player-strip .seat-stats { font-size: .65rem; }
+.in-match > .match-dock > .fan-hand .fan-scroll { overflow: hidden; }
+.in-match > .match-dock > .fan-hand .fan-card { top: 25px; }
+.in-match .fan-card:focus-visible { z-index: 301 !important; }
+.in-match .game-sidebar .drawer-heading button { display: block; }
+.in-match .board-panel .build-menu { bottom: 230px; right: 65px; transform: none; grid-template-columns: 1fr; }
+.in-match .board-panel .board-event-slot { top: 88px; }
+.in-match > .winner-banner { position: absolute; inset: 15% 15% auto; z-index: 30; max-height: 70%; overflow: auto; }
+
+@media (max-width: 700px) {
+ .in-match > .player-strip.game-players { left: 8px; top: 70px; width: 105px; gap: 4px; max-height: calc(100% - 210px); }
+ .in-match .player-strip .player-seat { grid-template-columns: 24px minmax(0,1fr); padding: 4px; gap: 2px 5px; min-height: 44px; }
+ .in-match .player-strip .seat-avatar { width: 24px; height: 24px; }
+ .in-match .player-strip .seat-main strong { font-size: .65rem; }
+ .in-match > header { right: 8px; top: max(8px,env(safe-area-inset-top)); }
+ .in-match > header button[aria-label="Toggle fullscreen"] { display: none; }
+ .in-match > .turn-bar { left: 8px; top: max(8px,env(safe-area-inset-top)); transform: none; max-width: calc(100% - 105px); padding: 5px 10px; }
+ .in-match > .save-status { top: 49px; right: 8px; }
+ .in-match > .match-dock { left: 8px; right: 8px; bottom: max(8px,env(safe-area-inset-bottom)); justify-content: flex-start; }
+ .in-match > .match-dock > .fan-hand { flex-basis: calc(100% - 112px); width: calc(100% - 112px); height: 110px; }
+ .in-match > .match-dock > .fan-hand .fan-card { width: 48px; height: 70px; }
+ .in-match > .match-dock > .dock-actions { width: 105px; }
+ .in-match .dock-actions button { min-height: 40px; font-size: .72rem; }
+ .in-match .board-panel .map-top { right: 8px; }
+ .in-match .board-panel .map-confirm { bottom: 125px; max-width: calc(100% - 135px); left: 8px; transform: none; }
+ .in-match .board-panel .build-menu { right: 56px; bottom: 220px; width: 128px; }
+ .in-match .immersive-layout.drawer-active > .game-sidebar,
+ .in-match .immersive-layout.trade-open.drawer-active > .game-sidebar { inset: 65px 8px auto; width: auto; max-height: calc(100% - 195px); }
+ .in-match .tutorial-coach { left: 8px; bottom: 130px; max-width: calc(100% - 130px); }
+ .in-match .board-panel .board-event-slot { top: 65px; max-width: 48%; }
+ .in-match > .action-prompt { top: 100px; max-width: 65%; }
+}
+@media (max-height: 500px) {
+ .in-match > .player-strip.game-players { top: 8px; gap: 3px; max-height: calc(100% - 16px); }
+ .in-match .player-strip .player-seat { min-height: 40px; padding: 3px 6px; }
+ .in-match .board-panel .map-top { top: 55px; transform: none; }
+ .in-match .map-top button { width: 32px; height: 32px; min-height: 32px; }
+ .in-match .board-panel .dice-display { right: 65px; top: 55px; }
+ .in-match .board-panel .build-menu { bottom: 130px; }
+ .in-match .immersive-layout.drawer-active > .game-sidebar { top: 55px; max-height: calc(100% - 65px); }
+}
+
+.in-match .tabletop-world select[aria-label="Graphics quality"] { top: auto !important; bottom: 12px; right: auto !important; left: 12px; max-width: 95px !important; font-size: .7rem; min-height: 32px; }
+.in-match .hand-strip .empty-hand-message,
+.in-match .hand-strip .fan-empty-target { background: transparent; padding: 0; }
+.in-match .board-panel .map-confirm { pointer-events: none; }
+.in-match .board-panel .map-confirm button:not(:disabled) { pointer-events: auto; }
+
+/* The hand stays below floating action windows, available for card drops. */
+.in-match .hand-mode { position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 310; min-height: 24px; padding: 2px 9px; font-size: .66rem; border: 0; border-radius: 12px; background: #153740e8; color: #e9d6a8; pointer-events: auto; white-space: nowrap; }
+.in-match .stacked-hand .fan-card { box-shadow: 2px 3px 0 #b6a783, 4px 6px 0 #7a806c, 0 8px 12px #0006; }
+.deck-count { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; min-width: 23px; height: 23px; padding: 0 4px; border: 1px solid #ead197; border-radius: 50%; background: #18383e; color: #fff0c9; font-size: .75rem; line-height: 1; }
+.in-match .board-panel .build-menu { bottom: 150px; right: 70px; width: min(390px,calc(100% - 150px)); max-height: calc(100% - 220px); overflow-y: auto; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 10px; gap: 8px; border: 1px solid #789389; }
+.construction-heading { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; font-size: .85rem; }
+.construction-heading button { min-height: 32px; padding: 3px 10px; }
+.in-match .build-option { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 10px 5px; text-align: center; }
+.in-match .build-title { flex-direction: column; }
+.in-match .build-title > span { font-size: .78rem; }
+.in-match .build-piece-preview { width: 52px; height: 46px; }
+.in-match .build-cost { justify-content: center; }
+.in-match .build-availability { margin-top: auto; font-size: .63rem; }
+.trade-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+.trade-modes button { font-size: .78rem; padding: 8px 4px; }
+.in-match .trade-card-lane { display: flex; flex-wrap: wrap; overflow: visible; gap: 8px; padding: 8px 4px; background: transparent; }
+.in-match .trade-mini-card { position: relative; flex: 0 0 34px; height: 49px; box-shadow: 2px 2px 0 #a89d7b; }
+.in-match .trade-mini-card .deck-count { min-width: 18px; height: 18px; font-size: .65rem; }
+.in-match .trade-panel .offer-form { display: grid; width: 100%; }
+.in-match .trade-panel select { min-width: 0; max-width: 100%; }
+.in-match .immersive-layout.trade-open.drawer-active > .game-sidebar { bottom: 150px; top: auto; max-height: calc(100% - 220px); }
+@media (max-width: 700px) {
+ .in-match .board-panel .build-menu { left: 8px; right: 8px; width: auto; bottom: 150px; max-height: calc(100% - 220px); }
+ .in-match .immersive-layout.trade-open.drawer-active > .game-sidebar { top: 65px; bottom: auto; max-height: calc(100% - 215px); }
+}
+@media (max-height: 500px) {
+ .in-match .board-panel .build-menu { top: 55px; bottom: auto; max-height: calc(100% - 185px); }
+ .in-match .immersive-layout.trade-open.drawer-active > .game-sidebar { top: 55px; bottom: auto; max-height: calc(100% - 185px); }
+}
+.in-match > .match-dock > .fan-hand .hand-mode { min-height: 24px; height: 24px; padding: 2px 9px; }
+.in-match .board-panel .build-menu { z-index: 15; right: 200px; }
+.in-match .immersive-layout.trade-open.drawer-active > .game-sidebar { bottom: 230px; max-height: calc(100% - 290px); }
+@media (max-width: 700px) {
+ .in-match .board-panel .build-menu { right: 8px; bottom: 215px; max-height: calc(100% - 280px); }
+ .in-match .immersive-layout.trade-open.drawer-active > .game-sidebar { bottom: auto; max-height: calc(100% - 295px); }
+}
+@media (max-height: 500px) {
+ .in-match .board-panel .build-menu { right: 200px; bottom: auto; }
+ .in-match .immersive-layout.trade-open.drawer-active > .game-sidebar { right: 200px; bottom: auto; width: min(365px,calc(100% - 340px)); max-height: calc(100% - 80px); }
+}
+.in-match .trade-open .panel-nav { display: none; }
+.in-match .trade-open .game-sidebar .drawer-heading { position: sticky; top: -12px; z-index: 30; flex-shrink: 0; background: #15383f; }
+
+/* Keep camera controls outside contextual panels, including forced offers. */
+@media(min-width:701px){.in-match .immersive-layout.drawer-active>.game-sidebar,.in-match .immersive-layout.trade-open.drawer-active>.game-sidebar{right:66px;width:min(365px,calc(100% - 230px))}}
+@media(max-width:700px){.in-match .immersive-layout.drawer-active>.game-sidebar,.in-match .immersive-layout.trade-open.drawer-active>.game-sidebar{right:56px}}
+@media(max-height:500px){.in-match .immersive-layout.trade-open.drawer-active>.game-sidebar{right:max(66px, min(200px,25vw))}}

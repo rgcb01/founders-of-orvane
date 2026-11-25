@@ -51,7 +51,6 @@ try{
  console.log('3D placement animation counts:',JSON.stringify(placementCounts));
  const setup=await readMatch(page);assert.equal(setup.setup.phase,'complete');
  assert.equal(setup.setup.settlements.length,12);assert.equal(setup.setup.roads.length,12);
- await page.locator('.match-dock').getByRole('button',{name:/Begin game/}).click();
  await page.waitForFunction(()=>!!JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].game);
  // Pause bots, so resource comparisons measure a stable board rather than new pieces.
  await button('Pause menu').click();
