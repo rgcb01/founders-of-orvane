@@ -32,10 +32,17 @@ try{
    const canvas=page.locator('canvas[data-benchmark3d]');await canvas.waitFor({timeout:30000});
    const coach=page.getByRole('complementary',{name:'Interactive tutorial'});
    if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
-   const snap=()=>canvas.evaluate(c=>({stats:JSON.parse(c.dataset.benchmark3d),counts:JSON.parse(c.dataset.renderCounts),ambientState:c.dataset.ambientState,targetFps:Number(c.dataset.targetFps),terrain:c.dataset.terrainBatchMetrics?JSON.parse(c.dataset.terrainBatchMetrics):null}));
+   const snap=()=>canvas.evaluate(c=>({stats:JSON.parse(c.dataset.benchmark3d),counts:JSON.parse(c.dataset.renderCounts),ambientState:c.dataset.ambientState,targetFps:Number(c.dataset.targetFps),shadows:c.dataset.shadows==='true',resolution:JSON.parse(c.dataset.resolution),terrain:c.dataset.terrainBatchMetrics?JSON.parse(c.dataset.terrainBatchMetrics):null}));
    for(const quality of (quick?(players===6?['low','high','auto']:['low','high']):['low','medium','high','auto'])){
     await page.getByLabel('Graphics quality').selectOption(quality);
     await sleep(500);
+    const adaptation=[];
+    if(quality==='auto'){
+     // Slow software WebGL may need several seconds per 30-frame sample window.
+     // Track actual transitions rather than assuming a four-second warm-up settles quality.
+     const deadline=Date.now()+25000;
+     do{const checkpoint=await snap();adaptation.push({elapsedMs:25000-(deadline-Date.now()),ratio:checkpoint.resolution.ratio,shadows:checkpoint.shadows,ambientFrames:checkpoint.counts.ambientFrames});if(!checkpoint.shadows)break;await sleep(1000);}while(Date.now()<deadline);
+    }
     const before=await snap(),start=performance.now();
     const windowMs=quality==='auto'?4000:quick?1000:3000;
     // Measure actual compositor callback cadence independently of submitted scene frames.
@@ -81,7 +88,7 @@ try{
     assert.equal(burst.synchronousFrames,0,'wheel burst should not render synchronously');
     assert.equal(burst.frames,1,'wheel burst should render once');
     const last=end.stats.samples.at(-1);
-    const item={profile,players,quality,targetFps:end.targetFps,display,tiles:end.stats.tiles,ambientFps:ambientDelta/duration,idleFrames:frameDelta,idleShadowUpdates:after.counts.shadowUpdates-before.counts.shadowUpdates,ambientCpuP50Ms:quantile(ambientSamples.map(s=>s.ms),.5),ambientCpuP95Ms:quantile(ambientSamples.map(s=>s.ms),.95),interactionCpuP50Ms:quantile(interactive.map(s=>s.ms),.5),interactionCpuP95Ms:quantile(interactive.map(s=>s.ms),.95),interactionCpuMaxMs:Math.max(...interactive.map(s=>s.ms)),interactionSamples:interactive.length,eventToRenderP95Ms:quantile(eventToRender,.95),interactionOver50Ms:interactive.filter(s=>s.ms>50).length,burst,interactionRawMs:interactive.map(s=>s.ms),drawCalls:last.drawCalls,triangles:last.triangles,geometries:end.stats.geometries,textures:end.stats.textures,pixelRatio:end.stats.pixelRatio,bufferWidth:end.stats.bufferWidth,bufferHeight:end.stats.bufferHeight,terrain:end.terrain};
+    const item={profile,players,quality,targetFps:end.targetFps,display,adaptation,shadowsBefore:before.shadows,shadowsAfter:after.shadows,tiles:end.stats.tiles,ambientFps:ambientDelta/duration,idleFrames:frameDelta,idleShadowUpdates:after.counts.shadowUpdates-before.counts.shadowUpdates,ambientCpuP50Ms:quantile(ambientSamples.map(s=>s.ms),.5),ambientCpuP95Ms:quantile(ambientSamples.map(s=>s.ms),.95),interactionCpuP50Ms:quantile(interactive.map(s=>s.ms),.5),interactionCpuP95Ms:quantile(interactive.map(s=>s.ms),.95),interactionCpuMaxMs:Math.max(...interactive.map(s=>s.ms)),interactionSamples:interactive.length,eventToRenderP95Ms:quantile(eventToRender,.95),interactionOver50Ms:interactive.filter(s=>s.ms>50).length,burst,interactionRawMs:interactive.map(s=>s.ms),drawCalls:last.drawCalls,triangles:last.triangles,geometries:end.stats.geometries,textures:end.stats.textures,pixelRatio:end.stats.pixelRatio,bufferWidth:end.stats.bufferWidth,bufferHeight:end.stats.bufferHeight,terrain:end.terrain};
     cases.push(item);console.log(JSON.stringify(item));
    }
    assert.deepEqual(errors,[]);
