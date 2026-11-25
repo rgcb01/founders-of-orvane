@@ -63,7 +63,10 @@ async function exerciseWorker(page){
  assert.equal(await page.locator('.game-sidebar').isVisible(),false,'journal starts closed on all devices');
  if(desktop){
   const dock=await page.locator('.match-dock').boundingBox();
-  assert.ok(dock&&map&&viewport&&dock.height>=100&&dock.y>=map.y+map.height-2&&dock.y+dock.height<=viewport.height+2,'hand dock has reserved visible space below board');
+  assert.ok(dock&&map&&viewport&&dock.height>=100&&dock.y<map.y+map.height&&dock.y+dock.height<=viewport.height+2,'hand floats within the board viewport');
+  assert.ok(map.height>=viewport.height*.94&&map.width>=viewport.width*.94,'desktop board occupies nearly the entire viewport');
+  const seats=await page.locator('.player-strip .player-seat').evaluateAll(els=>els.map(el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,h:r.height}}));
+  assert.ok(seats.length>=3&&seats.every((seat,i)=>i===0||Math.abs(seat.x-seats[0].x)<3&&seat.y>=seats[i-1].y+seats[i-1].h-1),'players stack vertically on the left');
   assert.equal(await page.getByLabel('Your resources').isVisible(),true,'solo resource hand visible');
  }
  {
