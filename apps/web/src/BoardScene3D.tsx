@@ -15,7 +15,8 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const harborCache=useRef<{board:Board;objects:THREE.Object3D[];boats:THREE.Group[]}|null>(null);
  const waterCache=useRef<{board:Board;mesh:THREE.Mesh<THREE.PlaneGeometry,THREE.MeshStandardMaterial>}|null>(null);
  const sharedMaterials=useRef(new Map<string,THREE.MeshStandardMaterial>());
- useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;harborCache.current=null;waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
+ useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;robberCache.current=null;harborCache.current=null;waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
+ const robberCache=useRef<THREE.Mesh[]|null>(null);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
  const pieceCache=useRef<{board:Board;entries:Map<string,{objects:THREE.Object3D[];pick:THREE.Object3D}>}|null>(null);
  const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
@@ -71,12 +72,12 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const robber=positions.find(({tile})=>tile.id===robberTile);
   if(robber){
    const {x,y:z}=robber.p;
-   const base=add(new THREE.CylinderGeometry(.19,.24,.09,8),'#292e35',x,.18,z+.40);
-   base.userData={selection:{kind:'tile',id:robber.tile.id}};selectable.push(base);
-   const body=add(new THREE.CylinderGeometry(.10,.17,.38,6),'#343942',x,.40,z+.40);
-   body.userData=base.userData;selectable.push(body);
-   const head=add(new THREE.IcosahedronGeometry(.12,0),'#252a31',x,.66,z+.40);
-   head.userData=base.userData;selectable.push(head);robberMeshes.push(base,body,head);
+   if(!robberCache.current){robberCache.current=[
+    add(new THREE.CylinderGeometry(.19,.24,.09,8),'#292e35',x,.18,z+.40),
+    add(new THREE.CylinderGeometry(.10,.17,.38,6),'#343942',x,.40,z+.40),
+    add(new THREE.IcosahedronGeometry(.12,0),'#252a31',x,.66,z+.40)
+   ];}
+   robberCache.current.forEach((mesh,i)=>{mesh.position.set(x,[.18,.40,.66][i],z+.40);mesh.userData={selection:{kind:'tile',id:robber.tile.id}};scene.add(mesh);selectable.push(mesh);robberMeshes.push(mesh);});
   }
   const vertices=new Map(board.vertices.map(v=>[v.id,vertexPosition(v,1)]));
   // Preview samples only; real matches will supply their own piece data.
