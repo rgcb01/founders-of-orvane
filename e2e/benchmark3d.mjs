@@ -37,7 +37,13 @@ try{
     await page.getByLabel('Graphics quality').selectOption(quality);
     await sleep(500);
     const before=await snap(),start=performance.now();
-    await sleep(quality==='auto'?4000:quick?1000:3000);
+    const windowMs=quality==='auto'?4000:quick?1000:3000;
+    // Measure actual compositor callback cadence independently of submitted scene frames.
+    const display=await page.evaluate(ms=>new Promise(resolve=>{
+     const start=performance.now();let count=0,last=start,maxGap=0;
+     const sample=now=>{count++;maxGap=Math.max(maxGap,now-last);last=now;if(now-start>=ms)resolve({callbacks:count,fps:count*1000/(now-start),maxGapMs:maxGap});else requestAnimationFrame(sample);};
+     requestAnimationFrame(sample);
+    }),windowMs);
     const after=await snap(),duration=(performance.now()-start)/1000;
     const frameDelta=after.counts.frames-before.counts.frames;
     const ambientDelta=after.counts.ambientFrames-before.counts.ambientFrames;
@@ -75,7 +81,7 @@ try{
     assert.equal(burst.synchronousFrames,0,'wheel burst should not render synchronously');
     assert.equal(burst.frames,1,'wheel burst should render once');
     const last=end.stats.samples.at(-1);
-    const item={profile,players,quality,targetFps:end.targetFps,tiles:end.stats.tiles,ambientFps:ambientDelta/duration,idleFrames:frameDelta,idleShadowUpdates:after.counts.shadowUpdates-before.counts.shadowUpdates,ambientCpuP50Ms:quantile(ambientSamples.map(s=>s.ms),.5),ambientCpuP95Ms:quantile(ambientSamples.map(s=>s.ms),.95),interactionCpuP50Ms:quantile(interactive.map(s=>s.ms),.5),interactionCpuP95Ms:quantile(interactive.map(s=>s.ms),.95),interactionCpuMaxMs:Math.max(...interactive.map(s=>s.ms)),interactionSamples:interactive.length,eventToRenderP95Ms:quantile(eventToRender,.95),interactionOver50Ms:interactive.filter(s=>s.ms>50).length,burst,interactionRawMs:interactive.map(s=>s.ms),drawCalls:last.drawCalls,triangles:last.triangles,geometries:end.stats.geometries,textures:end.stats.textures,pixelRatio:end.stats.pixelRatio,bufferWidth:end.stats.bufferWidth,bufferHeight:end.stats.bufferHeight,terrain:end.terrain};
+    const item={profile,players,quality,targetFps:end.targetFps,display,tiles:end.stats.tiles,ambientFps:ambientDelta/duration,idleFrames:frameDelta,idleShadowUpdates:after.counts.shadowUpdates-before.counts.shadowUpdates,ambientCpuP50Ms:quantile(ambientSamples.map(s=>s.ms),.5),ambientCpuP95Ms:quantile(ambientSamples.map(s=>s.ms),.95),interactionCpuP50Ms:quantile(interactive.map(s=>s.ms),.5),interactionCpuP95Ms:quantile(interactive.map(s=>s.ms),.95),interactionCpuMaxMs:Math.max(...interactive.map(s=>s.ms)),interactionSamples:interactive.length,eventToRenderP95Ms:quantile(eventToRender,.95),interactionOver50Ms:interactive.filter(s=>s.ms>50).length,burst,interactionRawMs:interactive.map(s=>s.ms),drawCalls:last.drawCalls,triangles:last.triangles,geometries:end.stats.geometries,textures:end.stats.textures,pixelRatio:end.stats.pixelRatio,bufferWidth:end.stats.bufferWidth,bufferHeight:end.stats.bufferHeight,terrain:end.terrain};
     cases.push(item);console.log(JSON.stringify(item));
    }
    assert.deepEqual(errors,[]);
