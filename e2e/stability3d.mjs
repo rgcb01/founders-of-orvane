@@ -16,7 +16,7 @@ try{
  await page.goto(url+'?benchmark3d=1');
  const button=name=>page.getByRole('button',{name,exact:true}).first();
  await page.getByRole('button',{name:/New game/}).first().click();
- await button('6 players').click();await page.getByLabel('Humans').selectOption('1');await page.getByLabel('AI').selectOption('expert');
+ await button('6 players').click();await page.getByLabel('Humans').selectOption('1');await page.getByRole('combobox',{name:/^AI\b/}).selectOption('expert');
  await page.getByLabel('Bot pace').first().selectOption('turbo');
  await button('Start setup').click();
  const canvas=page.locator('canvas[data-benchmark3d]');await canvas.waitFor({timeout:30000});
