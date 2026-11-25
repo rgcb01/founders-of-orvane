@@ -238,6 +238,17 @@ async function live3DCameraAndHarbors(browser){
   assert.equal((await counters()).ambientFrames,low.ambientFrames,'low graphics renders on demand');
   assert.equal((await counters()).shadowUpdates,low.shadowUpdates,'low graphics does not update shadow maps');
   assert.equal(await state(),'low-quality');
+  await button(page,'Reset view').click();
+  const burst=await canvas.evaluate(c=>{
+   const before=JSON.parse(c.dataset.renderCounts).frames;
+   for(let i=0;i<20;i++)c.dispatchEvent(new WheelEvent('wheel',{deltaY:-10,bubbles:true,cancelable:true}));
+   return {before,immediate:JSON.parse(c.dataset.renderCounts).frames};
+  });
+  assert.equal(burst.immediate,burst.before,'wheel burst does not submit synchronous redundant frames');
+  await page.waitForFunction(()=>JSON.parse(document.querySelector('canvas[data-camera-pose]').dataset.cameraPose).zoom>1.2);
+  assert.ok(Math.abs((await pose()).zoom-Math.exp(.2))<1e-6,'coalesced frame preserves every wheel delta');
+  assert.equal((await counters()).frames-burst.before,1,'twenty wheel events submit one demand frame');
+  await button(page,'Reset view').click();
   await page.getByLabel('Graphics quality').selectOption('medium');
   assert.deepEqual(await resolution(),{mode:'medium',ratio:1.5,cap:1.5,min:.75});
   await page.getByLabel('Graphics quality').selectOption('auto');
