@@ -1,0 +1,72 @@
+/* Floating match HUD. No interface row reserves space around the world. */
+.in-match .pace-bar,
+.in-match .map-help,
+.in-match > header .version,
+.in-match > header button[aria-label="Guided tutorial"],
+.in-match > header button[aria-label="Game guide"],
+.in-match > header button[aria-label="Mute sound"],
+.in-match > header button[aria-label="Enable sound"],
+.in-match > .turn-bar .muted { display: none; }
+.in-match .tabletop-pause-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.in-match > header { max-width: none; }
+.in-match > header .header-actions { flex-wrap: nowrap; }
+.in-match > .turn-bar { text-align: center; }
+.in-match > .turn-bar strong { font-size: .8rem; }
+.in-match .board-panel .map-top { top: 50%; transform: translateY(-50%); }
+.in-match .map-top > div { display: flex; flex-direction: column; gap: 6px; }
+.in-match .map-top button { width: 40px; height: 40px; }
+.in-match .board-panel .dice-display { top: 80px; background: transparent; }
+.in-match .dice-display > strong,
+.in-match .dice-display > .muted { display: none; }
+.in-match .player-strip .player-seat { display: grid; grid-template-columns: 32px minmax(0,1fr); }
+.in-match .player-strip .seat-avatar { grid-row: 1 / 3; }
+.in-match .player-strip .seat-score { grid-column: 2; font-size: .7rem; }
+.in-match .player-strip .seat-score small { display: none; }
+.in-match .player-strip .seat-main strong { display: block; }
+.in-match .player-strip .seat-stats { font-size: .65rem; }
+.in-match > .match-dock > .fan-hand .fan-scroll { overflow: hidden; }
+.in-match > .match-dock > .fan-hand .fan-card { top: 25px; }
+.in-match .fan-card:focus-visible { z-index: 301 !important; }
+.in-match .game-sidebar .drawer-heading button { display: block; }
+.in-match .board-panel .build-menu { bottom: 230px; right: 65px; transform: none; grid-template-columns: 1fr; }
+.in-match .board-panel .board-event-slot { top: 88px; }
+.in-match > .winner-banner { position: absolute; inset: 15% 15% auto; z-index: 30; max-height: 70%; overflow: auto; }
+
+@media (max-width: 700px) {
+ .in-match > .player-strip.game-players { left: 8px; top: 70px; width: 105px; gap: 4px; max-height: calc(100% - 210px); }
+ .in-match .player-strip .player-seat { grid-template-columns: 24px minmax(0,1fr); padding: 4px; gap: 2px 5px; min-height: 44px; }
+ .in-match .player-strip .seat-avatar { width: 24px; height: 24px; }
+ .in-match .player-strip .seat-main strong { font-size: .65rem; }
+ .in-match > header { right: 8px; top: max(8px,env(safe-area-inset-top)); }
+ .in-match > header button[aria-label="Toggle fullscreen"] { display: none; }
+ .in-match > .turn-bar { left: 8px; top: max(8px,env(safe-area-inset-top)); transform: none; max-width: calc(100% - 105px); padding: 5px 10px; }
+ .in-match > .save-status { top: 49px; right: 8px; }
+ .in-match > .match-dock { left: 8px; right: 8px; bottom: max(8px,env(safe-area-inset-bottom)); justify-content: flex-start; }
+ .in-match > .match-dock > .fan-hand { flex-basis: calc(100% - 112px); width: calc(100% - 112px); height: 110px; }
+ .in-match > .match-dock > .fan-hand .fan-card { width: 48px; height: 70px; }
+ .in-match > .match-dock > .dock-actions { width: 105px; }
+ .in-match .dock-actions button { min-height: 40px; font-size: .72rem; }
+ .in-match .board-panel .map-top { right: 8px; }
+ .in-match .board-panel .map-confirm { bottom: 125px; max-width: calc(100% - 135px); left: 8px; transform: none; }
+ .in-match .board-panel .build-menu { right: 56px; bottom: 220px; width: 128px; }
+ .in-match .immersive-layout.drawer-active > .game-sidebar,
+ .in-match .immersive-layout.trade-open.drawer-active > .game-sidebar { inset: 65px 8px auto; width: auto; max-height: calc(100% - 195px); }
+ .in-match .tutorial-coach { left: 8px; bottom: 130px; max-width: calc(100% - 130px); }
+ .in-match .board-panel .board-event-slot { top: 65px; max-width: 48%; }
+ .in-match > .action-prompt { top: 100px; max-width: 65%; }
+}
+@media (max-height: 500px) {
+ .in-match > .player-strip.game-players { top: 8px; gap: 3px; max-height: calc(100% - 16px); }
+ .in-match .player-strip .player-seat { min-height: 40px; padding: 3px 6px; }
+ .in-match .board-panel .map-top { top: 55px; transform: none; }
+ .in-match .map-top button { width: 32px; height: 32px; min-height: 32px; }
+ .in-match .board-panel .dice-display { right: 65px; top: 55px; }
+ .in-match .board-panel .build-menu { bottom: 130px; }
+ .in-match .immersive-layout.drawer-active > .game-sidebar { top: 55px; max-height: calc(100% - 65px); }
+}
+
+.in-match .tabletop-world select[aria-label="Graphics quality"] { top: auto !important; bottom: 12px; right: auto !important; left: 12px; max-width: 95px !important; font-size: .7rem; min-height: 32px; }
+.in-match .hand-strip .empty-hand-message,
+.in-match .hand-strip .fan-empty-target { background: transparent; padding: 0; }
+.in-match .board-panel .map-confirm { pointer-events: none; }
+.in-match .board-panel .map-confirm button:not(:disabled) { pointer-events: auto; }

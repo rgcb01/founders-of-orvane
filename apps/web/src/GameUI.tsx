@@ -25,11 +25,19 @@ export function ResourceHand({resources,queue,solo,desktop=false,canDrag=false}:
  const suppressClick=useRef(false);
  const [selected,setSelected]=useState<string|null>(null);
  const cards=RESOURCES.flatMap(resource=>Array.from({length:Math.max(0,resources[resource]-(solo?pendingIncome(queue,resource):0))},(_,index)=>({resource,index})));
- const spacing=cards.length<=4?48:cards.length<=7?34:cards.length<=12?24:18;
+ const handRef=useRef<HTMLDivElement>(null);
+ const [handWidth,setHandWidth]=useState(0);
+ useEffect(()=>{
+  const el=handRef.current;if(!el)return;
+  const observer=new ResizeObserver(([entry])=>setHandWidth(entry.contentRect.width));
+  observer.observe(el);return()=>observer.disconnect();
+ },[]);
+ const idealSpacing=cards.length<=4?48:cards.length<=7?34:cards.length<=12?24:18;
+ const spacing=Math.min(idealSpacing,Math.max(0,(handWidth-100)/Math.max(1,cards.length-1)));
  const selectedCard=cards.find(c=>c.resource+ c.index===selected);
  useEffect(()=>{if(selected&&!selectedCard)setSelected(null);},[selected,selectedCard]);
- return <div className={'resource-hand hand-strip fan-hand'+(desktop?' desktop-hand':'')} aria-label="Your resources">
-  {cards.length===0&&<span className="empty-hand-message">No resource cards</span>}<div className="fan-scroll"><div className="fan-deck" style={{width:`max(100%, ${86+Math.max(0,cards.length-1)*spacing}px)`}}>
+ return <div ref={handRef} className={'resource-hand hand-strip fan-hand'+(desktop?' desktop-hand':'')} aria-label="Your resources">
+  {cards.length===0&&<span className="empty-hand-message">No resource cards</span>}<div className="fan-scroll"><div className="fan-deck">
    {cards.map(({resource,index},i)=>{const offset=i-(cards.length-1)/2;const t=cards.length>1?offset/((cards.length-1)/2):0;const id=resource+index,raised=selected===id;return <button type="button" key={id} className={'fan-card'+(raised?' raised':'')} aria-pressed={raised} onClick={()=>{if(suppressClick.current){suppressClick.current=false;return;}setSelected(v=>v===id?null:id)}} onPointerDown={e=>{suppressClick.current=false;if(canDrag&&e.button===0)gesture.current={id:e.pointerId,x:e.clientX,y:e.clientY,resource,drag:false};}} onPointerMove={e=>{const g=gesture.current;if(!g||g.id!==e.pointerId)return;if(!g.drag&&g.y-e.clientY>14&&Math.abs(e.clientY-g.y)>Math.abs(e.clientX-g.x)){g.drag=true;e.currentTarget.setPointerCapture(e.pointerId);}if(g.drag)setDrag({resource:g.resource,x:e.clientX,y:e.clientY});}} onPointerUp={e=>{const g=gesture.current;gesture.current=null;setDrag(null);if(!canDrag||!g?.drag||g.id!==e.pointerId)return;suppressClick.current=true;const target=document.elementFromPoint(e.clientX,e.clientY)?.closest<HTMLElement>('[data-card-drop]');if(target)target.dispatchEvent(new CustomEvent('orvane-card-drop',{bubbles:true,detail:g.resource}));}} onPointerCancel={()=>{gesture.current=null;setDrag(null);}} onKeyDown={e=>{if(e.key==='Escape')setSelected(null);}} data-income-target={resource} aria-label={resourceName[resource]} title={resourceName[resource]} style={{left:`calc(50% + ${offset*spacing}px)`,transform:`translateX(-50%) translateY(${(raised?-18:Math.abs(t)*Math.abs(t)*9)}px) rotate(${raised?0:t*(cards.length<=4?6:10)}deg) scale(${raised?1.12:1})`,zIndex:raised?300:i+1}}><ResourceFace resource={resource}/></button>;})}
    {RESOURCES.filter(k=>!cards.some(c=>c.resource===k)).map(k=><span key={k} className="fan-empty-target" data-income-target={k} aria-hidden="true"/>)}
   </div></div>{drag&&<span className="drag-resource-ghost" aria-hidden="true" style={{left:drag.x,top:drag.y}}><ResourceFace resource={drag.resource}/></span>}
