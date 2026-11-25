@@ -76,13 +76,58 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    let mat=materials.get(color);if(!mat){mat=new THREE.MeshStandardMaterial({color,roughness:1,flatShading:true});materials.set(color,mat);}
    const mesh=new THREE.Mesh(geometry,mat);mesh.position.set(p.x,0,p.y);include(mesh);mesh.userData={selection:{kind:'tile',id:tile.id}};selectable.push(mesh);bounds.expandByObject(mesh);
    const x=p.x,z=p.y;
+   // Miniature terrain uses shared unit geometry and per-instance transforms.
+   // Leave the southern token shelf and perimeter construction sites clear.
+   const rotation=((Math.round(p.x*100)*31+Math.round(p.y*100)*17)%17)*.045;
+   const detail=(g:THREE.BufferGeometry,c:string,dx:number,y:number,dz:number,sx=1,sy=1,sz=1)=>{const m=add(g,c,x+dx,y,z+dz);m.scale.set(sx,sy,sz);m.rotation.y=rotation;return m;};
    switch(tile.terrain){
-    case 'forest': for(const [dx,dz,h] of [[-.38,-.22,.58],[.24,-.34,.45],[.32,.24,.62],[-.25,.35,.4]]){add(new THREE.CylinderGeometry(.045,.06,.19,5),'#795740',x+dx,.21,z+dz);vegetation.push({mesh:add(new THREE.ConeGeometry(.23,h*.7,5),'#315d45',x+dx,.26+h*.35,z+dz),phase:x+z+dx});vegetation.push({mesh:add(new THREE.ConeGeometry(.16,h*.65,5),'#497458',x+dx,.35+h*.65,z+dz),phase:x+z+dx});}break;
-    case 'pasture': for(const [dx,dz] of [[-.32,-.22],[.27,.15],[-.12,.38]]){add(new THREE.IcosahedronGeometry(.13,0),'#e0d9bd',x+dx,.24,z+dz).scale.set(1.4,.8,1);add(new THREE.IcosahedronGeometry(.055,0),'#665e50',x+dx+.14,.24,z+dz);}break;
-    case 'field': for(let i=0;i<5;i++){add(new THREE.BoxGeometry(.13,.035,.85),'#8f713e',x+(i-2)*.18,.14,z);for(let j=0;j<5;j++)vegetation.push({mesh:add(new THREE.ConeGeometry(.055,.15,4),'#e3bf65',x+(i-2)*.18,.22,z+(j-2)*.16),phase:x+z+i*.3+j*.2});}break;
-    case 'hill': for(const [dx,dz,h] of [[-.25,-.15,.27],[.28,.22,.36]]){add(new THREE.IcosahedronGeometry(.35,0),'#b67d55',x+dx,.12+h*.3,z+dz).scale.set(1,h/.35,1);}break;
-    case 'mountain': for(const [dx,dz,h] of [[-.28,-.13,.85],[.30,.14,.62]]){add(new THREE.ConeGeometry(.36,h,5),'#697b85',x+dx,.12+h/2,z+dz);add(new THREE.ConeGeometry(.13,h*.35,5),'#e2e6df',x+dx,.12+h*.825,z+dz);}break;
-    case 'desert': add(new THREE.SphereGeometry(.5,6,3),'#e2c18a',x,.12,z).scale.set(1,.24,.65);break;
+    case 'forest': {
+     const trees=[[-.42,-.26,.92],[.02,-.40,1.15],[.42,-.22,.8],[-.25,.17,1.04],[.27,.21,.88]];
+     for(const [dx,dz,h] of trees){
+      detail(new THREE.CylinderGeometry(.038,.053,.22,5),'#76553b',dx,.23,dz,1,h,1);
+      detail(new THREE.ConeGeometry(.23,.42,6),'#315d45',dx,.32+h*.12,dz,h,h,h);
+      detail(new THREE.ConeGeometry(.17,.34,6),'#497458',dx,.51+h*.12,dz,h,h,h);
+     }
+     break;
+    }
+    case 'pasture': {
+     for(const [dx,dz,scale] of [[-.31,-.24,1],[.07,-.32,.85],[.34,.04,.9],[-.22,.22,.75]]){
+      detail(new THREE.IcosahedronGeometry(.13,0),'#e0d9bd',dx,.24,dz,1.4*scale,.8*scale,scale);
+      detail(new THREE.IcosahedronGeometry(.055,0),'#665e50',dx+.14*scale,.24,dz,scale,scale,scale);
+     }
+     for(const [dx,dz] of [[-.45,.03],[.18,.34],[.42,-.3]])detail(new THREE.ConeGeometry(.09,.12,4),'#7d9460',dx,.16,dz,1,.7,1);
+     break;
+    }
+    case 'field': {
+     for(let i=0;i<5;i++){
+      const dx=(i-2)*.18;
+      detail(new THREE.BoxGeometry(.13,.035,.78),'#8f713e',dx,.14,-.12).rotation.y=0;
+      for(let j=0;j<5;j++){
+       const plant=detail(new THREE.ConeGeometry(.055,.15,4),'#e3bf65',dx,.22,(j-2)*.15-.12,1,.85+((i+j)%3)*.15,1);
+       vegetation.push({mesh:plant,phase:x+z+i*.3+j*.2});
+      }
+     }
+     break;
+    }
+    case 'hill': {
+     for(const [dx,dz,h] of [[-.34,-.18,.28],[.18,-.22,.36],[.36,.17,.24],[-.16,.23,.18]]){
+      detail(new THREE.IcosahedronGeometry(.35,0),'#b67d55',dx,.12+h*.3,dz,.9,h/.35,.85);
+     }
+     for(const [dx,dz] of [[-.34,.05],[.12,.15],[.43,-.14]])detail(new THREE.IcosahedronGeometry(.10,0),'#d69a71',dx,.17,dz,1,.55,.85);
+     break;
+    }
+    case 'mountain': {
+     for(const [dx,dz,h,w] of [[-.30,-.20,.85,.37],[.26,-.12,.66,.32],[.02,.20,.43,.26]]){
+      const peak=detail(new THREE.ConeGeometry(1,1,5),'#697b85',dx,.12+h/2,dz,w,h,w);
+      const snow=detail(new THREE.ConeGeometry(1,1,5),'#e2e6df',dx,.12+h*.825,dz,w*.35,h*.35,w*.35);snow.rotation.y=peak.rotation.y;
+     }
+     break;
+    }
+    case 'desert': {
+     detail(new THREE.SphereGeometry(.5,6,3),'#e2c18a',-.18,-.01,-.13,1,.36,.65);
+     detail(new THREE.SphereGeometry(.5,6,3),'#e2c18a',.32,-.025,.13,.65,.33,.45);
+     break;
+    }
    }
   }
   const oldRobber=previousRobber.current;previousRobber.current={board,tile:robberTile};
