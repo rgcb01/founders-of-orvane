@@ -35,6 +35,7 @@ jobs:
             pnpm benchmark:3d --quick
           fi
       - name: Stability
+        if: success() || failure()
         run: |
           if [ "${{ inputs.full }}" = "true" ]; then
             pnpm test:stability3d
