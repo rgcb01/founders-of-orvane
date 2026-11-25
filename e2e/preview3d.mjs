@@ -49,7 +49,8 @@ try{
  const pose=await initialCanvas.getAttribute('data-camera-pose');
  const before=await live.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.settlements.length);
  const turnBefore=await live.evaluate(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].setup.step);
- const confirm=live.getByRole('button',{name:'Confirm placement'}).first();
+ const confirm=live.locator('.match-dock').getByRole('button',{name:'✓ Place',exact:true});
+ await confirm.waitFor({state:'visible'});
  const rect=await live.locator('canvas').boundingBox();
  if(!rect)throw Error('Live 3D board has no canvas bounds');
 
