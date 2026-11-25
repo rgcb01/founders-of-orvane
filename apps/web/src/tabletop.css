@@ -113,3 +113,8 @@
 }
 .in-match .trade-open .panel-nav { display: none; }
 .in-match .trade-open .game-sidebar .drawer-heading { position: sticky; top: -12px; z-index: 30; flex-shrink: 0; background: #15383f; }
+
+/* Keep camera controls outside contextual panels, including forced offers. */
+@media(min-width:701px){.in-match .immersive-layout.drawer-active>.game-sidebar,.in-match .immersive-layout.trade-open.drawer-active>.game-sidebar{right:66px;width:min(365px,calc(100% - 230px))}}
+@media(max-width:700px){.in-match .immersive-layout.drawer-active>.game-sidebar,.in-match .immersive-layout.trade-open.drawer-active>.game-sidebar{right:56px}}
+@media(max-height:500px){.in-match .immersive-layout.trade-open.drawer-active>.game-sidebar{right:max(66px, min(200px,25vw))}}
