@@ -184,6 +184,17 @@ async function live3DCameraAndHarbors(browser){
   await button(page,'Zoom in').click();
   await button(page,'Reset view').click();
   assert.deepEqual(await pose(),{zoom:1,azimuth:0,panX:0,panY:0});
+  const cache=()=>canvas.evaluate(c=>JSON.parse(c.dataset.staticCache));
+  const before=await cache();
+  assert.ok(before.tokenTextures>0&&before.tokenTextures<=10,'at most ten distinct dice textures');
+  assert.ok(before.numberTokens>before.tokenTextures,'repeated numbers share textures');
+  assert.equal(before.pickGeometries,2,'all selection volumes share two geometries');
+  assert.ok(before.pickObjects>before.numberTokens);
+  await page.getByLabel('Graphics quality').selectOption('low');
+  await page.waitForFunction(()=>document.querySelector('canvas[data-static-cache]')?.dataset.staticCache!==undefined);
+  assert.deepEqual(await cache(),before,'quality change retains number and pick objects');
+  await page.getByLabel('Graphics quality').selectOption('medium');
+  assert.deepEqual(await cache(),before,'repeated scene update preserves static cache identity');
   assert.deepEqual(errors,[]);
   console.log('Chromium live 3D: shared map toolbar and harbor exchange labels passed');
  }finally{await ctx.close();}
