@@ -7,7 +7,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const server=spawn('pnpm',['--filter','@orvane/web','exec','vite','preview','--host','127.0.0.1','--port','4175','--strictPort'],{stdio:'inherit'});
 const quick=process.argv.includes('--quick');
 const baselinePath=process.argv.find(a=>a.startsWith('--baseline='))?.slice(11);
-const quantile=(values,p)=>{const sorted=[...values].sort((a,b)=>a-b);return sorted.length?sorted[Math.floor((sorted.length-1)*p)]:null;};
+const quantile=(values,p)=>{const sorted=[...values].sort((a,b)=>a-b);return sorted.length?sorted[Math.max(0,Math.ceil(sorted.length*p)-1)]:null;};
 let browser;
 try{
  let ready=false;for(let i=0;i<100;i++){try{if((await fetch(url)).ok){ready=true;break;}}catch{}await sleep(100);}assert.ok(ready,'preview server ready');
@@ -46,23 +46,42 @@ try{
     else assert.ok(ambientDelta>0,'ambient animation active');
     const sampleCount=Math.min(frameDelta,after.stats.samples.length);
     const ambientSamples=(sampleCount?after.stats.samples.slice(-sampleCount):[]).filter(s=>s.ambient);
-    const interactionBefore=await snap();
-    // Alternate camera changes to avoid hitting zoom bounds; direct clicks
-    // include real UI event dispatch but not Playwright wait time in CPU samples.
-    for(let i=0;i<10;i++){
-     await page.getByRole('button',{name:i%2?'Zoom out':'Zoom in',exact:true}).click();
+    // Warm the camera path before recording, then measure each submission separately.
+    const zoomButton=i=>page.getByRole('button',{name:i%2?'Zoom out':'Zoom in',exact:true});
+    for(let i=0;i<4;i++)await zoomButton(i).click();
+    const interactive=[],eventToRender=[];
+    const n=quick?24:40;
+    for(let i=0;i<n;i++){
+     const result=await zoomButton(i).evaluate(el=>{
+      const canvas=document.querySelector('canvas[data-benchmark3d]');
+      const before=JSON.parse(canvas.dataset.renderCounts).frames,t=performance.now();
+      el.click();
+      const end=performance.now(),stats=JSON.parse(canvas.dataset.benchmark3d);
+      if(stats.frames!==before+1)throw Error('Expected one synchronous toolbar frame');
+      return {sample:stats.samples.at(-1),elapsed:end-t};
+     });
+     assert.ok(!result.sample.ambient);interactive.push(result.sample);eventToRender.push(result.elapsed);
+     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve())));
     }
-    const end=await snap(),interactiveCount=Math.min(end.counts.frames-interactionBefore.counts.frames,end.stats.samples.length);
-    const interactive=(interactiveCount?end.stats.samples.slice(-interactiveCount):[]).filter(s=>!s.ambient);
-    assert.ok(interactive.length>=10,'camera renders recorded');
+    const end=await snap();
+    // Separately measure burst input: 20 events in one browser task, one queued frame.
+    const burst=await canvas.evaluate(async c=>{
+     const before=JSON.parse(c.dataset.renderCounts).frames,start=performance.now();
+     for(let i=0;i<20;i++)c.dispatchEvent(new WheelEvent('wheel',{deltaY:i%2?10:-10,bubbles:true,cancelable:true}));
+     const synchronousFrames=JSON.parse(c.dataset.renderCounts).frames-before;
+     await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
+     return {events:20,synchronousFrames,frames:JSON.parse(c.dataset.renderCounts).frames-before,elapsedMs:performance.now()-start};
+    });
+    assert.equal(burst.synchronousFrames,0,'wheel burst should not render synchronously');
+    assert.equal(burst.frames,1,'wheel burst should render once');
     const last=end.stats.samples.at(-1);
-    const item={profile,players,quality,tiles:end.stats.tiles,ambientFps:ambientDelta/duration,idleFrames:frameDelta,idleShadowUpdates:after.counts.shadowUpdates-before.counts.shadowUpdates,ambientCpuP50Ms:quantile(ambientSamples.map(s=>s.ms),.5),ambientCpuP95Ms:quantile(ambientSamples.map(s=>s.ms),.95),interactionCpuP50Ms:quantile(interactive.map(s=>s.ms),.5),interactionCpuP95Ms:quantile(interactive.map(s=>s.ms),.95),drawCalls:last.drawCalls,triangles:last.triangles,geometries:end.stats.geometries,textures:end.stats.textures,pixelRatio:end.stats.pixelRatio,bufferWidth:end.stats.bufferWidth,bufferHeight:end.stats.bufferHeight,terrain:end.terrain};
+    const item={profile,players,quality,tiles:end.stats.tiles,ambientFps:ambientDelta/duration,idleFrames:frameDelta,idleShadowUpdates:after.counts.shadowUpdates-before.counts.shadowUpdates,ambientCpuP50Ms:quantile(ambientSamples.map(s=>s.ms),.5),ambientCpuP95Ms:quantile(ambientSamples.map(s=>s.ms),.95),interactionCpuP50Ms:quantile(interactive.map(s=>s.ms),.5),interactionCpuP95Ms:quantile(interactive.map(s=>s.ms),.95),interactionCpuMaxMs:Math.max(...interactive.map(s=>s.ms)),interactionSamples:interactive.length,eventToRenderP95Ms:quantile(eventToRender,.95),interactionOver50Ms:interactive.filter(s=>s.ms>50).length,burst,interactionRawMs:interactive.map(s=>s.ms),drawCalls:last.drawCalls,triangles:last.triangles,geometries:end.stats.geometries,textures:end.stats.textures,pixelRatio:end.stats.pixelRatio,bufferWidth:end.stats.bufferWidth,bufferHeight:end.stats.bufferHeight,terrain:end.terrain};
     cases.push(item);console.log(JSON.stringify(item));
    }
    assert.deepEqual(errors,[]);
   }finally{await ctx.close();}
  }
- const report={schema:1,commit:process.env.GITHUB_SHA??null,renderer:'Chromium SwiftShader software WebGL',browser:browser.version(),platform:process.platform,quick,seed:'orvane-benchmark-v1',notes:'CPU submission times, not GPU timings; geometry and texture counts, not bytes. Phone profiles emulate viewport/DPR, not physical hardware. Initial setup, no long match.',cases};
+ const report={schema:2,commit:process.env.GITHUB_SHA??null,renderer:'Chromium SwiftShader software WebGL',browser:browser.version(),platform:process.platform,quick,seed:'orvane-benchmark-v1',notes:'CPU submission times, not GPU timings; geometry and texture counts, not bytes. Phone profiles emulate viewport/DPR, not physical hardware. Initial setup, no long match. Schema 2 uses nearest-rank percentiles and isolated warmed toolbar submissions; not directly comparable to schema 1 latency.',cases};
  if(baselinePath){const baseline=JSON.parse(await readFile(baselinePath,'utf8'));assert.equal(baseline.schema,report.schema);assert.equal(baseline.renderer,report.renderer);assert.equal(baseline.seed,report.seed);const keys=['ambientFps','interactionCpuP95Ms','drawCalls','triangles','geometries','textures'];report.comparison=cases.map(row=>{const old=baseline.cases.find(c=>c.profile===row.profile&&c.players===row.players&&c.quality===row.quality);return {profile:row.profile,players:row.players,quality:row.quality,delta:old?Object.fromEntries(keys.map(k=>[k,Number.isFinite(row[k])&&Number.isFinite(old[k])?row[k]-old[k]:null])):null};});}
  await mkdir('artifacts/benchmark3d',{recursive:true});await writeFile('artifacts/benchmark3d/results.json',JSON.stringify(report,null,2));
 }finally{await browser?.close();server.kill();}
