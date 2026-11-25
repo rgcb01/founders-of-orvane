@@ -197,6 +197,9 @@ async function live3DCameraAndHarbors(browser){
   const sceneIdentity=({scene,camera,sun,hemisphere})=>({scene,camera,sun,hemisphere});
   assert.ok(before.tokenTextures>0&&before.tokenTextures<=10,'at most ten distinct dice textures');
   assert.ok(before.numberTokens>before.tokenTextures,'repeated numbers share textures');
+  assert.ok(before.tokenBatches<=before.tokenTextures+1,'one batch per dice face plus token bases');
+  assert.equal(before.tokenDrawCallsAvoided,2*before.numberTokens-before.tokenBatches);
+  assert.ok(before.tokenDrawCallsAvoided>0,'token instancing reduces draw calls');
   assert.equal(before.pickGeometries,2,'all selection volumes share two geometries');
   assert.ok(before.pickObjects>before.numberTokens);
   await page.getByLabel('Graphics quality').selectOption('low');
