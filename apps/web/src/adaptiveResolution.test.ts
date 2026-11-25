@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,FRAME_MS,canRecoverCadence,type ResolutionState} from './adaptiveResolution';
+import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,FRAME_MS,canRecoverCadence,adaptShadows,type ResolutionState} from './adaptiveResolution';
 const repeat=(s:ResolutionState,n:number,ms:number,fps:number,target=30)=>{for(let i=0;i<n;i++)s=adaptResolution(s,ms,fps,target);return s;};
 describe('adaptive 3D resolution',()=>{
  it('honors device pixel ratio and manual quality caps',()=>{
@@ -57,4 +57,24 @@ it('requires headroom at the faster cadence before recovering',()=>{
  expect(canRecoverCadence(2,7,30)).toBe(true);
  expect(canRecoverCadence(2,7,20)).toBe(false);
  expect(canRecoverCadence(1,4,60)).toBe(false);
+});
+
+describe('adaptive shadows before cadence reduction',()=>{
+ it('keeps shadows until resolution is at its floor under sustained pressure',()=>{
+  let state={enabled:true,slow:0,fast:0};
+  for(let i=0;i<20;i++)state=adaptShadows(state,false,false,1,20,30);
+  expect(state.enabled).toBe(true);
+  for(let i=0;i<2;i++)state=adaptShadows(state,true,false,1,20,30);
+  expect(state.enabled).toBe(true);
+  state=adaptShadows(state,true,false,1,20,30);
+  expect(state.enabled).toBe(false);
+ });
+ it('restores shadows only with sustained headroom at full resolution and cadence',()=>{
+  let state={enabled:false,slow:0,fast:0};
+  for(let i=0;i<20;i++)state=adaptShadows(state,false,true,2,3,30);
+  expect(state.enabled).toBe(false);
+  for(let i=0;i<11;i++)state=adaptShadows(state,false,true,1,3,60);
+  expect(state.enabled).toBe(false);
+  expect(adaptShadows(state,false,true,1,3,60).enabled).toBe(true);
+ });
 });

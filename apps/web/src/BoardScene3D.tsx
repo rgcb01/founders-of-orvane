@@ -2,7 +2,7 @@ import {useEffect,useRef,useState,type RefObject} from 'react';
 import * as THREE from 'three';
 import {tilePosition,vertexPosition,type Board} from '@orvane/engine';
 import {TERRAIN_COLORS} from './TerrainArt';
-import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,canRecoverCadence,type ResolutionState} from './adaptiveResolution';
+import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,canRecoverCadence,adaptShadows,type ResolutionState} from './adaptiveResolution';
 
 export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void};
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
@@ -17,6 +17,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const ambientPausedRef=useRef(ambientPaused);
  const renderCounts=useRef({frames:0,shadowUpdates:0,ambientFrames:0});
  const automaticResolution=useRef<ResolutionState|undefined>(undefined);
+ const autoShadows=useRef({enabled:true,slow:0,fast:0});
  const ambientSampling=useRef<{quality:string;tier:string;running:boolean;samples:number;totalMs:number;sampleStart:number;slowWindows:number;stride:number;count:number}|null>(null);
  useEffect(()=>{ambientPausedRef.current=ambientPaused;ambientControl.current?.();},[ambientPaused]);
  const harborLabels=useRef<HTMLDivElement>(null);
@@ -241,7 +242,8 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   };
   include(hemisphere);
   sun.position.set(center.x-5,12,center.z+6);sun.target.position.copy(center);include(sun,sun.target);
-  renderer.shadowMap.enabled=tier!=='low';renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  if(quality!=='auto'||ambientSampling.current?.quality!=='auto')autoShadows.current={enabled:true,slow:0,fast:0};
+  renderer.shadowMap.enabled=tier!=='low'&&(quality!=='auto'||autoShadows.current.enabled);renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   sun.castShadow=true;const shadowSize=tier==='high'?1024:512;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.map?.dispose();sun.shadow.map=null;sun.shadow.mapSize.set(shadowSize,shadowSize);}sun.shadow.camera.left=-span;sun.shadow.camera.right=span;sun.shadow.camera.top=span;sun.shadow.camera.bottom=-span;sun.shadow.camera.near=.5;sun.shadow.camera.far=span*4+20;sun.shadow.normalBias=.025;sun.shadow.bias=-.0002;sun.shadow.camera.updateProjectionMatrix();
   for(const root of desired)if(!previousRoots.has(root))root.traverse(object=>{if(object instanceof THREE.Mesh&&object!==water&&object.material instanceof THREE.MeshStandardMaterial){object.castShadow=true;object.receiveShadow=true;}});
   camera.position.set(center.x,span*1.3,center.z+span);camera.lookAt(center);camera.updateMatrixWorld(true);
@@ -321,11 +323,15 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    if(renderer.shadowMap.enabled&&begin-lastShadow>=shadowInterval){renderer.shadowMap.needsUpdate=true;lastShadow=begin;}
    render(true);sampling.totalMs+=performance.now()-begin;sampling.samples++;
    if(sampling.samples>=30){const now=performance.now(),mean=sampling.totalMs/sampling.samples,ambientFps=sampling.samples*1000/Math.max(1,now-sampling.sampleStart);
-    if(perfHud.current)perfHud.current.textContent=`${ambientFps.toFixed(1)} / ${TARGET_FPS} FPS · DPR ${renderer.getPixelRatio().toFixed(2)} · CPU ${mean.toFixed(1)} ms · ${renderer.info.render.calls} draws`;
-    canvas.dataset.renderMetrics=JSON.stringify({ambientFps,cpuRenderMs:mean,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,ambientStride:sampling.stride,targetFps:TARGET_FPS,effectiveTargetFps:TARGET_FPS/sampling.stride,pixelRatio:renderer.getPixelRatio()});
+    if(perfHud.current)perfHud.current.textContent=`${ambientFps.toFixed(1)} / ${TARGET_FPS} FPS · DPR ${renderer.getPixelRatio().toFixed(2)} · CPU ${mean.toFixed(1)} ms · ${renderer.info.render.calls} draws · shadows ${renderer.shadowMap.enabled?'on':'off'}`;
+    canvas.dataset.renderMetrics=JSON.stringify({ambientFps,cpuRenderMs:mean,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,ambientStride:sampling.stride,targetFps:TARGET_FPS,effectiveTargetFps:TARGET_FPS/sampling.stride,shadows:renderer.shadowMap.enabled,pixelRatio:renderer.getPixelRatio()});
     if(quality==='auto'){
      const target=TARGET_FPS/sampling.stride;
      const atFloor=resolution.ratio<=Math.min(.75,resolution.cap);
+     const shadows=adaptShadows(autoShadows.current,atFloor,resolution.ratio>=resolution.cap,sampling.stride,mean,ambientFps);
+     const shadowsChanged=shadows.enabled!==autoShadows.current.enabled;
+     autoShadows.current=shadows;
+     if(shadowsChanged){renderer.shadowMap.enabled=shadows.enabled;renderer.shadowMap.needsUpdate=shadows.enabled;canvas.dataset.shadows=String(shadows.enabled);resetAdaptation();draw();resetSamples();return;}
      // Reduce pixel cost before sacrificing cadence; recover cadence before raising resolution.
      if(canRecoverCadence(sampling.stride,mean,ambientFps)){
       sampling.stride--;sampling.slowWindows=0;resetAdaptation();resetSamples();return;
@@ -334,7 +340,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
      const changed=next.ratio!==resolution.ratio;resolution=next;automaticResolution.current=next;
      if(changed){applyResolution();draw();}
      // A slow display/browser cadence alone must not cause us to halve an already limited refresh rate.
-     sampling.slowWindows=atFloor&&mean>1000/target*.9&&ambientFps<target*.85?sampling.slowWindows+1:0;
+     sampling.slowWindows=!autoShadows.current.enabled&&atFloor&&mean>1000/target*.9&&ambientFps<target*.85?sampling.slowWindows+1:0;
      if(sampling.slowWindows>=2){sampling.stride=Math.min(4,sampling.stride+1);sampling.slowWindows=0;}
     }
     
@@ -344,7 +350,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const ambientTick=(now:number)=>{ambientFrame=0;if(!sampling.running||document.hidden)return;const due=nextFrameDeadline(now,nextDue||now);if(due!==null){nextDue=due;ambient();}if(sampling.running&&!document.hidden)ambientFrame=requestAnimationFrame(ambientTick);};
   const syncAmbient=()=>{
    const reason=document.hidden?'hidden':ambientPausedRef.current?'paused':motion.matches?'reduced-motion':tier==='low'?'low-quality':'running';
-   canvas.dataset.ambientState=reason;canvas.dataset.targetFps=String(tier==='low'?0:TARGET_FPS);
+   canvas.dataset.ambientState=reason;canvas.dataset.targetFps=String(tier==='low'?0:TARGET_FPS);canvas.dataset.shadows=String(renderer.shadowMap.enabled);
    if(perfHud.current)perfHud.current.textContent=reason==='running'?'Measuring FPS…':`On demand · ${reason}`;
    if(reason==='running'){if(!sampling.running){resetSamples();resetAdaptation();sampling.running=true;}if(!ambientFrame){nextDue=0;ambientFrame=requestAnimationFrame(ambientTick);}}
    else {if(ambientFrame){cancelAnimationFrame(ambientFrame);ambientFrame=0;}if(sampling.running){sampling.running=false;resetSamples();resetAdaptation();}}

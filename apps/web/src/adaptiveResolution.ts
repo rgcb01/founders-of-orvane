@@ -32,3 +32,14 @@ export function adaptResolution(state:ResolutionState,meanMs:number,fps:number,t
  else if(next.fast>=4){next.ratio=Math.min(state.cap,state.ratio+.25);next.slow=0;next.fast=0;}
  return next;
 }
+
+export type ShadowQuality={enabled:boolean;slow:number;fast:number};
+// Shadows are the last visual feature to shed before reducing cadence.
+export function adaptShadows(state:ShadowQuality,atFloor:boolean,atCap:boolean,stride:number,mean:number,fps:number):ShadowQuality{
+ const target=TARGET_FPS/stride;
+ if(!Number.isFinite(mean)||!Number.isFinite(fps)||mean<0||fps<=0)return {...state,slow:0,fast:0};
+ const slow=state.enabled&&atFloor&&(mean>1000/target*.75||fps<target*.85)?state.slow+1:0;
+ const fast=!state.enabled&&stride===1&&atCap&&mean<5&&fps>=TARGET_FPS*.97?state.fast+1:0;
+ if(slow>=3||fast>=12)return {enabled:!state.enabled,slow:0,fast:0};
+ return {...state,slow,fast};
+}
