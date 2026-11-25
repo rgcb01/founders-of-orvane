@@ -75,7 +75,7 @@ export function currentLesson(progress:TutorialProgress,setup:SetupState|null,ga
 export function tutorialTip(lesson:Lesson):string{
  return lesson.target==='board'?'Golden rings mark legal places. Select one to inspect, then Confirm placement.':
  lesson.target==='build'?'Choose a construction, select a glowing road or vertex, then confirm.':
- lesson.target==='roll'?'Use the Roll dice button above the board.':
+ lesson.target==='roll'?'Use the Roll button beside your hand.':
  lesson.target==='launch'?'Use Begin game in the turn bar.':
  lesson.target==='trade'?'The trading post opens in the right panel or mobile bottom sheet.':
  lesson.target==='cards'?'Cards, robber actions and discards open together in the actions panel.':'Public moves and scores are visible in the field journal.';
