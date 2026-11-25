@@ -60,12 +60,13 @@ async function exerciseWorker(page){
  assert.ok(stage&&viewport&&Math.abs(stage.height-viewport.height)<8,'match uses the complete viewport');
  assert.ok(map&&map.height>175,'interactive board remains substantial');
  const desktop=await page.evaluate(()=>matchMedia('(min-width:1000px) and (pointer:fine)').matches);
- assert.equal(await page.locator('.game-sidebar').isVisible(),desktop,'desktop journal stays visible; mobile drawer starts closed');
+ assert.equal(await page.locator('.game-sidebar').isVisible(),false,'journal starts closed on all devices');
  if(desktop){
   const dock=await page.locator('.match-dock').boundingBox();
   assert.ok(dock&&map&&viewport&&dock.height>=100&&dock.y>=map.y+map.height-2&&dock.y+dock.height<=viewport.height+2,'hand dock has reserved visible space below board');
   assert.equal(await page.getByLabel('Your resources').isVisible(),true,'solo resource hand visible');
- }else{
+ }
+ {
   await page.getByRole('button',{name:'Open journal'}).click();
   await page.getByRole('button',{name:'Close game panel'}).waitFor();
   await page.getByRole('button',{name:'Close game panel'}).click();
