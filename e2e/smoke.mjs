@@ -184,6 +184,12 @@ async function live3DCameraAndHarbors(browser){
   await button(page,'Zoom in').click();
   await button(page,'Reset view').click();
   assert.deepEqual(await pose(),{zoom:1,azimuth:0,panX:0,panY:0});
+  const terrainBatches=()=>canvas.evaluate(c=>JSON.parse(c.dataset.terrainBatchMetrics));
+  const terrainBefore=await terrainBatches();
+  assert.ok(terrainBefore.batches>0,'repeated terrain decorations use static instancing');
+  assert.ok(terrainBefore.sources>terrainBefore.batches,'static instancing reduces individual draws');
+  assert.equal(terrainBefore.avoidedDrawCalls,terrainBefore.sources-terrainBefore.batches);
+  console.log('3D static terrain batching:',JSON.stringify(terrainBefore));
   const cache=()=>canvas.evaluate(c=>JSON.parse(c.dataset.staticCache));
   const before=await cache();
   const sceneCache=()=>canvas.evaluate(c=>JSON.parse(c.dataset.sceneCache));
@@ -196,6 +202,7 @@ async function live3DCameraAndHarbors(browser){
   await page.getByLabel('Graphics quality').selectOption('low');
   await page.waitForFunction(()=>document.querySelector('canvas[data-static-cache]')?.dataset.staticCache!==undefined);
   assert.deepEqual(await cache(),before,'quality change retains number and pick objects');
+  assert.deepEqual(await terrainBatches(),terrainBefore,'static terrain instance buffers persist across quality updates');
   const sceneAfter=await sceneCache();
   assert.deepEqual(sceneIdentity(sceneAfter),sceneIdentity(sceneBefore),'scene, camera and lights retain identity');
   assert.ok(sceneAfter.retained>sceneAfter.added,'unchanged scene roots are not detached and recreated');
