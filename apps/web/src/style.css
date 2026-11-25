@@ -541,3 +541,25 @@ html:has(main.in-match),body:has(main.in-match){height:100%;overflow:hidden;over
 @keyframes orvane-dice-tumble{0%{transform:translateY(-12px) rotateX(0deg) rotateY(0deg)}45%{transform:translateY(-5px) rotateX(410deg) rotateY(280deg)}72%{transform:translateY(2px) rotateX(700deg) rotateY(370deg)}85%{transform:translateY(-4px) rotateX(710deg) rotateY(382deg)}100%{transform:translateY(0) rotateX(702deg) rotateY(382deg)}}
 .orvane-die-roll{animation:orvane-dice-tumble 520ms ease-out both}
 @media(prefers-reduced-motion:reduce){.orvane-die-roll{animation:none}}
+
+/* Desktop match workspace: reserve real layout space for the hand. */
+.empty-hand-message{position:absolute;inset:0;display:grid;place-items:center;color:#c1d0cb;pointer-events:none;font-size:.85rem}.fan-hand{position:relative}.desktop-hand-label{display:none}
+@media(min-width:1000px) and (pointer:fine){
+ main.in-match{padding:8px 12px;gap:6px;background:#10252c}
+ .in-match .immersive-layout,.in-match .immersive-layout.drawer-active{grid-template-columns:minmax(0,1fr) minmax(240px,20%);gap:8px;background:transparent}
+ .in-match .game-sidebar,.in-match .immersive-layout.drawer-active .game-sidebar{display:flex;flex-direction:column;position:relative;inset:auto;max-height:none;min-height:0;border:1px solid #45636a;border-radius:10px;box-shadow:none;padding:10px}
+ .in-match .game-sidebar .drawer-heading button{display:none}
+ .in-match .board-panel{border-radius:10px;min-height:0;overflow:hidden}
+ .in-match .match-dock{display:flex;position:relative;inset:auto;flex:0 0 120px;min-height:120px;align-items:center;gap:12px;padding:4px 14px;border:1px solid #45636a;border-radius:10px;box-shadow:none}
+ .in-match .match-dock>.fan-hand{flex:1;min-width:0;width:100%;height:110px}
+ .in-match .match-dock>.hand-strip{flex:1;min-width:0}
+ .in-match .desktop-hand-label{display:block;flex:0 0 105px;font-size:.85rem;font-weight:700;color:#e4d3aa}
+ .in-match .dock-actions{display:flex;flex:0 0 auto;flex-wrap:wrap;max-width:310px;gap:6px;justify-content:flex-end}
+ .in-match .dock-actions button{min-height:40px;padding:7px 12px}
+ .in-match .build-menu{left:10px;bottom:55px;width:170px;backdrop-filter:none;padding:6px;border-radius:8px}
+ .in-match .build-option{min-height:55px;padding:5px 8px}
+ .in-match .player-strip{gap:6px;grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+ .in-match .player-seat{padding:6px 9px}
+ .in-match .turn-bar,.in-match .pace-bar{padding:5px 10px}
+}
+@media(min-width:781px) and (max-width:999px),(min-width:781px) and (pointer:coarse){.in-match .match-dock{display:flex;position:relative;flex:0 0 auto;min-height:112px}.in-match .match-dock>.fan-hand{flex:1;min-width:0}}
