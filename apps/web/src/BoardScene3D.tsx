@@ -2,7 +2,7 @@ import {useEffect,useRef,useState,type RefObject} from 'react';
 import * as THREE from 'three';
 import {tilePosition,vertexPosition,type Board} from '@orvane/engine';
 import {TERRAIN_COLORS} from './TerrainArt';
-import {adaptResolution,resolutionCap,resolutionStart,type ResolutionState} from './adaptiveResolution';
+import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,type ResolutionState} from './adaptiveResolution';
 
 export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void};
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
@@ -286,7 +286,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const controls:BoardCameraControls={reset:resetCamera.current,zoomBy:delta=>{zoom=THREE.MathUtils.clamp(zoom+delta,.65,3);cameraPose.current={zoom,azimuth,panX,panY};draw();}};
   if(cameraControls)cameraControls.current=controls;
   const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
-  let ambientTimer=0;const ambientStart=performance.now();
+  let ambientFrame=0,nextDue=0;const ambientStart=performance.now();
   const priorSampling=ambientSampling.current;
   const sampling=priorSampling?.quality===quality&&priorSampling.tier===tier?priorSampling:{quality,tier,running:false,samples:0,totalMs:0,sampleStart:performance.now(),slowWindows:0,stride:1,count:0};
   ambientSampling.current=sampling;
@@ -305,21 +305,30 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    if(renderer.shadowMap.enabled&&begin-lastShadow>=shadowInterval){renderer.shadowMap.needsUpdate=true;lastShadow=begin;}
    render(true);sampling.totalMs+=performance.now()-begin;sampling.samples++;
    if(sampling.samples>=30){const now=performance.now(),mean=sampling.totalMs/sampling.samples,ambientFps=sampling.samples*1000/Math.max(1,now-sampling.sampleStart);
-    canvas.dataset.renderMetrics=JSON.stringify({ambientFps,cpuRenderMs:mean,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,ambientStride:sampling.stride,pixelRatio:renderer.getPixelRatio()});
+    canvas.dataset.renderMetrics=JSON.stringify({ambientFps,cpuRenderMs:mean,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,ambientStride:sampling.stride,targetFps:TARGET_FPS,effectiveTargetFps:TARGET_FPS/sampling.stride,pixelRatio:renderer.getPixelRatio()});
     if(quality==='auto'){
-     const next=adaptResolution(resolution,mean,ambientFps,(tier==='high'?30:20)/sampling.stride);
+     const target=TARGET_FPS/sampling.stride;
+     const atFloor=resolution.ratio<=Math.min(.75,resolution.cap);
+     // Reduce pixel cost before sacrificing cadence; recover cadence before raising resolution.
+     if(sampling.stride>1&&mean<1000/target*.45&&ambientFps>=target*.92){
+      sampling.stride--;sampling.slowWindows=0;resetAdaptation();resetSamples();return;
+     }
+     const next=adaptResolution(resolution,mean,ambientFps,target);
      const changed=next.ratio!==resolution.ratio;resolution=next;automaticResolution.current=next;
      if(changed){applyResolution();draw();}
+     sampling.slowWindows=atFloor&&(mean>1000/target*.75||ambientFps<target*.85)?sampling.slowWindows+1:0;
+     if(sampling.slowWindows>=2){sampling.stride=Math.min(4,sampling.stride+1);sampling.slowWindows=0;}
     }
-    if(quality==='auto'){sampling.slowWindows=mean>18?sampling.slowWindows+1:0;if(sampling.slowWindows>=2){sampling.stride=Math.min(4,sampling.stride+1);sampling.slowWindows=0;}else if(mean<8&&sampling.stride>1)sampling.stride--;}
+    
     resetSamples();
    }
   };
+  const ambientTick=(now:number)=>{ambientFrame=0;if(!sampling.running||document.hidden)return;const due=nextFrameDeadline(now,nextDue||now);if(due!==null){nextDue=due;ambient();}if(sampling.running&&!document.hidden)ambientFrame=requestAnimationFrame(ambientTick);};
   const syncAmbient=()=>{
    const reason=document.hidden?'hidden':ambientPausedRef.current?'paused':motion.matches?'reduced-motion':tier==='low'?'low-quality':'running';
-   canvas.dataset.ambientState=reason;
-   if(reason==='running'){if(!sampling.running){resetSamples();resetAdaptation();sampling.running=true;}if(!ambientTimer)ambientTimer=window.setInterval(ambient,1000/(tier==='high'?30:20));}
-   else {if(ambientTimer){window.clearInterval(ambientTimer);ambientTimer=0;}if(sampling.running){sampling.running=false;resetSamples();resetAdaptation();}}
+   canvas.dataset.ambientState=reason;canvas.dataset.targetFps=String(tier==='low'?0:TARGET_FPS);
+   if(reason==='running'){if(!sampling.running){resetSamples();resetAdaptation();sampling.running=true;}if(!ambientFrame){nextDue=0;ambientFrame=requestAnimationFrame(ambientTick);}}
+   else {if(ambientFrame){cancelAnimationFrame(ambientFrame);ambientFrame=0;}if(sampling.running){sampling.running=false;resetSamples();resetAdaptation();}}
   };
   ambientControl.current=syncAmbient;
   const visibilityChanged=()=>{syncAmbient();if(!document.hidden){renderer.shadowMap.needsUpdate=renderer.shadowMap.enabled;draw();}};
@@ -335,7 +344,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   if(animated.length||movingRobber||productionRings.length)tick(started);else draw();
   syncAmbient();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
-  return()=>{document.removeEventListener('visibilitychange',visibilityChanged);motion.removeEventListener('change',syncAmbient);if(ambientControl.current===syncAmbient)ambientControl.current=null;if(cameraControls?.current===controls)cameraControls.current=null;observer.disconnect();window.clearInterval(ambientTimer);cancelAnimationFrame(frame);cancelAnimationFrame(cameraFrame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);};
+  return()=>{document.removeEventListener('visibilitychange',visibilityChanged);motion.removeEventListener('change',syncAmbient);if(ambientControl.current===syncAmbient)ambientControl.current=null;if(cameraControls?.current===controls)cameraControls.current=null;observer.disconnect();cancelAnimationFrame(ambientFrame);cancelAnimationFrame(frame);cancelAnimationFrame(cameraFrame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);};
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile,productionKey,quality,cameraControls]);
  return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/><div ref={harborLabels} role="group" aria-label="Harbor exchange rates" style={{position:'absolute',inset:0,pointerEvents:'none',overflow:'hidden'}}>{board.harbors.map(h=><span key={h.edgeId} data-harbor-edge={h.edgeId} aria-label={`${h.resource??'Generic'} harbor ${h.rate}:1`} style={{position:'absolute',visibility:'hidden',transform:'translate(-50%,-100%)',whiteSpace:'nowrap',background:'#19333c',color:'#fff',border:'1px solid #a6b8b5',borderRadius:5,padding:'2px 4px',fontSize:11,fontWeight:600,lineHeight:1.15,textTransform:'capitalize'}}>{h.resource??'Any'} {h.rate}:1</span>)}</div><select aria-label="Graphics quality" value={quality} onChange={e=>{const q=e.target.value as typeof quality;setQuality(q);try{localStorage.setItem('orvane.graphics',q);}catch{}}} style={{position:'absolute',right:12,top:12,zIndex:2,maxWidth:115}}><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>{!cameraControls&&<button type="button" aria-label="Reset 3D camera" onClick={()=>resetCamera.current()} style={{position:'absolute',right:12,bottom:12,zIndex:2}}>⌂</button>}{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
