@@ -1,0 +1,41 @@
+name: 3D stability
+on:
+  pull_request:
+    paths:
+      - 'apps/web/src/BoardScene3D.tsx'
+      - 'e2e/stability3d.mjs'
+      - '.github/workflows/stability3d.yml'
+  workflow_dispatch:
+    inputs:
+      full:
+        description: Run 40 cycles instead of six
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  stability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Stability
+        run: |
+          if [ "${{ inputs.full }}" = "true" ]; then
+            pnpm test:stability3d
+          else
+            pnpm test:stability3d --quick
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stability3d
+          path: artifacts/stability3d/
+          if-no-files-found: warn
