@@ -118,3 +118,56 @@
 @media(min-width:701px){.in-match .immersive-layout.drawer-active>.game-sidebar,.in-match .immersive-layout.trade-open.drawer-active>.game-sidebar{right:66px;width:min(365px,calc(100% - 230px))}}
 @media(max-width:700px){.in-match .immersive-layout.drawer-active>.game-sidebar,.in-match .immersive-layout.trade-open.drawer-active>.game-sidebar{right:56px}}
 @media(max-height:500px){.in-match .immersive-layout.trade-open.drawer-active>.game-sidebar{right:max(66px, min(200px,25vw))}}
+
+/* Orvane tabletop identity: restrained bronze, ivory and deep evergreen. */
+.in-match {
+ --hud-ink:#142b2c; --hud-edge:#8d9273; --hud-gold:#d8b77b;
+ --hud-paper:#f1e3c4; --hud-muted:#bacbc2;
+}
+.in-match .player-strip .player-seat{
+ background:linear-gradient(110deg,#1c3838f5,#11292cf5);
+ border:1px solid #84927b65;border-inline-start-width:4px;
+ border-radius:7px;box-shadow:0 3px 8px #081c2440;
+}
+.in-match .player-strip .player-seat.active{
+ background:linear-gradient(110deg,#38534af5,#1d3c39f5);
+ border-block-color:var(--hud-gold);border-inline-end-color:var(--hud-gold);
+}
+.in-match .player-strip .seat-avatar{border:1px solid #e5d6a577;border-radius:6px;overflow:hidden}
+.in-match .player-strip .seat-main strong{color:var(--hud-paper);font-weight:650;letter-spacing:.015em}
+.in-match .player-strip .seat-stats{color:var(--hud-muted)}
+.in-match .player-strip .seat-score{color:var(--hud-gold);font-variant-numeric:tabular-nums;font-weight:700}
+.in-match .player-strip .seat-award{color:var(--hud-gold)}
+.in-match>.turn-bar{background:#142d30f5;border:1px solid #c2ae785e;border-radius:9px;box-shadow:0 3px 10px #09202545;color:var(--hud-paper)}
+.in-match .turn-ident small{color:var(--hud-gold);letter-spacing:.11em}
+.in-match .dock-actions button,.in-match .map-top button,.in-match>header .header-actions button{
+ background:linear-gradient(180deg,#284746f5,#183233f5);border:1px solid #8c9b8166;
+ color:var(--hud-paper);border-radius:7px;box-shadow:0 2px 4px #09202540;
+}
+.in-match .dock-actions button:last-child{background:linear-gradient(180deg,#ecd399,#cba46a);color:#20322e;border-color:#f0d8a0;font-weight:750}
+.in-match .dock-actions button[aria-expanded=true],.in-match .map-top button[aria-expanded=true]{border-color:var(--hud-gold);background:#3b5347}
+.in-match .dock-actions button:not(:disabled):hover,.in-match .map-top button:not(:disabled):hover{border-color:var(--hud-gold)}
+.in-match .immersive-layout.drawer-active>.game-sidebar,.in-match .immersive-layout.trade-open.drawer-active>.game-sidebar,.in-match .board-panel .build-menu{
+ background:linear-gradient(145deg,#203c3dfc,#132b2efc);border-color:#a99b71;
+ border-radius:10px;box-shadow:0 8px 20px #071a2255;color:var(--hud-paper);
+}
+.in-match .trade-open .game-sidebar .drawer-heading{background:#203c3d}
+.in-match .drawer-heading strong,.in-match .construction-heading strong{
+ font-family:Georgia,'Times New Roman',serif;font-size:1.08rem;font-weight:600;letter-spacing:.025em;color:var(--hud-paper)
+}
+.in-match .construction-heading{border-bottom:1px solid #9c9f7555;padding-bottom:6px}
+.in-match .build-option{background:#2a4543;border:1px solid #7e8d7366;border-radius:7px;color:var(--hud-paper)}
+.in-match .build-option[aria-pressed=true]{border-color:var(--hud-gold);background:#405449}
+.in-match .build-availability{color:var(--hud-muted)}
+.in-match .build-cost .missing-cost{color:#ffb5a7}
+.in-match .trade-modes button[aria-pressed=true],.in-match .panel-nav button[aria-pressed=true]{border-color:var(--hud-gold);color:var(--hud-paper);background:#405449}
+.in-match .hand-mode{color:var(--hud-paper);background:#142d30f5;border:1px solid #a99b7177}
+.in-match>.match-dock>.fan-hand .fan-card{border:1px solid #dbc99f;border-radius:6px;box-shadow:0 4px 9px #0a1c235c}
+.in-match>.match-dock>.fan-hand .fan-card.raised{border-color:#ffe4a7;outline:2px solid #eacb8a;outline-offset:1px}
+.in-match>.match-dock>.fan-hand .fan-card:focus-visible{outline:2px solid #fff1be;outline-offset:2px}
+@media(min-width:1000px) and (pointer:fine){
+ .in-match>.match-dock>.fan-hand{height:140px}
+ .in-match>.match-dock>.fan-hand:not(.stacked-hand) .fan-card{width:76px;height:105px}
+ .in-match .board-panel .map-confirm{bottom:149px}
+ .in-match>.player-strip.game-players{width:clamp(145px,13vw,185px)}
+}

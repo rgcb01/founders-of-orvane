@@ -31,7 +31,9 @@ try {
    createRoot(host.firstChild).render(createElement(ResourceHand,{resources:{forest:12,pasture:9,field:8,hill:7,mountain:6},queue:[],solo:true}));
   });
   await page.locator('#hand-regression .fan-card').last().waitFor();
-  assert.equal(await page.locator('#hand-regression .fan-card').count(),5);
+  assert.equal(await page.locator('#hand-regression .fan-card').count(),42,'individual cards by default');
+  await page.locator('#hand-regression .hand-mode').click();
+  assert.equal(await page.locator('#hand-regression .fan-card').count(),5,'optional grouped view');
   await page.locator('#hand-regression .hand-mode').click();
   assert.equal(await page.locator('#hand-regression .fan-card').count(),42);
   await page.waitForFunction(()=>{const e=document.querySelector('#hand-regression .fan-scroll');return e.scrollWidth<=e.clientWidth;});

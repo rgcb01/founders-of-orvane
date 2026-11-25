@@ -38,7 +38,7 @@ try {
   await page.waitForFunction(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].game!==null);
   assert.equal(await page.getByRole('button',{name:/Begin game/}).count(),0);
   if(mode.startsWith('panels')){
-   assert.equal(await page.locator('.fan-card').count(),5,'five resource decks');
+   assert.equal(await page.locator('.fan-card').count(),25,'individual resource cards by default');
    await page.getByRole('button',{name:'Build',exact:true}).click();
    assert.equal(await page.locator('.build-option').count(),3);
    const hand=await page.locator('.resource-hand').boundingBox(),build=await page.locator('.build-menu').boundingBox();
