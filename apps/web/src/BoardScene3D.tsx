@@ -24,7 +24,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const rendererRef=useRef<THREE.WebGLRenderer|null>(null);
  const sceneResources=useRef<{scene:THREE.Scene;camera:THREE.OrthographicCamera;hemisphere:THREE.HemisphereLight;sun:THREE.DirectionalLight}|null>(null);
  const sharedGeometry=useRef(new Map<string,THREE.BufferGeometry>());
- const staticTerrain=useRef<{board:Board;objects:THREE.Object3D[];vegetation:{mesh:THREE.Mesh;phase:number}[];batches:Map<string,{mesh:THREE.InstancedMesh;items:{mesh:THREE.Mesh;phase:number}[]}>;selectable:THREE.Object3D[];geometry:THREE.CylinderGeometry;materials:Map<string,THREE.MeshStandardMaterial>;staticBatches:THREE.InstancedMesh[];staticSources:number}|null>(null);
+ const staticTerrain=useRef<{board:Board;objects:THREE.Object3D[];vegetation:{mesh:THREE.Mesh;phase:number}[];batches:Map<string,{mesh:THREE.InstancedMesh;items:{mesh:THREE.Mesh;phase:number}[]}>;selectable:THREE.Object3D[];geometry:THREE.CylinderGeometry;materials:Map<string,THREE.MeshStandardMaterial>;staticBatches:THREE.InstancedMesh[];staticSources:number;tileBatches:THREE.InstancedMesh[];tilePickMaterial:THREE.MeshBasicMaterial}|null>(null);
  const harborCache=useRef<{board:Board;objects:THREE.Object3D[];boats:THREE.Group[]}|null>(null);
  const waterCache=useRef<{board:Board;mesh:THREE.Mesh<THREE.PlaneGeometry,THREE.MeshStandardMaterial>}|null>(null);
  const sharedMaterials=useRef(new Map<string,THREE.MeshStandardMaterial>());
@@ -32,7 +32,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const tokenObjects=useRef<{board:Board;objects:THREE.InstancedMesh[];numberTokens:number}|null>(null);
  const pickCache=useRef<{board:Board;objects:THREE.Object3D[];vertexGeometry:THREE.SphereGeometry;edgeGeometry:THREE.BoxGeometry;material:THREE.MeshBasicMaterial}|null>(null);
  const disposePicks=()=>{const cache=pickCache.current;if(cache){cache.vertexGeometry.dispose();cache.edgeGeometry.dispose();cache.material.dispose();pickCache.current=null;}};
- useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
+ useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());terrain.tileBatches.forEach(b=>b.dispose());terrain.tilePickMaterial.dispose();staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
  const robberCache=useRef<THREE.Mesh[]|null>(null);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
  const pieceCache=useRef<{board:Board;entries:Map<string,{objects:THREE.Object3D[];pick:THREE.Object3D}>}|null>(null);
@@ -63,7 +63,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const selectable:THREE.Object3D[]=[];
   const positions=board.tiles.map(t=>({tile:t,p:tilePosition(t,1)}));
   const bounds=new THREE.Box3();
-  if(staticTerrain.current&&staticTerrain.current.board!==board){const old=staticTerrain.current;old.geometry.dispose();old.materials.forEach(m=>m.dispose());old.batches.forEach(b=>b.mesh.dispose());old.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}
+  if(staticTerrain.current&&staticTerrain.current.board!==board){const old=staticTerrain.current;old.geometry.dispose();old.materials.forEach(m=>m.dispose());old.batches.forEach(b=>b.mesh.dispose());old.staticBatches.forEach(b=>b.dispose());old.tileBatches.forEach(b=>b.dispose());old.tilePickMaterial.dispose();staticTerrain.current=null;}
   const cachedTerrain=staticTerrain.current;
   const geometry=cachedTerrain?.geometry??new THREE.CylinderGeometry(.98,.98,.24,6);
   const materials=cachedTerrain?.materials??new Map<string,THREE.MeshStandardMaterial>();
@@ -109,7 +109,13 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    batch.instanceMatrix.needsUpdate=true;batch.computeBoundingBox();batch.computeBoundingSphere();
    include(batch);staticBatches.push(batch);staticSources+=items.length;
   }
-  staticTerrain.current={board,objects:[...desired],vegetation,batches,selectable:[...selectable],geometry,materials,staticBatches,staticSources};}
+  // Batch visible terrain hexes by material while keeping the original meshes as invisible raycast proxies.
+  const tileGroups=new Map<THREE.Material,THREE.Mesh[]>();
+  const tilePickMaterial=new THREE.MeshBasicMaterial({visible:false,depthWrite:false});
+  for(const object of selectable){if(!(object instanceof THREE.Mesh)||Array.isArray(object.material))continue;const items=tileGroups.get(object.material)??[];items.push(object);tileGroups.set(object.material,items);}
+  const tileBatches:THREE.InstancedMesh[]=[];
+  for(const [material,items] of tileGroups){const batch=new THREE.InstancedMesh(geometry,material,items.length);items.forEach((item,i)=>{item.updateMatrix();batch.setMatrixAt(i,item.matrix);item.material=tilePickMaterial;});batch.instanceMatrix.needsUpdate=true;batch.computeBoundingBox();batch.computeBoundingSphere();include(batch);tileBatches.push(batch);}
+  staticTerrain.current={board,objects:[...desired],vegetation,batches,selectable:[...selectable],geometry,materials,staticBatches,staticSources,tileBatches,tilePickMaterial};}
   const robber=positions.find(({tile})=>tile.id===robberTile);
   if(robber){
    const {x,y:z}=robber.p;
@@ -294,7 +300,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const canvas=renderer.domElement;canvas.style.touchAction='none';
   // Only obsolete roots (removed pieces and transient overlays) are detached.
   let removedRoots=0;for(const root of [...scene.children])if(!desiredSet.has(root)){scene.remove(root);removedRoots++;}
-  canvas.dataset.terrainBatchMetrics=JSON.stringify({sources:staticTerrain.current?.staticSources??0,batches:staticTerrain.current?.staticBatches.length??0,avoidedDrawCalls:(staticTerrain.current?.staticSources??0)-(staticTerrain.current?.staticBatches.length??0),firstBatch:staticTerrain.current?.staticBatches[0]?.uuid});
+  canvas.dataset.terrainBatchMetrics=JSON.stringify({sources:staticTerrain.current?.staticSources??0,batches:staticTerrain.current?.staticBatches.length??0,avoidedDrawCalls:(staticTerrain.current?.staticSources??0)-(staticTerrain.current?.staticBatches.length??0),firstBatch:staticTerrain.current?.staticBatches[0]?.uuid,tileCount:staticTerrain.current?.selectable.length??0,tileBatches:staticTerrain.current?.tileBatches.length??0,tileDrawCallsAvoided:(staticTerrain.current?.selectable.length??0)-(staticTerrain.current?.tileBatches.length??0),firstTileBatch:staticTerrain.current?.tileBatches[0]?.uuid});
   canvas.dataset.sceneCache=JSON.stringify({scene:scene.uuid,camera:camera.uuid,sun:sun.uuid,hemisphere:hemisphere.uuid,roots:desired.length,retained:desired.filter(root=>previousRoots.has(root)).length,added:desired.filter(root=>!previousRoots.has(root)).length,removed:removedRoots});
   const raycaster=new THREE.Raycaster();const ndc=new THREE.Vector2();let start:{x:number;y:number}|null=null;let moved=false;
   const selectAt=(x:number,y:number)=>{const rect=canvas.getBoundingClientRect();ndc.set((x-rect.left)/rect.width*2-1,-((y-rect.top)/rect.height*2-1));raycaster.setFromCamera(ndc,camera);const hit=raycaster.intersectObjects([...pickObjects,...selectable],false)[0];const selection=hit?.object.userData.selection as BoardSelection|undefined;if(selection){const point=hit.object.getWorldPosition(new THREE.Vector3());marker.position.set(point.x,Math.max(point.y+.18,.35),point.z);marker.scale.setScalar(selection.kind==='tile'?2.8:1);marker.visible=true;setSelected(selection);selectionCallback.current?.(selection);draw();}};
