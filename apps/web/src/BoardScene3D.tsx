@@ -2,7 +2,7 @@ import {useEffect,useRef,useState,type RefObject} from 'react';
 import * as THREE from 'three';
 import {tilePosition,vertexPosition,type Board} from '@orvane/engine';
 import {TERRAIN_COLORS} from './TerrainArt';
-import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,type ResolutionState} from './adaptiveResolution';
+import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,canRecoverCadence,type ResolutionState} from './adaptiveResolution';
 
 export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void};
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
@@ -310,7 +310,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
      const target=TARGET_FPS/sampling.stride;
      const atFloor=resolution.ratio<=Math.min(.75,resolution.cap);
      // Reduce pixel cost before sacrificing cadence; recover cadence before raising resolution.
-     if(sampling.stride>1&&mean<(1000/(TARGET_FPS/(sampling.stride-1)))*.45&&ambientFps>=target*.92){
+     if(canRecoverCadence(sampling.stride,mean,ambientFps)){
       sampling.stride--;sampling.slowWindows=0;resetAdaptation();resetSamples();return;
      }
      const next=adaptResolution(resolution,mean,ambientFps,target);
