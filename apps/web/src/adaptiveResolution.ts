@@ -7,6 +7,10 @@ export function nextFrameDeadline(now:number,due:number):number|null{
  const next=due+FRAME_MS;
  return next<=now+1?now+FRAME_MS:next;
 }
+// Recover only when there is sufficient headroom at the prospective faster cadence.
+export function canRecoverCadence(stride:number,meanMs:number,fps:number):boolean{
+ return stride>1&&meanMs<1000/(TARGET_FPS/(stride-1))*.45&&fps>=TARGET_FPS/stride*.92;
+}
 export type ResolutionState={cap:number;ratio:number;slow:number;fast:number};
 export function resolutionCap(deviceRatio:number,tier:'low'|'medium'|'high'):number{
  const device=Number.isFinite(deviceRatio)&&deviceRatio>0?deviceRatio:1;
