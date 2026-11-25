@@ -164,7 +164,7 @@ async function live3DCameraAndHarbors(browser){
  const ctx=await browser.newContext({viewport:{width:1366,height:768},deviceScaleFactor:1.5}),page=await ctx.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  try{
-  await page.goto(url);
+  await page.goto(url+'?perf=1');
   await start(page);
   const canvas=page.locator('canvas[data-camera-pose]');
   await canvas.waitFor({timeout:30000});
@@ -239,6 +239,7 @@ async function live3DCameraAndHarbors(browser){
   assert.equal((await counters()).shadowUpdates,low.shadowUpdates,'low graphics does not update shadow maps');
   assert.equal(await state(),'low-quality');
   assert.equal(await canvas.getAttribute('data-target-fps'),'0','low quality remains demand-rendered');
+  assert.match(await page.getByLabel('3D performance').textContent(),/On demand · low-quality/);
   await button(page,'Reset view').click();
   const burst=await canvas.evaluate(c=>{
    const before=JSON.parse(c.dataset.renderCounts).frames;
@@ -254,6 +255,7 @@ async function live3DCameraAndHarbors(browser){
   assert.deepEqual(await resolution(),{mode:'medium',ratio:1.5,cap:1.5,min:.75});
   await page.getByLabel('Graphics quality').selectOption('auto');
   assert.equal(await canvas.getAttribute('data-target-fps'),'60','auto mode targets 60 FPS');
+  await page.waitForFunction(()=>document.querySelector('[aria-label="3D performance"]')?.textContent?.includes('/ 60 FPS'),null,{timeout:30000});
   const auto=await resolution();assert.equal(auto.mode,'auto');assert.ok(auto.ratio>=auto.min&&auto.ratio<=auto.cap);
   const buffer=await canvas.evaluate(c=>({width:c.width,css:c.parentElement.clientWidth}));
   assert.ok(Math.abs(buffer.width-buffer.css*auto.ratio)<=1,'pixel ratio applies to canvas drawing buffer');
