@@ -316,7 +316,8 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
      const next=adaptResolution(resolution,mean,ambientFps,target);
      const changed=next.ratio!==resolution.ratio;resolution=next;automaticResolution.current=next;
      if(changed){applyResolution();draw();}
-     sampling.slowWindows=atFloor&&(mean>1000/target*.75||ambientFps<target*.85)?sampling.slowWindows+1:0;
+     // A slow display/browser cadence alone must not cause us to halve an already limited refresh rate.
+     sampling.slowWindows=atFloor&&mean>1000/target*.9&&ambientFps<target*.85?sampling.slowWindows+1:0;
      if(sampling.slowWindows>=2){sampling.stride=Math.min(4,sampling.stride+1);sampling.slowWindows=0;}
     }
     
