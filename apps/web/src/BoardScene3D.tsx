@@ -2,6 +2,7 @@ import {useEffect,useRef,useState,type RefObject} from 'react';
 import * as THREE from 'three';
 import {tilePosition,vertexPosition,type Board} from '@orvane/engine';
 import {TERRAIN_COLORS} from './TerrainArt';
+import {adaptResolution,resolutionCap,resolutionStart,type ResolutionState} from './adaptiveResolution';
 
 export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void};
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
@@ -13,6 +14,8 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const ambientControl=useRef<(()=>void)|null>(null);
  const ambientPausedRef=useRef(ambientPaused);
  const renderCounts=useRef({frames:0,shadowUpdates:0,ambientFrames:0});
+ const automaticResolution=useRef<ResolutionState|undefined>(undefined);
+ const ambientSampling=useRef<{quality:string;tier:string;running:boolean;samples:number;totalMs:number;sampleStart:number;slowWindows:number;stride:number;count:number}|null>(null);
  useEffect(()=>{ambientPausedRef.current=ambientPaused;ambientControl.current?.();},[ambientPaused]);
  const harborLabels=useRef<HTMLDivElement>(null);
  const rendererRef=useRef<THREE.WebGLRenderer|null>(null);
@@ -232,7 +235,15 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const labelAnchors=board.harbors.flatMap(h=>{const edge=board.edges.find(e=>e.id===h.edgeId);if(!edge)return [];const a=vertices.get(edge.a),b=vertices.get(edge.b),tile=positions.find(t=>t.tile.id===edge.tiles[0]);if(!a||!b||!tile)return [];const x=(a.x+b.x)/2,z=(a.y+b.y)/2,dx=x-tile.p.x,dz=z-tile.p.y,len=Math.hypot(dx,dz);if(!len)return [];return [{id:h.edgeId,point:new THREE.Vector3(x+dx/len*.78,.57,z+dz/len*.78)}];});
   const labelNodes=new Map(Array.from(harborLabels.current?.querySelectorAll<HTMLElement>('[data-harbor-edge]')??[]).map(node=>[node.dataset.harborEdge,node]));
   const projectedLabel=new THREE.Vector3();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,tier==='high'?2:tier==='medium'?1.5:1));el.appendChild(renderer.domElement);
+  const cap=resolutionCap(window.devicePixelRatio,tier);
+  const oldResolution=automaticResolution.current;
+  const preserveResolution=quality==='auto'&&ambientSampling.current?.quality==='auto'&&oldResolution?.cap===cap;
+  let resolution=preserveResolution&&oldResolution?oldResolution:resolutionStart(cap,quality==='auto'?oldResolution:undefined);
+  if(quality==='auto')automaticResolution.current=resolution;
+  const applyResolution=()=>{if(renderer.getPixelRatio()!==resolution.ratio)renderer.setPixelRatio(resolution.ratio);
+   renderer.domElement.dataset.resolution=JSON.stringify({mode:quality,ratio:resolution.ratio,cap:resolution.cap,min:Math.min(.75,resolution.cap)});
+  };
+  applyResolution();el.appendChild(renderer.domElement);
   const render=(ambient=false)=>{const counts=renderCounts.current;if(renderer.shadowMap.enabled&&renderer.shadowMap.needsUpdate)counts.shadowUpdates++;renderer.render(scene,camera);counts.frames++;if(ambient)counts.ambientFrames++;renderer.domElement.dataset.renderCounts=JSON.stringify(counts);};
   renderer.shadowMap.needsUpdate=renderer.shadowMap.enabled;
   const draw=()=>{const w=el.clientWidth,h=el.clientHeight;if(document.hidden||!w||!h)return;camera.position.set(target.x+Math.sin(azimuth)*span,target.y+span*1.3,target.z+Math.cos(azimuth)*span);camera.lookAt(target);camera.updateMatrixWorld(true);const projected=new THREE.Box3();for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])projected.expandByPoint(new THREE.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse));const fit=projected.getSize(new THREE.Vector3()),mid=projected.getCenter(new THREE.Vector3());const aspect=w/h,half=Math.max(fit.y/2,fit.x/(2*aspect))*1.08/zoom;camera.left=mid.x+panX-half*aspect;camera.right=mid.x+panX+half*aspect;camera.top=mid.y+panY+half;camera.bottom=mid.y+panY-half;camera.updateProjectionMatrix();if(renderer.domElement.width!==Math.floor(w*renderer.getPixelRatio())||renderer.domElement.height!==Math.floor(h*renderer.getPixelRatio()))renderer.setSize(w,h,false);render();const canvas=renderer.domElement;canvas.dataset.cameraPose=JSON.stringify({zoom,azimuth,panX,panY});canvas.dataset.staticCache=JSON.stringify({tokenTextures:tokens.materials.size,numberTokens:(tokenObjects.current?.objects.length??0)/2,tokenGeometry:tokens.geometry.uuid,firstToken:tokenObjects.current?.objects[0]?.uuid,pickGeometries:2,pickObjects:pickObjects.length,firstPick:pickObjects[0]?.uuid});for(const {id,point} of labelAnchors){const node=labelNodes.get(id);if(!node)continue;const p=projectedLabel.copy(point).project(camera);node.style.visibility=Math.abs(p.x)<=1&&Math.abs(p.y)<=1&&Math.abs(p.z)<=1?'visible':'hidden';node.style.left=`${(p.x+1)*w/2}px`;node.style.top=`${(1-p.y)*h/2}px`;}canvas.dataset.legalVertices=JSON.stringify([...legalVertexSet].flatMap(id=>{const p=vertices.get(id);if(!p)return [];const q=new THREE.Vector3(p.x,.32,p.y).project(camera);return [{id,x:(q.x+1)*w/2,y:(1-q.y)*h/2}]}));canvas.dataset.legalEdges=JSON.stringify([...legalEdgeSet].flatMap(id=>{const edge=board.edges.find(e=>e.id===id);if(!edge)return [];const a=vertices.get(edge.a),b=vertices.get(edge.b);if(!a||!b)return [];const q=new THREE.Vector3((a.x+b.x)/2,.29,(a.y+b.y)/2).project(camera);return [{id,x:(q.x+1)*w/2,y:(1-q.y)*h/2}]}));};
@@ -260,30 +271,39 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   if(cameraControls)cameraControls.current=controls;
   const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
   let ambientTimer=0;const ambientStart=performance.now();
-  let samples=0,totalMs=0,slowWindows=0;let sampleStart=performance.now();let ambientStride=1,ambientCount=0,lastShadow=performance.now();
-  const resetSamples=()=>{samples=0;totalMs=0;sampleStart=performance.now();};
+  const priorSampling=ambientSampling.current;
+  const sampling=priorSampling?.quality===quality&&priorSampling.tier===tier?priorSampling:{quality,tier,running:false,samples:0,totalMs:0,sampleStart:performance.now(),slowWindows:0,stride:1,count:0};
+  ambientSampling.current=sampling;
+  let lastShadow=performance.now();
+  const resetSamples=()=>{sampling.samples=0;sampling.totalMs=0;sampling.sampleStart=performance.now();};
+  const resetAdaptation=()=>{resolution={...resolution,slow:0,fast:0};if(quality==='auto')automaticResolution.current=resolution;sampling.slowWindows=0;};
   const ambient=()=>{
    if(document.hidden||ambientPausedRef.current||motion.matches||!el.clientWidth||!el.clientHeight){resetSamples();return;}
-   if(++ambientCount%ambientStride!==0)return;
+   if(++sampling.count%sampling.stride!==0)return;
    const begin=performance.now(),t=(begin-ambientStart)/1000;
    for(const {mesh:batch,items} of batches.values()){items.forEach(({mesh,phase},i)=>{mesh.rotation.z=.055*Math.sin(t*1.6+phase);mesh.rotation.x=.025*Math.cos(t*1.2+phase);mesh.updateMatrix();batch.setMatrixAt(i,mesh.matrix);});batch.instanceMatrix.needsUpdate=true;}
    boats.forEach((boat,i)=>{boat.position.y=.035*Math.sin(t*1.7+i);boat.rotation.z=.045*Math.sin(t*1.3+i);});
    const pos=waterGeometry.attributes.position;for(let i=0;i<pos.count;i++)pos.setZ(i,.035*Math.sin(pos.getX(i)*.8+t)+.025*Math.cos(pos.getY(i)*.9-t*.8));pos.needsUpdate=true;waterGeometry.computeVertexNormals();
    // Ambient motion needs only occasional shadow refreshes; camera motion needs none.
-   const shadowInterval=(tier==='high'?250:500)*ambientStride;
+   const shadowInterval=(tier==='high'?250:500)*sampling.stride;
    if(renderer.shadowMap.enabled&&begin-lastShadow>=shadowInterval){renderer.shadowMap.needsUpdate=true;lastShadow=begin;}
-   render(true);totalMs+=performance.now()-begin;samples++;
-   if(samples>=30){const now=performance.now(),mean=totalMs/samples,ambientFps=samples*1000/Math.max(1,now-sampleStart);
-    canvas.dataset.renderMetrics=JSON.stringify({ambientFps,cpuRenderMs:mean,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,ambientStride});
-    if(quality==='auto'){slowWindows=mean>18?slowWindows+1:0;if(slowWindows>=2){ambientStride=Math.min(4,ambientStride+1);slowWindows=0;}else if(mean<8&&ambientStride>1)ambientStride--;}
+   render(true);sampling.totalMs+=performance.now()-begin;sampling.samples++;
+   if(sampling.samples>=30){const now=performance.now(),mean=sampling.totalMs/sampling.samples,ambientFps=sampling.samples*1000/Math.max(1,now-sampling.sampleStart);
+    canvas.dataset.renderMetrics=JSON.stringify({ambientFps,cpuRenderMs:mean,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,ambientStride:sampling.stride,pixelRatio:renderer.getPixelRatio()});
+    if(quality==='auto'){
+     const next=adaptResolution(resolution,mean,ambientFps,(tier==='high'?30:20)/sampling.stride);
+     const changed=next.ratio!==resolution.ratio;resolution=next;automaticResolution.current=next;
+     if(changed){applyResolution();draw();}
+    }
+    if(quality==='auto'){sampling.slowWindows=mean>18?sampling.slowWindows+1:0;if(sampling.slowWindows>=2){sampling.stride=Math.min(4,sampling.stride+1);sampling.slowWindows=0;}else if(mean<8&&sampling.stride>1)sampling.stride--;}
     resetSamples();
    }
   };
   const syncAmbient=()=>{
    const reason=document.hidden?'hidden':ambientPausedRef.current?'paused':motion.matches?'reduced-motion':tier==='low'?'low-quality':'running';
    canvas.dataset.ambientState=reason;
-   if(reason==='running'){if(!ambientTimer){resetSamples();ambientTimer=window.setInterval(ambient,1000/(tier==='high'?30:20));}}
-   else if(ambientTimer){window.clearInterval(ambientTimer);ambientTimer=0;resetSamples();}
+   if(reason==='running'){if(!sampling.running){resetSamples();resetAdaptation();sampling.running=true;}if(!ambientTimer)ambientTimer=window.setInterval(ambient,1000/(tier==='high'?30:20));}
+   else {if(ambientTimer){window.clearInterval(ambientTimer);ambientTimer=0;}if(sampling.running){sampling.running=false;resetSamples();resetAdaptation();}}
   };
   ambientControl.current=syncAmbient;
   const visibilityChanged=()=>{syncAmbient();if(!document.hidden){renderer.shadowMap.needsUpdate=renderer.shadowMap.enabled;draw();}};

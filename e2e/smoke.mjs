@@ -161,7 +161,7 @@ async function passAndPlay(browser,mobile=false){
  }finally{await ctx.close();}
 }
 async function live3DCameraAndHarbors(browser){
- const ctx=await browser.newContext({viewport:{width:1366,height:768}}),page=await ctx.newPage(),errors=[];
+ const ctx=await browser.newContext({viewport:{width:1366,height:768},deviceScaleFactor:1.5}),page=await ctx.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  try{
   await page.goto(url);
@@ -232,10 +232,18 @@ async function live3DCameraAndHarbors(browser){
   await page.waitForFunction(()=>document.querySelector('canvas[data-ambient-state]')?.dataset.ambientState==='running');
   await page.getByLabel('Graphics quality').selectOption('low');
   await page.waitForFunction(()=>document.querySelector('canvas[data-ambient-state]')?.dataset.ambientState==='low-quality');
+  const resolution=()=>canvas.evaluate(c=>JSON.parse(c.dataset.resolution));
+  assert.deepEqual(await resolution(),{mode:'low',ratio:1,cap:1,min:.75});
   const low=await counters();await sleep(300);
   assert.equal((await counters()).ambientFrames,low.ambientFrames,'low graphics renders on demand');
   assert.equal((await counters()).shadowUpdates,low.shadowUpdates,'low graphics does not update shadow maps');
   assert.equal(await state(),'low-quality');
+  await page.getByLabel('Graphics quality').selectOption('medium');
+  assert.deepEqual(await resolution(),{mode:'medium',ratio:1.5,cap:1.5,min:.75});
+  await page.getByLabel('Graphics quality').selectOption('auto');
+  const auto=await resolution();assert.equal(auto.mode,'auto');assert.ok(auto.ratio>=auto.min&&auto.ratio<=auto.cap);
+  const buffer=await canvas.evaluate(c=>({width:c.width,css:c.parentElement.clientWidth}));
+  assert.ok(Math.abs(buffer.width-buffer.css*auto.ratio)<=1,'pixel ratio applies to canvas drawing buffer');
   assert.deepEqual(errors,[]);
   console.log('Chromium live 3D: shared map toolbar and harbor exchange labels passed');
  }finally{await ctx.close();}
