@@ -49,3 +49,16 @@ Release acceptance: automated checks and benchmark pass; no data loss,
 unhandled exceptions, unexpected context loss, or blocked legal actions;
 physical-device responsiveness accepted by tester. This protocol is
 not evidence that the tests have already passed.
+
+## Physical-device FPS overlay
+
+Open the published game with `?perf=1` and use Auto or Medium quality at
+normal bot pace. The top-left overlay reports measured ambient renderer
+submissions per second, target 60, effective pixel ratio, mean CPU frame
+work and draw calls. It updates every 30 ambient frames. Paused, hidden,
+turbo, reduced-motion and Low quality use demand rendering; the overlay
+labels those states rather than reporting stale FPS. It is a submission
+cadence estimate, not independent GPU/compositor presentation timing.
+Record a screenshot after several seconds of normal play and again during
+camera interaction on a six-player board. Do not enable `benchmark3d=1`
+for ordinary hardware testing, because sample serialization adds overhead.
