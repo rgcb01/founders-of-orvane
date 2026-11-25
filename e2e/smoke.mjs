@@ -231,7 +231,14 @@ async function live3DCameraAndHarbors(browser){
   const frameBefore=(await counters()).frames;
   await button(page,'Zoom in').click();
   assert.ok((await counters()).frames>frameBefore,'camera remains responsive with ambient rendering stopped');
-  await page.getByLabel('Bot pace').first().selectOption('normal');
+  const paceControl=page.getByLabel('Bot pace',{exact:true}).first();
+  if(await paceControl.isVisible())await paceControl.selectOption('normal');
+  else{
+   await page.getByRole('button',{name:'Pause menu'}).click();
+   const menu=page.getByRole('dialog',{name:'Pause menu'});
+   await menu.getByLabel('Pause menu bot pace').selectOption('normal');
+   await menu.getByRole('button',{name:'▶ Resume game'}).click();
+  }
   await page.waitForFunction(()=>document.querySelector('canvas[data-ambient-state]')?.dataset.ambientState==='running');
   const ambientBefore=(await counters()).ambientFrames;
   await page.waitForFunction(n=>JSON.parse(document.querySelector('canvas[data-render-counts]').dataset.renderCounts).ambientFrames>n,ambientBefore);
