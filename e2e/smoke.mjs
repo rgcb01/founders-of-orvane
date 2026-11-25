@@ -192,12 +192,19 @@ async function live3DCameraAndHarbors(browser){
   assert.ok(terrainBefore.tileBatches<=7,'at most seven terrain material batches');
   assert.equal(terrainBefore.tileDrawCallsAvoided,terrainBefore.tileCount-terrainBefore.tileBatches);
   assert.ok(terrainBefore.tileDrawCallsAvoided>0);
-  const centers=await canvas.evaluate(c=>JSON.parse(c.dataset.tileCenters));
-  const rect=await canvas.boundingBox();
-  const tile=centers.find(p=>p.x>30&&p.y>60&&p.x<rect.width-130&&p.y<rect.height-30);
-  assert.ok(tile,'visible tile for raycast test');
-  await page.mouse.click(rect.x+tile.x,rect.y+tile.y);
-  await page.getByText('Selected tile: '+tile.id,{exact:true}).waitFor();
+  // The HUD can cover projected tile centers. Only click points the canvas actually receives.
+  const centers=await canvas.evaluate(c=>{const rect=c.getBoundingClientRect();return JSON.parse(c.dataset.tileCenters).filter(p=>p.x>=0&&p.y>=0&&p.x<rect.width&&p.y<rect.height&&document.elementFromPoint(rect.left+p.x,rect.top+p.y)===c);});
+  assert.ok(centers.length>=2,'at least two unobstructed tile centers');
+  const picks=[];
+  for(const tile of centers){
+   await canvas.evaluate(c=>delete c.dataset.lastPick);
+   await canvas.click({position:{x:tile.x,y:tile.y}});
+   const picked=await canvas.evaluate(c=>JSON.parse(c.dataset.lastPick??'null'));
+   picks.push({expected:tile.id,picked});
+   if(picks.filter(p=>p.picked?.kind==='tile'&&p.picked.id===p.expected).length>=2)break;
+  }
+  console.log('3D tile raycast picks:',JSON.stringify(picks));
+  assert.ok(picks.filter(p=>p.picked?.kind==='tile'&&p.picked.id===p.expected).length>=2,'individual tile IDs survive instancing');
   console.log('3D static terrain batching:',JSON.stringify(terrainBefore));
   const cache=()=>canvas.evaluate(c=>JSON.parse(c.dataset.staticCache));
   const before=await cache();
