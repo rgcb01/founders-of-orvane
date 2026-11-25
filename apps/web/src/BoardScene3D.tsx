@@ -15,7 +15,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const resetCamera=useRef(()=>{});
  const ambientControl=useRef<(()=>void)|null>(null);
  const ambientPausedRef=useRef(ambientPaused);
- const renderCounts=useRef({frames:0,shadowUpdates:0,ambientFrames:0});
+ const renderCounts=useRef({frames:0,shadowUpdates:0,ambientFrames:0,animationFrames:0,animationShadowUpdates:0,completedAnimations:0});
  const automaticResolution=useRef<ResolutionState|undefined>(undefined);
  const autoShadows=useRef({enabled:true,slow:0,fast:0});
  const ambientSampling=useRef<{quality:string;tier:string;running:boolean;samples:number;totalMs:number;sampleStart:number;slowWindows:number;stride:number;count:number}|null>(null);
@@ -369,13 +369,15 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const observer=new ResizeObserver(draw);observer.observe(el);const started=performance.now();
   const robberTargets=robberMeshes.map(mesh=>mesh.position.clone());
   const movingRobber=!!origin&&!!robber&&robberMeshes.length>0;
-  const tick=(now:number)=>{frame=0;lastAnimationTime=now;if(document.hidden)return;const begin=performance.now(),elapsed=now-started,t=Math.min(1,elapsed/380),ease=1-Math.pow(1-t,3);for(const group of animated)group.scale.set(1,Math.max(.05,ease),1);
+  const tick=(now:number)=>{frame=0;lastAnimationTime=now;const begin=performance.now(),elapsed=document.hidden?Infinity:now-started,t=Math.min(1,elapsed/380),ease=1-Math.pow(1-t,3);for(const group of animated)group.scale.set(1,Math.max(.05,ease),1);
    const u=Math.min(1,elapsed/520),smooth=u*u*(3-2*u);
    if(movingRobber&&origin&&robber){robberMeshes.forEach((mesh,i)=>{const dest=robberTargets[i];mesh.position.set(dest.x+(origin.p.x-robber.p.x)*(1-smooth),dest.y+Math.sin(Math.PI*u)*.48,dest.z+(origin.p.y-robber.p.y)*(1-smooth));});}
    const pulse=Math.min(1,elapsed/650);for(const ring of productionRings)ring.scale.setScalar(.85+.15*Math.sin(Math.PI*pulse));productionMaterial.opacity=.85*(1-pulse);
    const pending=(animated.length>0&&t<1)||(movingRobber&&u<1)||(productionRings.length>0&&pulse<1);
    // Keep the previous shadow map during the short construction animation; refresh at its end.
-   if(!pending&&(animated.length>0||movingRobber)&&renderer.shadowMap.enabled)renderer.shadowMap.needsUpdate=true;
+   if(!pending){renderCounts.current.completedAnimations++;if((animated.length>0||movingRobber)&&renderer.shadowMap.enabled)renderer.shadowMap.needsUpdate=true;}
+   if(document.hidden)return;
+   renderCounts.current.animationFrames++;if(renderer.shadowMap.enabled&&renderer.shadowMap.needsUpdate)renderCounts.current.animationShadowUpdates++;
    // Camera projection, DOM labels, and legal-site data do not change during piece scaling.
    if(cameraFrame){draw();}else{render(sampling.running);if(sampling.running)recordActiveFrame(begin);}
    if(pending)frame=requestAnimationFrame(tick);
