@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,FRAME_MS,type ResolutionState} from './adaptiveResolution';
+import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,FRAME_MS,canRecoverCadence,type ResolutionState} from './adaptiveResolution';
 const repeat=(s:ResolutionState,n:number,ms:number,fps:number,target=30)=>{for(let i=0;i<n;i++)s=adaptResolution(s,ms,fps,target);return s;};
 describe('adaptive 3D resolution',()=>{
  it('honors device pixel ratio and manual quality caps',()=>{
@@ -50,4 +50,11 @@ describe('60 FPS display cadence',()=>{
   expect(repeat(initial,2,5,48,60).ratio).toBe(1.25);
   expect(repeat(initial,10,5,59,60).ratio).toBe(1.5);
  });
+});
+
+it('requires headroom at the faster cadence before recovering',()=>{
+ expect(canRecoverCadence(2,14,30)).toBe(false);
+ expect(canRecoverCadence(2,7,30)).toBe(true);
+ expect(canRecoverCadence(2,7,20)).toBe(false);
+ expect(canRecoverCadence(1,4,60)).toBe(false);
 });
