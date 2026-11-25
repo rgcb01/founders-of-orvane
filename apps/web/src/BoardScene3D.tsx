@@ -223,6 +223,19 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const span=Math.max(size.x,size.z)+3;
   if(waterCache.current?.board!==board){waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.dispose();waterCache.current={board,mesh:new THREE.Mesh(new THREE.PlaneGeometry(span*8,span*8,24,24),new THREE.MeshStandardMaterial({color:'#285963',roughness:.85}))};}
   const water=waterCache.current.mesh;const waterGeometry=water.geometry;water.rotation.x=-Math.PI/2;water.position.set(center.x,-.15,center.z);include(water);water.receiveShadow=true;
+  // The two separable waves have analytic slopes. Precompute spatial phases
+  // once per scene update; animate without rebuilding triangle normals.
+  const waveSize=25,waveX=new Float32Array(waveSize),waveY=new Float32Array(waveSize);
+  const waveDx=new Float32Array(waveSize),waveDy=new Float32Array(waveSize);
+  const waterPosition=waterGeometry.attributes.position,waterNormal=waterGeometry.attributes.normal;
+  const phaseX=Array.from({length:waveSize},(_,i)=>waterPosition.getX(i)*.8);
+  const phaseY=Array.from({length:waveSize},(_,i)=>waterPosition.getY(i*waveSize)*.9);
+  waterPosition.setUsage(THREE.DynamicDrawUsage);waterNormal.setUsage(THREE.DynamicDrawUsage);
+  const animateWater=(t:number)=>{
+   for(let i=0;i<waveSize;i++){const x=phaseX[i]+t,y=phaseY[i]-t*.8;waveX[i]=.035*Math.sin(x);waveY[i]=.025*Math.cos(y);waveDx[i]=.028*Math.cos(x);waveDy[i]=-.0225*Math.sin(y);}
+   for(let y=0;y<waveSize;y++)for(let x=0;x<waveSize;x++){const i=y*waveSize+x,dx=waveDx[x],dy=waveDy[y],length=Math.sqrt(1+dx*dx+dy*dy);waterPosition.setZ(i,waveX[x]+waveY[y]);waterNormal.setXYZ(i,-dx/length,-dy/length,1/length);}
+   waterPosition.needsUpdate=true;waterNormal.needsUpdate=true;
+  };
   include(hemisphere);
   sun.position.set(center.x-5,12,center.z+6);sun.target.position.copy(center);include(sun,sun.target);
   renderer.shadowMap.enabled=tier!=='low';renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -299,7 +312,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    const begin=performance.now(),t=(begin-ambientStart)/1000;
    for(const {mesh:batch,items} of batches.values()){items.forEach(({mesh,phase},i)=>{mesh.rotation.z=.055*Math.sin(t*1.6+phase);mesh.rotation.x=.025*Math.cos(t*1.2+phase);mesh.updateMatrix();batch.setMatrixAt(i,mesh.matrix);});batch.instanceMatrix.needsUpdate=true;}
    boats.forEach((boat,i)=>{boat.position.y=.035*Math.sin(t*1.7+i);boat.rotation.z=.045*Math.sin(t*1.3+i);});
-   const pos=waterGeometry.attributes.position;for(let i=0;i<pos.count;i++)pos.setZ(i,.035*Math.sin(pos.getX(i)*.8+t)+.025*Math.cos(pos.getY(i)*.9-t*.8));pos.needsUpdate=true;waterGeometry.computeVertexNormals();
+   animateWater(t);
    // Ambient motion needs only occasional shadow refreshes; camera motion needs none.
    const shadowInterval=(tier==='high'?250:500)*sampling.stride;
    if(renderer.shadowMap.enabled&&begin-lastShadow>=shadowInterval){renderer.shadowMap.needsUpdate=true;lastShadow=begin;}
