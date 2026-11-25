@@ -310,7 +310,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
      const target=TARGET_FPS/sampling.stride;
      const atFloor=resolution.ratio<=Math.min(.75,resolution.cap);
      // Reduce pixel cost before sacrificing cadence; recover cadence before raising resolution.
-     if(sampling.stride>1&&mean<1000/target*.45&&ambientFps>=target*.92){
+     if(sampling.stride>1&&mean<(1000/(TARGET_FPS/(sampling.stride-1)))*.45&&ambientFps>=target*.92){
       sampling.stride--;sampling.slowWindows=0;resetAdaptation();resetSamples();return;
      }
      const next=adaptResolution(resolution,mean,ambientFps,target);
