@@ -230,7 +230,8 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const waterPosition=waterGeometry.attributes.position,waterNormal=waterGeometry.attributes.normal;
   const phaseX=Array.from({length:waveSize},(_,i)=>waterPosition.getX(i)*.8);
   const phaseY=Array.from({length:waveSize},(_,i)=>waterPosition.getY(i*waveSize)*.9);
-  waterPosition.setUsage(THREE.DynamicDrawUsage);waterNormal.setUsage(THREE.DynamicDrawUsage);
+  if(waterPosition instanceof THREE.BufferAttribute&&waterPosition.version===0)waterPosition.setUsage(THREE.DynamicDrawUsage);
+  if(waterNormal instanceof THREE.BufferAttribute&&waterNormal.version===0)waterNormal.setUsage(THREE.DynamicDrawUsage);
   const animateWater=(t:number)=>{
    for(let i=0;i<waveSize;i++){const x=phaseX[i]+t,y=phaseY[i]-t*.8;waveX[i]=.035*Math.sin(x);waveY[i]=.025*Math.cos(y);waveDx[i]=.028*Math.cos(x);waveDy[i]=-.0225*Math.sin(y);}
    for(let y=0;y<waveSize;y++)for(let x=0;x<waveSize;x++){const i=y*waveSize+x,dx=waveDx[x],dy=waveDy[y],length=Math.sqrt(1+dx*dx+dy*dy);waterPosition.setZ(i,waveX[x]+waveY[y]);waterNormal.setXYZ(i,-dx/length,-dy/length,1/length);}
