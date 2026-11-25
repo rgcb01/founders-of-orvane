@@ -186,6 +186,9 @@ async function live3DCameraAndHarbors(browser){
   assert.deepEqual(await pose(),{zoom:1,azimuth:0,panX:0,panY:0});
   const cache=()=>canvas.evaluate(c=>JSON.parse(c.dataset.staticCache));
   const before=await cache();
+  const sceneCache=()=>canvas.evaluate(c=>JSON.parse(c.dataset.sceneCache));
+  const sceneBefore=await sceneCache();
+  const sceneIdentity=({scene,camera,sun,hemisphere})=>({scene,camera,sun,hemisphere});
   assert.ok(before.tokenTextures>0&&before.tokenTextures<=10,'at most ten distinct dice textures');
   assert.ok(before.numberTokens>before.tokenTextures,'repeated numbers share textures');
   assert.equal(before.pickGeometries,2,'all selection volumes share two geometries');
@@ -193,8 +196,14 @@ async function live3DCameraAndHarbors(browser){
   await page.getByLabel('Graphics quality').selectOption('low');
   await page.waitForFunction(()=>document.querySelector('canvas[data-static-cache]')?.dataset.staticCache!==undefined);
   assert.deepEqual(await cache(),before,'quality change retains number and pick objects');
+  const sceneAfter=await sceneCache();
+  assert.deepEqual(sceneIdentity(sceneAfter),sceneIdentity(sceneBefore),'scene, camera and lights retain identity');
+  assert.ok(sceneAfter.retained>sceneAfter.added,'unchanged scene roots are not detached and recreated');
+  assert.equal(sceneAfter.roots,sceneAfter.retained+sceneAfter.added);
+  assert.equal(sceneAfter.removed,sceneBefore.roots-sceneAfter.retained,'only obsolete roots are detached');
   await page.getByLabel('Graphics quality').selectOption('medium');
   assert.deepEqual(await cache(),before,'repeated scene update preserves static cache identity');
+  assert.deepEqual(sceneIdentity(await sceneCache()),sceneIdentity(sceneBefore),'repeated updates preserve scene identity');
   assert.deepEqual(errors,[]);
   console.log('Chromium live 3D: shared map toolbar and harbor exchange labels passed');
  }finally{await ctx.close();}
