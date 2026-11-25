@@ -33,17 +33,17 @@ try{
    const coach=page.getByRole('complementary',{name:'Interactive tutorial'});
    if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
    const snap=()=>canvas.evaluate(c=>({stats:JSON.parse(c.dataset.benchmark3d),counts:JSON.parse(c.dataset.renderCounts),ambientState:c.dataset.ambientState,targetFps:Number(c.dataset.targetFps),terrain:c.dataset.terrainBatchMetrics?JSON.parse(c.dataset.terrainBatchMetrics):null}));
-   for(const quality of (quick?['low','high']:['low','medium','high','auto'])){
+   for(const quality of (quick?(players===6?['low','high','auto']:['low','high']):['low','medium','high','auto'])){
     await page.getByLabel('Graphics quality').selectOption(quality);
     await sleep(500);
     const before=await snap(),start=performance.now();
-    await sleep(quick?1000:3000);
+    await sleep(quality==='auto'?4000:quick?1000:3000);
     const after=await snap(),duration=(performance.now()-start)/1000;
     const frameDelta=after.counts.frames-before.counts.frames;
     const ambientDelta=after.counts.ambientFrames-before.counts.ambientFrames;
     assert.ok(frameDelta>=0&&ambientDelta>=0);
-    if(quality==='low')assert.equal(ambientDelta,0,'low quality idle has no ambient frames');
-    else assert.ok(ambientDelta>0,'ambient animation active');
+    if(quality==='low'){assert.equal(ambientDelta,0,'low quality idle has no ambient frames');assert.equal(after.targetFps,0);}
+    else {assert.ok(ambientDelta>0,'ambient animation active');assert.equal(after.targetFps,60,'active quality targets 60 FPS');}
     const sampleCount=Math.min(frameDelta,after.stats.samples.length);
     const ambientSamples=(sampleCount?after.stats.samples.slice(-sampleCount):[]).filter(s=>s.ambient);
     // Warm the camera path before recording, then measure each submission separately.
