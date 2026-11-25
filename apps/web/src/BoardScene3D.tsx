@@ -15,7 +15,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const resetCamera=useRef(()=>{});
  const ambientControl=useRef<(()=>void)|null>(null);
  const ambientPausedRef=useRef(ambientPaused);
- const renderCounts=useRef({frames:0,shadowUpdates:0,ambientFrames:0});
+ const renderCounts=useRef({frames:0,shadowUpdates:0,ambientFrames:0,animationFrames:0,animationShadowUpdates:0,completedAnimations:0});
  const automaticResolution=useRef<ResolutionState|undefined>(undefined);
  const autoShadows=useRef({enabled:true,slow:0,fast:0});
  const ambientSampling=useRef<{quality:string;tier:string;running:boolean;samples:number;totalMs:number;sampleStart:number;slowWindows:number;stride:number;count:number}|null>(null);
@@ -291,7 +291,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const markerGeometry=new THREE.TorusGeometry(.23,.035,8,32);
   const markerMaterial=new THREE.MeshBasicMaterial({color:'#fff2a8',depthTest:false});
   const marker=new THREE.Mesh(markerGeometry,markerMaterial);marker.rotation.x=-Math.PI/2;marker.visible=false;marker.renderOrder=10;include(marker);
-  const canvas=renderer.domElement;canvas.style.touchAction='none';
+  const canvas=renderer.domElement;canvas.style.touchAction='none';canvas.style.width='100%';canvas.style.height='100%';canvas.style.display='block';
   // Only obsolete roots (removed pieces and transient overlays) are detached.
   let removedRoots=0;for(const root of [...scene.children])if(!desiredSet.has(root)){scene.remove(root);removedRoots++;}
   canvas.dataset.terrainBatchMetrics=JSON.stringify({sources:staticTerrain.current?.staticSources??0,batches:staticTerrain.current?.staticBatches.length??0,avoidedDrawCalls:(staticTerrain.current?.staticSources??0)-(staticTerrain.current?.staticBatches.length??0),firstBatch:staticTerrain.current?.staticBatches[0]?.uuid});
@@ -308,7 +308,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const controls:BoardCameraControls={reset:resetCamera.current,zoomBy:delta=>{zoom=THREE.MathUtils.clamp(zoom+delta,.65,3);cameraPose.current={zoom,azimuth,panX,panY};draw();}};
   if(cameraControls)cameraControls.current=controls;
   const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
-  let ambientFrame=0,nextDue=0;const ambientStart=performance.now();
+  let ambientFrame=0,nextDue=0,frame=0,lastAnimationTime=-1;const ambientStart=performance.now();
   const priorSampling=ambientSampling.current;
   const sampling=priorSampling?.quality===quality&&priorSampling.tier===tier?priorSampling:{quality,tier,running:false,samples:0,totalMs:0,sampleStart:performance.now(),slowWindows:0,stride:1,count:0};
   ambientSampling.current=sampling;
@@ -317,7 +317,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const resetAdaptation=()=>{resolution={...resolution,slow:0,fast:0};if(quality==='auto')automaticResolution.current=resolution;sampling.slowWindows=0;};
   const ambient=()=>{
    if(document.hidden||ambientPausedRef.current||motion.matches||!el.clientWidth||!el.clientHeight){resetSamples();return;}
-   if(cameraFrame)return;if(++sampling.count%sampling.stride!==0)return;
+   if(cameraFrame||frame)return;if(++sampling.count%sampling.stride!==0)return;
    const begin=performance.now(),t=(begin-ambientStart)/1000;
    for(const {mesh:batch,items} of batches.values()){items.forEach(({mesh,phase},i)=>{mesh.rotation.z=.055*Math.sin(t*1.6+phase);mesh.rotation.x=.025*Math.cos(t*1.2+phase);mesh.updateMatrix();batch.setMatrixAt(i,mesh.matrix);});batch.instanceMatrix.needsUpdate=true;}
    boats.forEach((boat,i)=>{boat.position.y=.035*Math.sin(t*1.7+i);boat.rotation.z=.045*Math.sin(t*1.3+i);});
@@ -325,7 +325,10 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    // Ambient motion needs only occasional shadow refreshes; camera motion needs none.
    const shadowInterval=(tier==='high'?250:500)*sampling.stride;
    if(renderer.shadowMap.enabled&&begin-lastShadow>=shadowInterval){renderer.shadowMap.needsUpdate=true;lastShadow=begin;}
-   render(true);sampling.totalMs+=performance.now()-begin;sampling.samples++;
+   render(true);recordActiveFrame(begin);
+  };
+  const recordActiveFrame=(begin:number)=>{
+   sampling.totalMs+=performance.now()-begin;sampling.samples++;
    if(sampling.samples>=30){const now=performance.now(),mean=sampling.totalMs/sampling.samples,ambientFps=sampling.samples*1000/Math.max(1,now-sampling.sampleStart);
     if(perfHud.current)perfHud.current.textContent=`${ambientFps.toFixed(1)} / ${TARGET_FPS} FPS · DPR ${renderer.getPixelRatio().toFixed(2)} · CPU ${mean.toFixed(1)} ms · ${renderer.info.render.calls} draws · shadows ${renderer.shadowMap.enabled?'on':'off'}`;
     canvas.dataset.renderMetrics=JSON.stringify({ambientFps,cpuRenderMs:mean,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,ambientStride:sampling.stride,targetFps:TARGET_FPS,effectiveTargetFps:TARGET_FPS/sampling.stride,shadows:renderer.shadowMap.enabled,pixelRatio:renderer.getPixelRatio()});
@@ -351,7 +354,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
     resetSamples();
    }
   };
-  const ambientTick=(now:number)=>{ambientFrame=0;if(!sampling.running||document.hidden)return;const due=nextFrameDeadline(now,nextDue||now);if(due!==null){nextDue=due;ambient();}if(sampling.running&&!document.hidden)ambientFrame=requestAnimationFrame(ambientTick);};
+  const ambientTick=(now:number)=>{ambientFrame=0;if(!sampling.running||document.hidden)return;const due=nextFrameDeadline(now,nextDue||now);if(due!==null){nextDue=due;if(now!==lastAnimationTime)ambient();}if(sampling.running&&!document.hidden)ambientFrame=requestAnimationFrame(ambientTick);};
   const syncAmbient=()=>{
    const reason=document.hidden?'hidden':ambientPausedRef.current?'paused':motion.matches?'reduced-motion':tier==='low'?'low-quality':'running';
    canvas.dataset.ambientState=reason;canvas.dataset.targetFps=String(tier==='low'?0:TARGET_FPS);canvas.dataset.shadows=String(renderer.shadowMap.enabled);
@@ -363,14 +366,25 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const visibilityChanged=()=>{syncAmbient();if(!document.hidden){renderer.shadowMap.needsUpdate=renderer.shadowMap.enabled;draw();}};
   document.addEventListener('visibilitychange',visibilityChanged);
   motion.addEventListener('change',syncAmbient);
-  const observer=new ResizeObserver(draw);observer.observe(el);let frame=0;const started=performance.now();
+  const observer=new ResizeObserver(draw);observer.observe(el);const started=performance.now();
   const robberTargets=robberMeshes.map(mesh=>mesh.position.clone());
   const movingRobber=!!origin&&!!robber&&robberMeshes.length>0;
-  const tick=(now:number)=>{const elapsed=now-started,t=Math.min(1,elapsed/380),ease=1-Math.pow(1-t,3);for(const group of animated)group.scale.set(1,Math.max(.05,ease),1);
+  const tick=(now:number)=>{frame=0;lastAnimationTime=now;const begin=performance.now(),elapsed=document.hidden?Infinity:now-started,t=Math.min(1,elapsed/380),ease=1-Math.pow(1-t,3);for(const group of animated)group.scale.set(1,Math.max(.05,ease),1);
    const u=Math.min(1,elapsed/520),smooth=u*u*(3-2*u);
    if(movingRobber&&origin&&robber){robberMeshes.forEach((mesh,i)=>{const dest=robberTargets[i];mesh.position.set(dest.x+(origin.p.x-robber.p.x)*(1-smooth),dest.y+Math.sin(Math.PI*u)*.48,dest.z+(origin.p.y-robber.p.y)*(1-smooth));});}
-   const pulse=Math.min(1,elapsed/650);for(const ring of productionRings)ring.scale.setScalar(.85+.15*Math.sin(Math.PI*pulse));productionMaterial.opacity=.85*(1-pulse);scene.updateMatrixWorld(true);if((animated.length>0||movingRobber)&&renderer.shadowMap.enabled)renderer.shadowMap.needsUpdate=true;draw();if((animated.length>0&&t<1)||(movingRobber&&u<1)||(productionRings.length>0&&pulse<1))frame=requestAnimationFrame(tick);};
-  if(animated.length||movingRobber||productionRings.length)tick(started);else draw();
+   const pulse=Math.min(1,elapsed/650);for(const ring of productionRings)ring.scale.setScalar(.85+.15*Math.sin(Math.PI*pulse));productionMaterial.opacity=.85*(1-pulse);
+   const pending=(animated.length>0&&t<1)||(movingRobber&&u<1)||(productionRings.length>0&&pulse<1);
+   // Keep the previous shadow map during the short construction animation; refresh at its end.
+   if(!pending){renderCounts.current.completedAnimations++;if((animated.length>0||movingRobber)&&renderer.shadowMap.enabled)renderer.shadowMap.needsUpdate=true;}
+   if(document.hidden)return;
+   renderCounts.current.animationFrames++;if(renderer.shadowMap.enabled&&renderer.shadowMap.needsUpdate)renderCounts.current.animationShadowUpdates++;
+   // Camera projection, DOM labels, and legal-site data do not change during piece scaling.
+   if(cameraFrame){draw();}else{render(sampling.running);if(sampling.running)recordActiveFrame(begin);}
+   if(pending)frame=requestAnimationFrame(tick);
+  };
+  // One initial layout draw, then lightweight animation-only renders.
+  for(const group of animated)group.scale.y=.05;
+  draw();if(animated.length||movingRobber||productionRings.length)frame=requestAnimationFrame(tick);
   syncAmbient();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
   return()=>{document.removeEventListener('visibilitychange',visibilityChanged);motion.removeEventListener('change',syncAmbient);if(ambientControl.current===syncAmbient)ambientControl.current=null;if(cameraControls?.current===controls)cameraControls.current=null;observer.disconnect();cancelAnimationFrame(ambientFrame);cancelAnimationFrame(frame);cancelAnimationFrame(cameraFrame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);};

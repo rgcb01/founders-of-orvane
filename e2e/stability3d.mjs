@@ -11,7 +11,7 @@ let browser;
 try{
  let ready=false;for(let i=0;i<100;i++){try{if((await fetch(url)).ok){ready=true;break;}}catch{}await sleep(100);}assert.ok(ready);
  browser=await chromium.launch({args:['--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
- const ctx=await browser.newContext({viewport:{width:1366,height:768}}),page=await ctx.newPage(),errors=[];
+ const ctx=await browser.newContext({viewport:{width:1366,height:768},deviceScaleFactor:1.5}),page=await ctx.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto(url+'?benchmark3d=1');
  const button=name=>page.getByRole('button',{name,exact:true}).first();
@@ -27,6 +27,8 @@ try{
  const report=()=>writeFile('artifacts/stability3d/checkpoints.json',JSON.stringify({seed:'orvane-stability-v1',cycles,players:6,snapshots},null,2));
  const sample=async label=>{const data=await canvas.evaluate(c=>({cache:JSON.parse(c.dataset.staticCache),scene:JSON.parse(c.dataset.sceneCache),terrain:JSON.parse(c.dataset.terrainBatchMetrics),stats:JSON.parse(c.dataset.benchmark3d),counts:JSON.parse(c.dataset.renderCounts)}));const record={label,scene:data.scene.scene,firstToken:data.cache.firstToken,firstPick:data.cache.firstPick,firstBatch:data.terrain.firstBatch,roots:data.scene.roots,geometries:data.stats.geometries,textures:data.stats.textures,frames:data.counts.frames};snapshots.push(record);await report();return record;};
  const initial=await sample('initial');
+ const canvasSizing=await canvas.evaluate(c=>({cssWidth:c.getBoundingClientRect().width,hostWidth:c.parentElement.clientWidth,bufferWidth:c.width}));
+ assert.ok(Math.abs(canvasSizing.cssWidth-canvasSizing.hostWidth)<1,'canvas CSS size is independent of pixel ratio');
  // Use actual WebGL raycasts for human placement, letting the five bots run.
  for(let i=0;i<30;i++){
   const match=await readMatch(page);if(match.setup.phase==='complete')break;
@@ -42,6 +44,11 @@ try{
   }
   assert.ok(placed,'a legal site is selectable by raycast');
  }
+ await sleep(750);
+ const placementCounts=await canvas.evaluate(c=>JSON.parse(c.dataset.renderCounts));
+ assert.ok(placementCounts.animationFrames>0,'real construction animation frames measured');
+ assert.ok(placementCounts.animationShadowUpdates<=placementCounts.completedAnimations,'no per-frame construction shadow rebuilds');
+ console.log('3D placement animation counts:',JSON.stringify(placementCounts));
  const setup=await readMatch(page);assert.equal(setup.setup.phase,'complete');
  assert.equal(setup.setup.settlements.length,12);assert.equal(setup.setup.roads.length,12);
  await button('Begin game').click();
