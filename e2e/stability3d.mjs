@@ -16,13 +16,16 @@ try{
  await page.goto(url+'?benchmark3d=1');
  const button=name=>page.getByRole('button',{name,exact:true}).first();
  await page.getByRole('button',{name:/New game/}).first().click();
- await button('6 players').click();await page.getByLabel('Humans').selectOption('1');await page.getByRole('combobox',{name:/^AI\b/}).selectOption('expert');
+ await button('6 players').click();await page.getByLabel('Humans').selectOption('1');
+ await page.getByLabel('Map seed').fill('orvane-stability-v1');await button('Generate').click();await page.getByRole('combobox',{name:/^AI\b/}).selectOption('expert');
  await page.getByLabel('Bot pace').first().selectOption('turbo');
  await button('Start setup').click();
  const canvas=page.locator('canvas[data-benchmark3d]');await canvas.waitFor({timeout:30000});
  const coach=page.getByRole('complementary',{name:'Interactive tutorial'});if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
  const snapshots=[];
- const sample=async label=>{const data=await canvas.evaluate(c=>({cache:JSON.parse(c.dataset.staticCache),scene:JSON.parse(c.dataset.sceneCache),terrain:JSON.parse(c.dataset.terrainBatchMetrics),stats:JSON.parse(c.dataset.benchmark3d),counts:JSON.parse(c.dataset.renderCounts)}));const record={label,scene:data.scene.scene,firstToken:data.cache.firstToken,firstPick:data.cache.firstPick,firstBatch:data.terrain.firstBatch,roots:data.scene.roots,geometries:data.stats.geometries,textures:data.stats.textures,frames:data.counts.frames};snapshots.push(record);return record;};
+ await mkdir('artifacts/stability3d',{recursive:true});
+ const report=()=>writeFile('artifacts/stability3d/checkpoints.json',JSON.stringify({seed:'orvane-stability-v1',cycles,players:6,snapshots},null,2));
+ const sample=async label=>{const data=await canvas.evaluate(c=>({cache:JSON.parse(c.dataset.staticCache),scene:JSON.parse(c.dataset.sceneCache),terrain:JSON.parse(c.dataset.terrainBatchMetrics),stats:JSON.parse(c.dataset.benchmark3d),counts:JSON.parse(c.dataset.renderCounts)}));const record={label,scene:data.scene.scene,firstToken:data.cache.firstToken,firstPick:data.cache.firstPick,firstBatch:data.terrain.firstBatch,roots:data.scene.roots,geometries:data.stats.geometries,textures:data.stats.textures,frames:data.counts.frames};snapshots.push(record);await report();return record;};
  const initial=await sample('initial');
  // Use actual WebGL raycasts for human placement, letting the five bots run.
  for(let i=0;i<30;i++){
