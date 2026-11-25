@@ -2,7 +2,7 @@ import {useEffect,useRef,useState,type RefObject} from 'react';
 import * as THREE from 'three';
 import {tilePosition,vertexPosition,type Board} from '@orvane/engine';
 import {TERRAIN_COLORS} from './TerrainArt';
-import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,canRecoverCadence,type ResolutionState} from './adaptiveResolution';
+import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,canRecoverCadence,adaptShadows,type ResolutionState} from './adaptiveResolution';
 
 export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void};
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
@@ -328,11 +328,10 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
     if(quality==='auto'){
      const target=TARGET_FPS/sampling.stride;
      const atFloor=resolution.ratio<=Math.min(.75,resolution.cap);
-     const shadows=autoShadows.current;
-     // At the minimum pixel ratio, sacrifice dynamic shadows before frame cadence.
-     shadows.slow=shadows.enabled&&atFloor&&(mean>1000/target*.75||ambientFps<target*.85)?shadows.slow+1:0;
-     shadows.fast=!shadows.enabled&&sampling.stride===1&&resolution.ratio>=resolution.cap&&mean<5&&ambientFps>=TARGET_FPS*.97?shadows.fast+1:0;
-     if(shadows.slow>=3||shadows.fast>=12){shadows.enabled=!shadows.enabled;shadows.slow=0;shadows.fast=0;renderer.shadowMap.enabled=shadows.enabled;renderer.shadowMap.needsUpdate=shadows.enabled;canvas.dataset.shadows=String(shadows.enabled);resetAdaptation();draw();resetSamples();return;}
+     const shadows=adaptShadows(autoShadows.current,atFloor,resolution.ratio>=resolution.cap,sampling.stride,mean,ambientFps);
+     const shadowsChanged=shadows.enabled!==autoShadows.current.enabled;
+     autoShadows.current=shadows;
+     if(shadowsChanged){renderer.shadowMap.enabled=shadows.enabled;renderer.shadowMap.needsUpdate=shadows.enabled;canvas.dataset.shadows=String(shadows.enabled);resetAdaptation();draw();resetSamples();return;}
      // Reduce pixel cost before sacrificing cadence; recover cadence before raising resolution.
      if(canRecoverCadence(sampling.stride,mean,ambientFps)){
       sampling.stride--;sampling.slowWindows=0;resetAdaptation();resetSamples();return;
