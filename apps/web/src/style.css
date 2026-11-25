@@ -585,3 +585,52 @@ html:has(main.in-match),body:has(main.in-match){height:100%;overflow:hidden;over
 
 /* Keep notifications contextual; never reserve a permanent event panel. */
 .in-match .event-idle{display:none}.in-match .board-event-slot{min-height:0;width:min(290px,70%)}.in-match .board-event-slot:empty{display:none}.in-match .board-event-slot .event-stage{min-height:36px;padding:5px 9px;border-radius:8px;background:#102d34e8;gap:6px;box-shadow:none}.in-match .board-event-slot .event-actor{font-size:.75rem;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.in-match .board-event-slot .event-symbol{font-size:1.25rem}.in-match .match-feed{background:transparent;border:0;box-shadow:none;padding:4px}.in-match .info-stack .cartographer{display:none}.in-match .map-confirm button:disabled{opacity:.65}.in-match .drawer-heading,.in-match .panel-nav{box-shadow:none}
+
+/* Desktop tabletop: floating controls on a single full-height playing surface. */
+@media(min-width:1000px) and (pointer:fine){
+ main.in-match{position:relative;isolation:isolate;display:block;width:100%;max-width:none;height:100dvh;min-height:0;padding:0!important;overflow:hidden;background:#416e78}
+ .in-match>.immersive-layout,.in-match>.immersive-layout.drawer-active,.in-match>.immersive-layout.trade-open.drawer-active{position:absolute;inset:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);padding:0!important;margin:0;gap:0;z-index:0}
+ .in-match .immersive-layout>.board-panel{position:relative;width:100%;height:100%;max-height:none;min-height:0;margin:0;padding:0;border:0;border-radius:0;background:#416e78;overflow:hidden}
+ .in-match .tabletop-world{top:0!important;bottom:0!important}
+ .in-match>.header,.in-match>header{position:absolute;top:12px;right:12px;width:auto;max-width:45%;z-index:8;padding:0;margin:0;background:none;border:0;box-shadow:none}
+ .in-match>header>div:first-child{display:none}
+ .in-match>header .header-actions{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+ .in-match>header .header-actions button,.in-match .map-top button{background:#153740e8;border:1px solid #70928b55;color:#f0e8d0;min-width:34px;min-height:34px;padding:5px 8px;border-radius:8px}
+ .in-match>.save-status{position:absolute;right:14px;top:54px;width:auto;z-index:8;margin:0;padding:3px 7px;background:#163740d9;border:0;border-radius:6px;font-size:.65rem}
+ .in-match>.turn-bar{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:max-content;max-width:36%;min-height:34px;margin:0;padding:4px 14px;z-index:7;border:0;border-radius:20px;background:#163740ed;box-shadow:none}
+ .in-match>.turn-bar .sizes{display:none}
+ .in-match>.turn-bar .turn-ident{gap:7px}.in-match>.turn-bar .turn-ident small{font-size:.62rem}.in-match>.turn-bar .turn-ident strong{font-size:.9rem}
+ .in-match>.player-strip.game-players{position:absolute;top:12px;left:12px;z-index:7;display:grid;grid-template-columns:minmax(0,1fr);grid-auto-rows:auto;align-content:start;width:clamp(125px,12vw,172px);max-height:calc(100% - 130px);gap:6px;overflow:auto;padding:0;margin:0;background:transparent;border:0;box-shadow:none}
+ .in-match .player-strip .player-seat{width:100%;min-width:0;max-width:none;min-height:50px;padding:7px 8px;gap:7px;border:1px solid #70928b44;border-radius:9px;background:#153740e8;box-shadow:none}
+ .in-match .player-strip .player-seat.active{border-color:#ebca81;background:#204b50f5}
+ .in-match .player-strip .seat-avatar{width:32px;height:32px;flex:0 0 32px}
+ .in-match .player-strip .seat-main{min-width:0}.in-match .player-strip .seat-main strong{font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .in-match .player-strip .seat-score{font-size:.78rem;white-space:nowrap}
+ .in-match .board-panel .map-top{position:absolute;top:78px;right:12px;left:auto;bottom:auto;width:auto;z-index:6;padding:0;background:transparent;box-shadow:none;border:0}
+ .in-match .map-top>.map-brand{display:none}.in-match .map-top .toolbar-label{display:none}
+ .in-match>.match-dock{position:absolute;inset:auto 12px 8px 12px;z-index:8;display:flex;justify-content:center;align-items:flex-end;min-height:0;height:auto;max-height:none;margin:0;padding:0;border:0;background:transparent;box-shadow:none;pointer-events:none}
+ .in-match>.match-dock>.desktop-hand-label{display:none}
+ .in-match>.match-dock>.fan-hand{position:relative;flex:0 1 52%;width:52%;height:122px;min-width:0;padding:0;background:transparent;border:0;box-shadow:none;pointer-events:none}
+ .in-match>.match-dock>.fan-hand .fan-scroll{pointer-events:auto}
+ .in-match>.match-dock>.fan-hand .fan-card{width:64px;height:88px;pointer-events:auto}
+ .in-match>.match-dock>.hand-strip:not(.fan-hand){flex:0 1 auto;pointer-events:auto;background:#153740d9;border-radius:8px;padding:6px 10px}
+ .in-match>.match-dock>.dock-actions{position:absolute;right:0;bottom:5px;width:clamp(128px,13vw,174px);max-width:none;display:flex;flex-direction:column;align-items:stretch;gap:6px;pointer-events:auto}
+ .in-match .dock-actions button{width:100%;min-height:36px;padding:6px 10px;justify-content:center;background:#153740ed;color:#f1e6ce;border:1px solid #70928b55;border-radius:8px;box-shadow:none}
+ .in-match .dock-actions button:last-child{background:#d5b675;color:#243b35;border-color:#d5b675;font-weight:700;min-height:40px}
+ .in-match .dock-actions button[aria-label="Map"]{display:none}
+ .in-match .dock-actions button:disabled{opacity:.55}
+ .in-match .immersive-layout.drawer-active>.game-sidebar,.in-match .immersive-layout.trade-open.drawer-active>.game-sidebar{position:absolute;inset:120px 12px auto auto;width:min(365px,34vw);height:auto;max-height:calc(100% - 360px);min-height:140px;z-index:20;overflow:auto;display:flex;background:#15383ff7;border:1px solid #70928b66;border-radius:12px;padding:12px;box-shadow:0 10px 24px #0003}
+ .in-match .immersive-layout:not(.drawer-active)>.game-sidebar{display:none}
+ .in-match .board-panel .build-menu{left:auto;right:12px;bottom:245px;width:150px;z-index:5;background:#153740e8;border-radius:9px;padding:5px;box-shadow:none}
+ .in-match .board-panel .build-menu .build-option{min-height:44px}
+ .in-match .board-panel .map-confirm{left:50%;right:auto;bottom:130px;transform:translateX(-50%);width:max-content;max-width:48%;z-index:6}
+ .in-match .board-panel .dice-display{top:124px;right:12px}
+ .in-match .board-panel .dice-display.board-dice-throw{top:48%;right:auto;left:50%}
+ .in-match .board-panel .board-event-slot{top:57px;left:50%;max-width:30%;min-height:0}
+ .in-match .board-panel svg[data-board-root]{position:absolute!important;inset:0!important;width:100%;height:100%!important;max-height:none}
+ .in-match>.action-prompt{position:absolute;top:58px;left:50%;transform:translateX(-50%);width:max-content;max-width:40%;z-index:10;padding:6px 10px;margin:0;background:#153740ed;border-radius:9px}
+ .in-match>.sound-settings{position:absolute;right:12px;top:85px;z-index:40;max-width:330px;background:#153740f7;padding:12px;border-radius:10px}
+ .in-match>.storage-warning{position:absolute;top:100px;left:50%;transform:translateX(-50%);z-index:45;max-width:50%;background:#3c2923;padding:8px;border-radius:8px}
+ .in-match>.setup-bar[role="alert"]{position:absolute;top:90px;left:50%;transform:translateX(-50%);z-index:45;max-width:55%;background:#3c2923;border-radius:8px}
+ .in-match .tutorial-coach{left:calc(clamp(125px,12vw,172px) + 24px);bottom:135px;max-width:260px}
+}
