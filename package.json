@@ -13,7 +13,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "check": "pnpm typecheck && pnpm test",
-    "test:browser": "node e2e/smoke.mjs"
+    "test:browser": "node e2e/smoke.mjs",
+    "benchmark:3d": "node e2e/benchmark3d.mjs"
   },
   "devDependencies": {
     "typescript": "~5.8.3",
