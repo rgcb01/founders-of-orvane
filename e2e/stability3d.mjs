@@ -40,7 +40,7 @@ try{
   for(const site of sites){
    if(site.x<0||site.y<0||site.x>rect.width||site.y>rect.height)continue;
    await page.mouse.click(rect.x+site.x,rect.y+site.y);
-   const confirm=button('Confirm placement');if(await confirm.isEnabled()){await confirm.click();placed=true;break;}
+   const confirm=page.locator('.match-dock').getByRole('button',{name:'✓ Place',exact:true});if(await confirm.isEnabled()){await confirm.click();placed=true;break;}
   }
   assert.ok(placed,'a legal site is selectable by raycast');
  }
@@ -51,10 +51,13 @@ try{
  console.log('3D placement animation counts:',JSON.stringify(placementCounts));
  const setup=await readMatch(page);assert.equal(setup.setup.phase,'complete');
  assert.equal(setup.setup.settlements.length,12);assert.equal(setup.setup.roads.length,12);
- await button('Begin game').click();
+ await page.locator('.match-dock').getByRole('button',{name:/Begin game/}).click();
  await page.waitForFunction(()=>!!JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].game);
  // Pause bots, so resource comparisons measure a stable board rather than new pieces.
- const pause=button('⏸ Pause bots');if(await pause.isVisible())await pause.click();
+ await button('Pause menu').click();
+ const menu=page.getByRole('dialog',{name:'Pause menu'});
+ const pause=menu.getByRole('button',{name:'⏸ Pause bots',exact:true});if(await pause.isVisible())await pause.click();
+ await menu.getByRole('button',{name:'▶ Resume game',exact:true}).click();
  await page.getByLabel('Graphics quality').selectOption('low');await button('Reset view').click();await sleep(800);
  const settled=await sample('setup-complete');
  for(const key of ['scene','firstToken','firstPick','firstBatch'])assert.equal(settled[key],initial[key],'persistent '+key);
@@ -68,7 +71,8 @@ try{
   assert.equal(state.geometries,settled.geometries,'geometry count stable on unchanged board');
   assert.equal(state.textures,settled.textures,'texture count stable in low quality');
  }
- const saved=await readMatch(page);await button('Save & exit').click();
+ const saved=await readMatch(page);await button('Pause menu').click();
+ await page.getByRole('dialog',{name:'Pause menu'}).getByRole('button',{name:'💾 Save & exit to menu',exact:true}).click();
  await page.getByRole('button',{name:/Continue/}).first().click();await canvas.waitFor({timeout:30000});
  const recovered=await readMatch(page);assert.deepEqual(recovered.game,saved.game,'saved game recovered unchanged');
  assert.deepEqual(errors,[]);
