@@ -3,7 +3,9 @@ export const FRAME_MS=1000/TARGET_FPS;
 // A 120 Hz display submits at most 60 ambient frames; slower displays are not forced to catch up.
 export function nextFrameDeadline(now:number,due:number):number|null{
  if(now+1<due)return null;
- return Math.max(due+FRAME_MS,now+FRAME_MS-1);
+ // Keep phase on non-multiple refresh rates (90/144 Hz); skip missed slots instead of catching up.
+ const next=due+FRAME_MS;
+ return next<=now+1?now+FRAME_MS:next;
 }
 export type ResolutionState={cap:number;ratio:number;slow:number;fast:number};
 export function resolutionCap(deviceRatio:number,tier:'low'|'medium'|'high'):number{
