@@ -38,6 +38,7 @@ describe('60 FPS display cadence',()=>{
  it('targets a 16.67ms frame budget on 60Hz and 120Hz displays',()=>{
   expect(TARGET_FPS).toBe(60);expect(FRAME_MS).toBeCloseTo(16.667,2);
   expect(submissions(60)).toBe(300);expect(submissions(120)).toBe(300);
+  expect(submissions(90)).toBe(300);expect(submissions(144)).toBe(300);
  });
  it('does not try to catch up with multiple frames on a slower display',()=>{
   expect(submissions(30)).toBe(150);
