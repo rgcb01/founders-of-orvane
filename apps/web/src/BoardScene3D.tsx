@@ -190,15 +190,31 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    const cacheKey='road:'+road.edgeId+':'+road.color;if(reuse(cacheKey))continue;
    const start=desired.length;
    const length=Math.hypot(b.x-a.x,b.y-a.y),angle=Math.atan2(b.y-a.y,b.x-a.x);
-   add(new THREE.BoxGeometry(length*.92,.11,.13),'#52463e',(a.x+b.x)/2,.17,(a.y+b.y)/2).rotation.y=-angle;
-   const pick=add(new THREE.BoxGeometry(length*.9,.07,.18),road.color,(a.x+b.x)/2,.25,(a.y+b.y)/2);pick.rotation.y=-angle;pick.userData={selection:{kind:'edge',id:edge.id}};selectable.push(pick);groupNew('road:'+road.edgeId,start,(a.x+b.x)/2,(a.y+b.y)/2);entries.set(cacheKey,{objects:desired.slice(start),pick});
+   // A stone verge and a raised, owner-coloured road surface retain the same two meshes.
+   add(new THREE.BoxGeometry(length*.94,.095,.22),'#807564',(a.x+b.x)/2,.1675,(a.y+b.y)/2).rotation.y=-angle;
+   const pick=add(new THREE.BoxGeometry(length*.88,.045,.15),road.color,(a.x+b.x)/2,.2375,(a.y+b.y)/2);pick.rotation.y=-angle;pick.userData={selection:{kind:'edge',id:edge.id}};selectable.push(pick);groupNew('road:'+road.edgeId,start,(a.x+b.x)/2,(a.y+b.y)/2);entries.set(cacheKey,{objects:desired.slice(start),pick});
   }
   for(const building of display.buildings){const p=vertices.get(building.vertexId);if(!p)continue;
    const cacheKey=building.kind+':'+building.vertexId+':'+building.color;if(reuse(cacheKey))continue;
    const start=desired.length;
-   const pick=add(new THREE.BoxGeometry(.49,.07,.43),'#746656',p.x,.17,p.y);pick.userData={selection:{kind:'vertex',id:building.vertexId}};selectable.push(pick);
-   const house=(x:number,z:number,w:number,h:number)=>{add(new THREE.BoxGeometry(w,h,w*.85),building.color,x,.21+h/2,z);const roof=add(new THREE.CylinderGeometry(0,w*.77,w*.48,4),building.color,x,.21+h+w*.24,z);roof.rotation.y=Math.PI/4;add(new THREE.BoxGeometry(w*.22,h*.6,.025),'#443e37',x,.21+h*.3,z+w*.43);};
-   if(building.kind==='city'){house(p.x-.12,p.y,.26,.36);house(p.x+.15,p.y+.04,.21,.24);}else house(p.x,p.y,.30,.23);groupNew(building.kind+':'+building.vertexId,start,p.x,p.y);entries.set(cacheKey,{objects:desired.slice(start),pick});
+   // The plinth and roof identify the owner from every camera angle.
+   // A gabled cottage uses the same three meshes as the old pyramid house.
+   const pick=add(new THREE.BoxGeometry(.49,.07,.43),building.color,p.x,.17,p.y);pick.userData={selection:{kind:'vertex',id:building.vertexId}};selectable.push(pick);
+   const house=(x:number,z:number,w:number,h:number)=>{
+    add(new THREE.BoxGeometry(w,h,w*.85),'#d8c5a2',x,.21+h/2,z);
+    const r=w*.65;
+    const roof=add(new THREE.CylinderGeometry(r,r,w*.98,3,1),building.color,x,.21+h+r*.5,z);
+    roof.rotation.x=-Math.PI/2;
+    add(new THREE.BoxGeometry(w*.25,h*.65,.025),'#594637',x,.21+h*.325,z+w*.43);
+   };
+   const tower=(x:number,z:number)=>{
+    const w=.22,h=.41;
+    add(new THREE.CylinderGeometry(w*.48,w*.58,h,6),'#aaa38c',x,.21+h/2,z);
+    add(new THREE.ConeGeometry(w*.69,.19,6),building.color,x,.21+h+.095,z);
+    add(new THREE.BoxGeometry(.055,.11,.018),'#514b40',x,.21+h*.68,z+w*.51);
+   };
+   if(building.kind==='city'){tower(p.x-.12,p.y-.015);house(p.x+.13,p.y+.025,.25,.23);}else house(p.x,p.y,.30,.23);
+   groupNew(building.kind+':'+building.vertexId,start,p.x,p.y);entries.set(cacheKey,{objects:desired.slice(start),pick});
   }
   // Invisible selection volumes cover every buildable graph location, including empty sites.
   // Keep them separate from visible meshes so construction remains possible before ownership.
