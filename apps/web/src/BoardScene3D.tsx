@@ -303,6 +303,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   }
   if(!cachedHarbors){
    harborCache.current?.batches.forEach(b=>b.dispose());
+   harborCache.current?.boatBatches.forEach(b=>b.mesh.dispose());
    // Only dock meshes are static; animated boat groups keep their original transforms.
    const groups=new Map<string,THREE.Mesh[]>();
    for(const object of desired.slice(harborStart)){
