@@ -277,12 +277,19 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   if(cachedHarbors){include(...cachedHarbors.objects);}else for(const harbor of board.harbors){
    const edge=board.edges.find(e=>e.id===harbor.edgeId);if(!edge)continue;const a=vertices.get(edge.a),b=vertices.get(edge.b),t=positions.find(t=>t.tile.id===edge.tiles[0]);if(!a||!b||!t)continue;
    const x=(a.x+b.x)/2,z=(a.y+b.y)/2,dx=x-t.p.x,dz=z-t.p.y,len=Math.hypot(dx,dz);if(!len)continue;const ux=dx/len,uz=dz/len,angle=Math.atan2(uz,ux);
-   add(new THREE.BoxGeometry(.65,.1,.27),'#a7855c',x+ux*.24,.03,z+uz*.24).rotation.y=-angle;
+   // Wooden jetty, with a darker crosspiece at its seaward end.
+   add(new THREE.BoxGeometry(.65,.10,.30),'#98764e',x+ux*.24,.03,z+uz*.24).rotation.y=-angle;
+   const end=add(new THREE.BoxGeometry(.065,.13,.36),'#624b38',x+ux*.51,.045,z+uz*.51);end.rotation.y=-angle;
    const sx=x+ux*.78,sz=z+uz*.78;
    const boatStart=desired.length;
-   add(new THREE.SphereGeometry(.29,6,4),'#624b38',sx,-.03,sz).scale.set(1.5,.5,.65);
-   add(new THREE.CylinderGeometry(.025,.025,.45,6),'#825d40',sx,.23,sz);
-   add(new THREE.ConeGeometry(.23,.42,3),'#e9dfbe',sx,.35,sz).scale.set(1,1,.28);
+   // Long, tapered clinker hull oriented alongside the dock.
+   const hull=add(new THREE.SphereGeometry(.29,8,4),'#684d36',sx,-.03,sz);hull.scale.set(1.35,.45,.60);hull.rotation.y=-angle+Math.PI/2;
+   add(new THREE.CylinderGeometry(.021,.025,.48,6),'#825d40',sx,.23,sz);
+   // A triangular canvas sail, coloured by the existing harbour specialization.
+   const sailColor=harbor.resource?TERRAIN_COLORS[harbor.resource]:'#e9dfbe';
+   const sail=add(new THREE.CylinderGeometry(.22,.22,.035,3,1),sailColor,sx,.36,sz);
+   sail.rotation.set(Math.PI/2,0,-angle);
+   sail.scale.set(1,1,1.10);
    const boat=new THREE.Group();boat.position.set(sx,0,sz);groupSince(boat,boatStart);boats.push(boat);
   }
   if(!cachedHarbors)harborCache.current={board,objects:desired.slice(harborStart),boats};
