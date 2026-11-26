@@ -6,6 +6,7 @@ import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_F
 
 export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void};
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
+type BoatBatch={mesh:THREE.InstancedMesh;parts:{boat:THREE.Group;local:THREE.Matrix4}[]};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
 export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges,robberTile,producingTiles,cameraControls,ambientPaused=false}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[];robberTile?:string;producingTiles?:readonly string[];cameraControls?:RefObject<BoardCameraControls|null>;ambientPaused?:boolean}){
  const [quality,setQuality]=useState<'auto'|'low'|'medium'|'high'>(()=>{try{const q=localStorage.getItem('orvane.graphics');return q==='low'||q==='medium'||q==='high'?q:'auto';}catch{return 'auto';}});
@@ -25,14 +26,14 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const sceneResources=useRef<{scene:THREE.Scene;camera:THREE.OrthographicCamera;hemisphere:THREE.HemisphereLight;sun:THREE.DirectionalLight}|null>(null);
  const sharedGeometry=useRef(new Map<string,THREE.BufferGeometry>());
  const staticTerrain=useRef<{board:Board;objects:THREE.Object3D[];vegetation:{mesh:THREE.Mesh;phase:number}[];batches:Map<string,{mesh:THREE.InstancedMesh;items:{mesh:THREE.Mesh;phase:number}[]}>;selectable:THREE.Object3D[];geometry:THREE.CylinderGeometry;materials:Map<string,THREE.MeshStandardMaterial>;staticBatches:THREE.InstancedMesh[];staticSources:number}|null>(null);
- const harborCache=useRef<{board:Board;objects:THREE.Object3D[];boats:THREE.Group[];batches:THREE.InstancedMesh[]}|null>(null);
+ const harborCache=useRef<{board:Board;objects:THREE.Object3D[];boats:THREE.Group[];batches:THREE.InstancedMesh[];boatBatches:BoatBatch[]}|null>(null);
  const waterCache=useRef<{board:Board;mesh:THREE.Mesh<THREE.PlaneGeometry,THREE.MeshStandardMaterial>}|null>(null);
  const sharedMaterials=useRef(new Map<string,THREE.MeshStandardMaterial>());
  const tokenResources=useRef<{geometry:THREE.CircleGeometry;materials:Map<number,THREE.MeshBasicMaterial>}|null>(null);
  const tokenObjects=useRef<{board:Board;objects:THREE.InstancedMesh[];numberTokens:number}|null>(null);
  const pickCache=useRef<{board:Board;objects:THREE.Object3D[];vertexGeometry:THREE.SphereGeometry;edgeGeometry:THREE.BoxGeometry;material:THREE.MeshBasicMaterial}|null>(null);
  const disposePicks=()=>{const cache=pickCache.current;if(cache){cache.vertexGeometry.dispose();cache.edgeGeometry.dispose();cache.material.dispose();pickCache.current=null;}};
- useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current?.batches.forEach(b=>b.dispose());harborCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.map?.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
+ useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current?.batches.forEach(b=>b.dispose());harborCache.current?.boatBatches.forEach(b=>b.mesh.dispose());harborCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.map?.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
  const robberCache=useRef<THREE.Mesh[]|null>(null);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
  const pieceCache=useRef<{board:Board;entries:Map<string,{objects:THREE.Object3D[];pick:THREE.Object3D}>}|null>(null);
@@ -279,6 +280,8 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   }
   const cachedHarbors=harborCache.current?.board===board?harborCache.current:null;
   const boats:THREE.Group[]=cachedHarbors?.boats??[];
+  const boatMatrix=new THREE.Matrix4();
+  const boatBatches:BoatBatch[]=cachedHarbors?.boatBatches??[];
   const harborStart=desired.length;
   if(cachedHarbors){include(...cachedHarbors.objects);}else for(const harbor of board.harbors){
    const edge=board.edges.find(e=>e.id===harbor.edgeId);if(!edge)continue;const a=vertices.get(edge.a),b=vertices.get(edge.b),t=positions.find(t=>t.tile.id===edge.tiles[0]);if(!a||!b||!t)continue;
@@ -315,7 +318,36 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
     batch.instanceMatrix.needsUpdate=true;batch.computeBoundingBox();batch.computeBoundingSphere();
     include(batch);batches.push(batch);
    }
-   harborCache.current={board,objects:desired.slice(harborStart),boats,batches};
+   // Three shared geometry batches: hull, mast and sail. Instance colours
+   // preserve each harbour's resource palette without splitting sail draw calls.
+   const byGeometry=new Map<string,{boat:THREE.Group;part:THREE.Mesh}[]>();
+   for(const boat of boats){
+    boat.updateMatrix();
+    for(const part of boat.children){
+     if(!(part instanceof THREE.Mesh)||!(part.material instanceof THREE.MeshStandardMaterial))continue;
+     part.updateMatrix();const key=part.geometry.uuid;
+     const items=byGeometry.get(key)??[];items.push({boat,part});byGeometry.set(key,items);
+    }
+   }
+   const matrix=new THREE.Matrix4();
+   let boatMaterial=sharedMaterials.current.get('boat-instance-neutral');
+   if(!boatMaterial){boatMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',flatShading:true,roughness:1});sharedMaterials.current.set('boat-instance-neutral',boatMaterial);}
+   for(const items of byGeometry.values()){
+    const batch=new THREE.InstancedMesh(items[0].part.geometry,boatMaterial,items.length);
+    batch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const parts=items.map(({boat,part},i)=>{
+     const local=part.matrix.clone();batch.setMatrixAt(i,matrix.multiplyMatrices(boat.matrix,local));
+     batch.setColorAt(i,(part.material as THREE.MeshStandardMaterial).color);
+     return {boat,local};
+    });
+    batch.instanceMatrix.needsUpdate=true;if(batch.instanceColor)batch.instanceColor.needsUpdate=true;
+    batch.computeBoundingBox();batch.computeBoundingSphere();
+    // Animated displacement is small; disable culling to avoid edge popping.
+    batch.frustumCulled=false;
+    include(batch);boatBatches.push({mesh:batch,parts});
+   }
+   for(const boat of boats){scene.remove(boat);exclude(boat);}
+   harborCache.current={board,objects:desired.slice(harborStart),boats,batches,boatBatches};
   }
   scene.updateMatrixWorld(true);bounds.makeEmpty();for(const object of desired)bounds.expandByObject(object);
   const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
@@ -436,7 +468,11 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    if(cameraFrame||frame)return;if(++sampling.count%sampling.stride!==0)return;
    const begin=performance.now(),t=(begin-ambientStart)/1000;
    for(const {mesh:batch,items} of batches.values()){items.forEach(({mesh,phase},i)=>{mesh.rotation.z=.055*Math.sin(t*1.6+phase);mesh.rotation.x=.025*Math.cos(t*1.2+phase);mesh.updateMatrix();batch.setMatrixAt(i,mesh.matrix);});batch.instanceMatrix.needsUpdate=true;}
-   boats.forEach((boat,i)=>{boat.position.y=.035*Math.sin(t*1.7+i);boat.rotation.z=.045*Math.sin(t*1.3+i);});
+   boats.forEach((boat,i)=>{boat.position.y=.035*Math.sin(t*1.7+i);boat.rotation.z=.045*Math.sin(t*1.3+i);boat.updateMatrix();});
+   for(const {mesh,parts} of boatBatches){
+    parts.forEach(({boat,local},i)=>mesh.setMatrixAt(i,boatMatrix.multiplyMatrices(boat.matrix,local)));
+    mesh.instanceMatrix.needsUpdate=true;
+   }
    animateWater(t);
    // Ambient motion needs only occasional shadow refreshes; camera motion needs none.
    const shadowInterval=(tier==='high'?250:500)*sampling.stride;
