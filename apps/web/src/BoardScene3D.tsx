@@ -32,7 +32,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const tokenObjects=useRef<{board:Board;objects:THREE.InstancedMesh[];numberTokens:number}|null>(null);
  const pickCache=useRef<{board:Board;objects:THREE.Object3D[];vertexGeometry:THREE.SphereGeometry;edgeGeometry:THREE.BoxGeometry;material:THREE.MeshBasicMaterial}|null>(null);
  const disposePicks=()=>{const cache=pickCache.current;if(cache){cache.vertexGeometry.dispose();cache.edgeGeometry.dispose();cache.material.dispose();pickCache.current=null;}};
- useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
+ useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.map?.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
  const robberCache=useRef<THREE.Mesh[]|null>(null);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
  const pieceCache=useRef<{board:Board;entries:Map<string,{objects:THREE.Object3D[];pick:THREE.Object3D}>}|null>(null);
@@ -51,7 +51,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   let renderer:THREE.WebGLRenderer;
   try{renderer=rendererRef.current??new THREE.WebGLRenderer({antialias:true,alpha:false});rendererRef.current=renderer;renderer.shadowMap.autoUpdate=false;}catch{fallback.current();return;}
   const tier=quality==='auto'?(window.matchMedia('(pointer: coarse)').matches?'medium':'high'):quality;
-  if(!sceneResources.current){const scene=new THREE.Scene();scene.background=new THREE.Color('#183e49');sceneResources.current={scene,camera:new THREE.OrthographicCamera(-1,1,1,-1,.1,500),hemisphere:new THREE.HemisphereLight('#fff1d8','#526b72',1.65),sun:new THREE.DirectionalLight('#fff0d0',2.2)};}
+  if(!sceneResources.current){const scene=new THREE.Scene();scene.background=new THREE.Color('#183e49');sceneResources.current={scene,camera:new THREE.OrthographicCamera(-1,1,1,-1,.1,500),hemisphere:new THREE.HemisphereLight('#fff4df','#577481',1.55),sun:new THREE.DirectionalLight('#ffe7bc',2.15)};}
   const {scene,camera,hemisphere,sun}=sceneResources.current;
   // Reconcile root membership without detaching unchanged objects from the live scene.
   const previousRoots=new Set(scene.children);
@@ -66,6 +66,12 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   if(staticTerrain.current&&staticTerrain.current.board!==board){const old=staticTerrain.current;old.geometry.dispose();old.materials.forEach(m=>m.dispose());old.batches.forEach(b=>b.mesh.dispose());old.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}
   const cachedTerrain=staticTerrain.current;
   const geometry=cachedTerrain?.geometry??new THREE.CylinderGeometry(.98,.98,.24,6);
+  if(!cachedTerrain){
+   const positions=geometry.getAttribute('position'),colors=new Float32Array(positions.count*3);
+   const lower=new THREE.Color('#b5ac91'),upper=new THREE.Color('#ffffff');
+   for(let i=0;i<positions.count;i++){const c=lower.clone().lerp(upper,THREE.MathUtils.smoothstep(positions.getY(i),-.12,.12));c.toArray(colors,i*3);}
+   geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
+  }
   const materials=cachedTerrain?.materials??new Map<string,THREE.MeshStandardMaterial>();
   const geometryCache=sharedGeometry.current;
   
@@ -73,7 +79,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const vegetation: {mesh:THREE.Mesh;phase:number}[]=cachedTerrain?.vegetation??[];
   if(cachedTerrain){include(...cachedTerrain.objects);selectable.push(...cachedTerrain.selectable);}else for(const {tile,p} of positions){
    const color=TERRAIN_COLORS[tile.terrain];
-   let mat=materials.get(color);if(!mat){mat=new THREE.MeshStandardMaterial({color,roughness:1,flatShading:true});materials.set(color,mat);}
+   let mat=materials.get(color);if(!mat){mat=new THREE.MeshStandardMaterial({color,roughness:1,flatShading:true,vertexColors:true});materials.set(color,mat);}
    const mesh=new THREE.Mesh(geometry,mat);mesh.position.set(p.x,0,p.y);include(mesh);mesh.userData={selection:{kind:'tile',id:tile.id}};selectable.push(mesh);bounds.expandByObject(mesh);
    const x=p.x,z=p.y;
    // Miniature terrain uses shared unit geometry and per-instance transforms.
@@ -296,7 +302,31 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   scene.updateMatrixWorld(true);bounds.makeEmpty();for(const object of desired)bounds.expandByObject(object);
   const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
   const span=Math.max(size.x,size.z)+3;
-  if(waterCache.current?.board!==board){waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.dispose();waterCache.current={board,mesh:new THREE.Mesh(new THREE.PlaneGeometry(span*8,span*8,24,24),new THREE.MeshStandardMaterial({color:'#285963',roughness:.85}))};}
+  if(waterCache.current?.board!==board){
+   waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.map?.dispose();waterCache.current?.mesh.material.dispose();
+   // The wave mesh keeps its existing 25x25 topology. A cached procedural
+   // depth texture provides a finer coastal gradient without new draw calls.
+   const plane=new THREE.PlaneGeometry(span*8,span*8,24,24);
+   const material=new THREE.MeshStandardMaterial({color:'#ffffff',roughness:.76});
+   const resolution=256,extent=span*8,data=new Uint8Array(resolution*resolution*4);
+   const deep=new THREE.Color('#24515d'),shallow=new THREE.Color('#588f89'),sand=new THREE.Color('#96ad92');
+   const sample=new THREE.Color();
+   for(let row=0;row<resolution;row++)for(let col=0;col<resolution;col++){
+    const wx=center.x+((col+.5)/resolution-.5)*extent,wz=center.z+(.5-(row+.5)/resolution)*extent;
+    let distance=Infinity;
+    for(const {p} of positions)distance=Math.min(distance,Math.hypot(wx-p.x,wz-p.y));
+    const coast=Math.max(0,distance-.9);
+    sample.copy(shallow).lerp(deep,THREE.MathUtils.smoothstep(coast,.15,2.4));
+    sample.lerp(sand,(1-THREE.MathUtils.smoothstep(coast,.04,.45))*.45);
+    sample.convertLinearToSRGB();
+    const offset=(row*resolution+col)*4;
+    data[offset]=Math.round(sample.r*255);data[offset+1]=Math.round(sample.g*255);data[offset+2]=Math.round(sample.b*255);data[offset+3]=255;
+   }
+   const texture=new THREE.DataTexture(data,resolution,resolution,THREE.RGBAFormat);
+   texture.colorSpace=THREE.SRGBColorSpace;texture.magFilter=THREE.LinearFilter;texture.minFilter=THREE.LinearFilter;texture.needsUpdate=true;
+   material.map=texture;
+   waterCache.current={board,mesh:new THREE.Mesh(plane,material)};
+  }
   const water=waterCache.current.mesh;const waterGeometry=water.geometry;water.rotation.x=-Math.PI/2;water.position.set(center.x,-.15,center.z);include(water);water.receiveShadow=true;
   // The two separable waves have analytic slopes. Precompute spatial phases
   // once per scene update; animate without rebuilding triangle normals.
