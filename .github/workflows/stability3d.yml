@@ -2,7 +2,7 @@ name: 3D stability
 on:
   pull_request:
     paths:
-      - 'apps/web/src/BoardScene3D.tsx'
+      - 'apps/web/src/**'
       - 'e2e/stability3d.mjs'
       - '.github/workflows/stability3d.yml'
   workflow_dispatch:
