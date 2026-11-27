@@ -700,7 +700,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
     for(const building of display.buildings){const p=vertices.get(building.vertexId);if(p){const h=building.kind==='city'?.8:.55;obstacles.push({x:p.x,y:.12+h/2,z:p.y,hx:.24,hy:h/2,hz:.23});}}
     diceSimulation=createPhysicalDice(R,scene,center,{x:size.x/2+1,z:size.z/2+1},diceRoll.values,obstacles,Math.max(200,diceRoll.duration-(performance.now()-diceStarted)));
     let previous=performance.now();
-    const rollTick=(now:number)=>{diceFrame=0;if(diceCancelled||!diceSimulation)return;const running=diceSimulation.step((now-previous)/1000);previous=now;lastAnimationTime=now;if(!document.hidden)render();if(running&&!document.hidden)diceFrame=requestAnimationFrame(rollTick);};
+    const rollTick=(now:number)=>{diceFrame=0;if(diceCancelled||!diceSimulation)return;const running=diceSimulation.step(document.hidden?0:Math.min((now-previous)/1000,.1));previous=now;lastAnimationTime=now;if(!document.hidden)render();if(running)diceFrame=requestAnimationFrame(rollTick);};
     diceFrame=requestAnimationFrame(rollTick);
    }).catch(()=>{});
   }
