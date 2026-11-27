@@ -94,7 +94,38 @@ try{
    assert.deepEqual(errors,[]);
   }finally{await ctx.close();}
  }
- const report={schema:2,commit:process.env.GITHUB_SHA??null,renderer:'Chromium SwiftShader software WebGL',browser:browser.version(),platform:process.platform,quick,seed:'orvane-benchmark-v1',notes:'CPU submission times, not GPU timings; geometry and texture counts, not bytes. Phone profiles emulate viewport/DPR, not physical hardware. Initial setup, no long match. Schema 2 uses nearest-rank percentiles and isolated warmed toolbar submissions; not directly comparable to schema 1 latency.',cases};
+ // Additional fixed-workload renderer stress cases. No game state is mutated.
+ const stressCases=[];
+ for(const [level,requested] of Object.entries({early:[12,12,0],mid:[35,18,6],late:[60,20,18],max:[90,30,24]})){
+  const ctx=await browser.newContext({viewport:{width:1366,height:768},deviceScaleFactor:1});
+  const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  try{
+   await page.goto(url+'?benchmark3d=1&stress3d='+level);
+   await page.getByRole('button',{name:/New game/}).first().click();
+   await page.getByRole('button',{name:'6 players',exact:true}).click();
+   await page.getByLabel('Humans').selectOption('6');
+   await page.getByLabel('Map seed').fill('orvane-benchmark-v1');
+   await page.getByRole('button',{name:'Generate',exact:true}).click();
+   await page.getByRole('button',{name:'Start setup',exact:true}).click();
+   const gate=page.getByRole('dialog',{name:'Pass the device'});if(await gate.isVisible())await gate.getByRole('button',{name:/I'm ready/}).click();
+   const canvas=page.locator('canvas[data-benchmark3d][data-stress3d]');await canvas.waitFor({timeout:30000});
+   const coach=page.getByRole('complementary',{name:'Interactive tutorial'});if(await coach.isVisible())await coach.getByRole('button',{name:'Hide tutorial'}).click();
+   await page.getByLabel('Graphics quality').selectOption('high');
+   const snap=()=>canvas.evaluate(c=>({load:JSON.parse(c.dataset.stress3d),stats:JSON.parse(c.dataset.benchmark3d),counts:JSON.parse(c.dataset.renderCounts)}));
+   await sleep(500);const before=await snap(),start=performance.now();await sleep(quick?1500:3000);const after=await snap(),seconds=(performance.now()-start)/1000;
+   const n=Math.min(after.counts.frames-before.counts.frames,after.stats.samples.length);
+   const samples=(n?after.stats.samples.slice(-n):[]).filter(x=>x.ambient);
+   assert.equal(after.load.level,level);assert.deepEqual([after.load.roads,after.load.settlements,after.load.cities],requested,'extended board supports requested synthetic load');
+   assert.ok(samples.length>0,'stress ambient frames');
+   const zoom=page.getByRole('button',{name:'Zoom in',exact:true});await zoom.click();const end=await snap();
+   const last=end.stats.samples.at(-1);
+   const row={level,...after.load,drawCalls:last.drawCalls,triangles:last.triangles,geometries:end.stats.geometries,textures:end.stats.textures,ambientFps:(after.counts.ambientFrames-before.counts.ambientFrames)/seconds,ambientCpuP50Ms:quantile(samples.map(s=>s.ms),.5),ambientCpuP95Ms:quantile(samples.map(s=>s.ms),.95)};
+   assert.ok(row.drawCalls<=120,'settled board draw call budget');
+   assert.deepEqual(errors,[]);stressCases.push(row);console.log('STRESS3D '+JSON.stringify(row));
+   await mkdir('artifacts/benchmark3d',{recursive:true});await page.screenshot({path:'artifacts/benchmark3d/stress-'+level+'.png'});
+  }finally{await ctx.close();}
+ }
+ const report={stressCases,schema:2,commit:process.env.GITHUB_SHA??null,renderer:'Chromium SwiftShader software WebGL',browser:browser.version(),platform:process.platform,quick,seed:'orvane-benchmark-v1',notes:'CPU submission times, not GPU timings; geometry and texture counts, not bytes. Phone profiles emulate viewport/DPR, not physical hardware. Initial setup plus synthetic settled construction workloads; not a long legal match. Schema 2 uses nearest-rank percentiles and isolated warmed toolbar submissions; not directly comparable to schema 1 latency.',cases};
  if(baselinePath){const baseline=JSON.parse(await readFile(baselinePath,'utf8'));assert.equal(baseline.schema,report.schema);assert.equal(baseline.renderer,report.renderer);assert.equal(baseline.seed,report.seed);const keys=['ambientFps','interactionCpuP95Ms','drawCalls','triangles','geometries','textures'];report.comparison=cases.map(row=>{const old=baseline.cases.find(c=>c.profile===row.profile&&c.players===row.players&&c.quality===row.quality);return {profile:row.profile,players:row.players,quality:row.quality,delta:old?Object.fromEntries(keys.map(k=>[k,Number.isFinite(row[k])&&Number.isFinite(old[k])?row[k]-old[k]:null])):null};});}
  await mkdir('artifacts/benchmark3d',{recursive:true});await writeFile('artifacts/benchmark3d/results.json',JSON.stringify(report,null,2));
 }finally{await browser?.close();server.kill();}
