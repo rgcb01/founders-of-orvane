@@ -31,9 +31,10 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const sharedMaterials=useRef(new Map<string,THREE.MeshStandardMaterial>());
  const tokenResources=useRef<{geometry:THREE.CircleGeometry;materials:Map<number,THREE.MeshBasicMaterial>}|null>(null);
  const tokenObjects=useRef<{board:Board;objects:THREE.InstancedMesh[];numberTokens:number}|null>(null);
+ const legalMarkerCache=useRef<{board:Board;key:string;meshes:THREE.InstancedMesh[]}|null>(null);
  const pickCache=useRef<{board:Board;objects:THREE.Object3D[];vertexGeometry:THREE.SphereGeometry;edgeGeometry:THREE.BoxGeometry;material:THREE.MeshBasicMaterial}|null>(null);
  const disposePicks=()=>{const cache=pickCache.current;if(cache){cache.vertexGeometry.dispose();cache.edgeGeometry.dispose();cache.material.dispose();pickCache.current=null;}};
- useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current?.batches.forEach(b=>b.dispose());harborCache.current?.boatBatches.forEach(b=>b.mesh.dispose());harborCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.map?.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
+ useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current?.batches.forEach(b=>b.dispose());harborCache.current?.boatBatches.forEach(b=>b.mesh.dispose());harborCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();legalMarkerCache.current?.meshes.forEach(m=>m.dispose());legalMarkerCache.current=null;waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.map?.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
  const robberCache=useRef<THREE.Mesh[]|null>(null);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
  const pieceCache=useRef<{board:Board;entries:Map<string,{objects:THREE.Object3D[];pick:THREE.Object3D}>}|null>(null);
@@ -249,13 +250,30 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    pickCache.current={board,objects,vertexGeometry,edgeGeometry,material};
   }
   const pickObjects=pickCache.current.objects;include(...pickObjects);
-  for(const id of legalVertexSet){const p=vertices.get(id);if(p)add(new THREE.TorusGeometry(.19,.035,6,12),'#f5d784',p.x,.20,p.y).rotation.x=-Math.PI/2;}
-  for(const edge of board.edges){
-   if(!legalEdgeSet.has(edge.id))continue;
-   const a=vertices.get(edge.a),b=vertices.get(edge.b);if(!a||!b)continue;
-   const length=Math.hypot(b.x-a.x,b.y-a.y);
-   add(new THREE.BoxGeometry(length*.65,.045,.065),'#f5d784',(a.x+b.x)/2,.23,(a.y+b.y)/2).rotation.y=-Math.atan2(b.y-a.y,b.x-a.x);
+  // Batch legal markers separately from the immutable, invisible pick volumes.
+  const markerKey=JSON.stringify([[...legalVertexSet].sort(),[...legalEdgeSet].sort()]);
+  if(legalMarkerCache.current?.board!==board||legalMarkerCache.current.key!==markerKey){
+   legalMarkerCache.current?.meshes.forEach(mesh=>mesh.dispose());
+   const meshes:THREE.InstancedMesh[]=[];
+   const rings:THREE.Mesh[]=[],roads:THREE.Mesh[]=[];
+   for(const id of legalVertexSet){const p=vertices.get(id);if(p){const m=add(new THREE.TorusGeometry(.19,.035,6,12),'#f5d784',p.x,.20,p.y);m.rotation.x=-Math.PI/2;rings.push(m);}}
+   for(const edge of board.edges){
+    if(!legalEdgeSet.has(edge.id))continue;
+    const a=vertices.get(edge.a),b=vertices.get(edge.b);if(!a||!b)continue;
+    const length=Math.hypot(b.x-a.x,b.y-a.y);
+    const m=add(new THREE.BoxGeometry(1,.045,.065),'#f5d784',(a.x+b.x)/2,.23,(a.y+b.y)/2);
+    m.scale.x=length*.65;m.rotation.y=-Math.atan2(b.y-a.y,b.x-a.x);roads.push(m);
+   }
+   for(const items of [rings,roads]){
+    if(!items.length)continue;
+    const batch=new THREE.InstancedMesh(items[0].geometry,items[0].material,items.length);
+    items.forEach((mesh,i)=>{mesh.updateMatrix();batch.setMatrixAt(i,mesh.matrix);scene.remove(mesh);exclude(mesh);});
+    batch.instanceMatrix.needsUpdate=true;batch.computeBoundingBox();batch.computeBoundingSphere();
+    meshes.push(batch);
+   }
+   legalMarkerCache.current={board,key:markerKey,meshes};
   }
+  include(...legalMarkerCache.current.meshes);
   // One texture/material per dice number, rather than per tile or scene update.
   const tokens=tokenResources.current??(tokenResources.current={geometry:new THREE.CircleGeometry(.21,32),materials:new Map()});
   if(tokenObjects.current?.board===board){include(...tokenObjects.current.objects);}else{
