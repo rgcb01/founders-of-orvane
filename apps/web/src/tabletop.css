@@ -194,3 +194,30 @@
  .in-match .dock-actions button:last-child{min-height:43px}
 }
 .in-match .board-panel .map-confirm button:not(:disabled){background:linear-gradient(180deg,#ecd399,#cba46a);color:#20322e;border:1px solid #f0d8a0;font-weight:750;border-radius:7px}
+
+/* Resting dice are a small tabletop object, not a permanent status banner. */
+.in-match .board-panel .dice-display:not(.board-dice-throw){
+ background:linear-gradient(145deg,#233c36ed,#142d2ee8);
+ border:1px solid #b49b675e;border-radius:9px;box-shadow:0 3px 8px #10292c55;
+ backdrop-filter:none;gap:9px;padding:8px 10px;
+}
+.in-match .dice-display:not(.board-dice-throw)>strong{
+ display:grid;place-items:center;min-width:24px;height:24px;border-radius:50%;
+ color:var(--hud-paper);background:#132c2e;border:1px solid #b49b6780;font:700 .78rem Georgia,serif;
+}
+.in-match>.match-dock>.fan-hand .fan-card{box-shadow:0 4px 6px #091d2480,0 0 0 1px #162c3266}
+.in-match>.match-dock>.fan-hand .fan-card.raised{box-shadow:0 7px 14px #071b2490}
+@media(min-width:1000px) and (min-height:600px){
+ .in-match>.match-dock>.fan-hand{height:152px;flex-basis:56%;width:56%;isolation:isolate}
+ .in-match>.match-dock>.fan-hand:not(.stacked-hand) .fan-card{width:78px;height:107px;top:28px}
+ .in-match>.match-dock>.fan-hand .fan-card:hover{top:28px}
+ .in-match>.match-dock>.fan-hand::before{
+  content:"";position:absolute;pointer-events:none;z-index:-1;inset:22px 3% -12px;
+  background:radial-gradient(ellipse at 50% 100%,#10292c99 0%,#10292c44 42%,transparent 73%);
+ }
+ .in-match .board-panel .map-confirm{bottom:165px}
+}
+@media(max-width:700px){
+ .in-match .board-panel .dice-display:not(.board-dice-throw){padding:5px 6px;gap:5px}
+ .in-match .dice-display:not(.board-dice-throw)>strong{min-width:20px;height:20px;font-size:.7rem}
+}
