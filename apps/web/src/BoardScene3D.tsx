@@ -34,9 +34,10 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const legalMarkerCache=useRef<{board:Board;key:string;meshes:THREE.InstancedMesh[]}|null>(null);
  const pickCache=useRef<{board:Board;objects:THREE.Object3D[];vertexGeometry:THREE.SphereGeometry;edgeGeometry:THREE.BoxGeometry;material:THREE.MeshBasicMaterial}|null>(null);
  const disposePicks=()=>{const cache=pickCache.current;if(cache){cache.vertexGeometry.dispose();cache.edgeGeometry.dispose();cache.material.dispose();pickCache.current=null;}};
- useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current?.batches.forEach(b=>b.dispose());harborCache.current?.boatBatches.forEach(b=>b.mesh.dispose());harborCache.current=null;buildingBatchCache.current?.meshes.forEach(m=>m.dispose());buildingBatchCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();legalMarkerCache.current?.meshes.forEach(m=>m.dispose());legalMarkerCache.current=null;waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.map?.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
+ useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current?.batches.forEach(b=>b.dispose());harborCache.current?.boatBatches.forEach(b=>b.mesh.dispose());harborCache.current=null;roadBatchCache.current?.meshes.forEach(m=>m.dispose());roadBatchCache.current=null;buildingBatchCache.current?.meshes.forEach(m=>m.dispose());buildingBatchCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();legalMarkerCache.current?.meshes.forEach(m=>m.dispose());legalMarkerCache.current=null;waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.map?.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
  const robberCache=useRef<THREE.Mesh[]|null>(null);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
+ const roadBatchCache=useRef<{board:Board;key:string;meshes:THREE.InstancedMesh[]}|null>(null);
  const buildingBatchCache=useRef<{board:Board;key:string;meshes:THREE.InstancedMesh[]}|null>(null);
  const pieceCache=useRef<{board:Board;entries:Map<string,{objects:THREE.Object3D[];pick:THREE.Object3D}>}|null>(null);
  const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
@@ -195,14 +196,42 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const reuse=(key:string)=>{const entry=entries.get(key);if(!entry)return false;for(const object of entry.objects){object.scale.y=object instanceof THREE.Group?1:object.scale.y;include(object);}selectable.push(entry.pick);return true;};
   const animated:THREE.Group[]=[];
   const groupNew=(key:string,start:number,x:number,z:number)=>{if(!animate||prior?.keys.has(key))return;const group=new THREE.Group();group.position.set(x,.12,z);groupSince(group,start);animated.push(group);};
+  const settledRoads:{id:string;color:string;length:number;x:number;z:number;angle:number}[]=[];
   for(const road of display.roads){const edge=board.edges.find(e=>e.id===road.edgeId);if(!edge)continue;const a=vertices.get(edge.a),b=vertices.get(edge.b);if(!a||!b)continue;
-   const cacheKey='road:'+road.edgeId+':'+road.color;if(reuse(cacheKey))continue;
-   const start=desired.length;
+   const cacheKey='road:'+road.edgeId+':'+road.color;
    const length=Math.hypot(b.x-a.x,b.y-a.y),angle=Math.atan2(b.y-a.y,b.x-a.x);
+   if(!animate||prior?.keys.has('road:'+road.edgeId)){
+    settledRoads.push({id:road.edgeId,color:road.color,length,x:(a.x+b.x)/2,z:(a.y+b.y)/2,angle});entries.delete(cacheKey);continue;
+   }
+   if(reuse(cacheKey))continue;
+   const start=desired.length;
    // A stone verge and a raised, owner-coloured road surface retain the same two meshes.
    add(new THREE.BoxGeometry(length*.94,.095,.22),'#807564',(a.x+b.x)/2,.1675,(a.y+b.y)/2).rotation.y=-angle;
    const pick=add(new THREE.BoxGeometry(length*.88,.045,.15),road.color,(a.x+b.x)/2,.2375,(a.y+b.y)/2);pick.rotation.y=-angle;pick.userData={selection:{kind:'edge',id:edge.id}};selectable.push(pick);groupNew('road:'+road.edgeId,start,(a.x+b.x)/2,(a.y+b.y)/2);entries.set(cacheKey,{objects:desired.slice(start),pick});
   }
+  // Settled roads have two shared unit geometries and per-instance owner colours.
+  // New roads still use the existing placement group until the next reconciliation.
+  const roadKey=JSON.stringify(settledRoads.map(r=>[r.id,r.color]).sort((a,b)=>a[0].localeCompare(b[0])));
+  if(roadBatchCache.current?.board!==board||roadBatchCache.current.key!==roadKey){
+   roadBatchCache.current?.meshes.forEach(m=>m.dispose());
+   const meshes:THREE.InstancedMesh[]=[];
+   if(settledRoads.length){
+    const dummy=new THREE.Object3D();
+    for(const layer of [{y:.1675,h:.095,w:.22,l:.94,color:'#807564'},{y:.2375,h:.045,w:.15,l:.88,color:null}]){
+     const source=add(new THREE.BoxGeometry(1,layer.h,layer.w),'#ffffff',0,0,0);
+     scene.remove(source);exclude(source);
+     const batch=new THREE.InstancedMesh(source.geometry,source.material,settledRoads.length);
+     settledRoads.forEach((road,i)=>{
+      dummy.position.set(road.x,layer.y,road.z);dummy.rotation.set(0,-road.angle,0);dummy.scale.set(road.length*layer.l,1,1);dummy.updateMatrix();
+      batch.setMatrixAt(i,dummy.matrix);batch.setColorAt(i,new THREE.Color(layer.color??road.color));
+     });
+     batch.instanceMatrix.needsUpdate=true;if(batch.instanceColor)batch.instanceColor.needsUpdate=true;
+     batch.computeBoundingBox();batch.computeBoundingSphere();meshes.push(batch);
+    }
+   }
+   roadBatchCache.current={board,key:roadKey,meshes};
+  }
+  include(...roadBatchCache.current.meshes);
   const settledBuildings=display.buildings.filter(building=>!animate||prior?.keys.has(building.kind+':'+building.vertexId));
   const buildingKey=JSON.stringify(settledBuildings.map(v=>[v.kind,v.vertexId,v.color]).sort((a,b)=>a[1].localeCompare(b[1])));
   const cachedBuildings=buildingBatchCache.current?.board===board&&buildingBatchCache.current.key===buildingKey?buildingBatchCache.current:null;
