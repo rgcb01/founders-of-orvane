@@ -34,9 +34,10 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const legalMarkerCache=useRef<{board:Board;key:string;meshes:THREE.InstancedMesh[]}|null>(null);
  const pickCache=useRef<{board:Board;objects:THREE.Object3D[];vertexGeometry:THREE.SphereGeometry;edgeGeometry:THREE.BoxGeometry;material:THREE.MeshBasicMaterial}|null>(null);
  const disposePicks=()=>{const cache=pickCache.current;if(cache){cache.vertexGeometry.dispose();cache.edgeGeometry.dispose();cache.material.dispose();pickCache.current=null;}};
- useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current?.batches.forEach(b=>b.dispose());harborCache.current?.boatBatches.forEach(b=>b.mesh.dispose());harborCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();legalMarkerCache.current?.meshes.forEach(m=>m.dispose());legalMarkerCache.current=null;waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.map?.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
+ useEffect(()=>{return()=>{rendererRef.current?.dispose();rendererRef.current?.domElement.remove();rendererRef.current=null;sceneResources.current?.sun.shadow.dispose();sceneResources.current?.scene.clear();sceneResources.current=null;robberCache.current=null;harborCache.current?.batches.forEach(b=>b.dispose());harborCache.current?.boatBatches.forEach(b=>b.mesh.dispose());harborCache.current=null;buildingBatchCache.current?.meshes.forEach(m=>m.dispose());buildingBatchCache.current=null;pieceCache.current=null;previousPieces.current=null;previousRobber.current=null;tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());tokenObjects.current=null;const tokens=tokenResources.current;if(tokens){tokens.geometry.dispose();tokens.materials.forEach(m=>{m.map?.dispose();m.dispose();});tokenResources.current=null;}disposePicks();legalMarkerCache.current?.meshes.forEach(m=>m.dispose());legalMarkerCache.current=null;waterCache.current?.mesh.geometry.dispose();waterCache.current?.mesh.material.map?.dispose();waterCache.current?.mesh.material.dispose();waterCache.current=null;const terrain=staticTerrain.current;if(terrain){terrain.geometry.dispose();terrain.materials.forEach(m=>m.dispose());terrain.batches.forEach(b=>b.mesh.dispose());terrain.staticBatches.forEach(b=>b.dispose());staticTerrain.current=null;}for(const g of sharedGeometry.current.values())g.dispose();sharedGeometry.current.clear();for(const m of sharedMaterials.current.values())m.dispose();sharedMaterials.current.clear();};},[]);
  const robberCache=useRef<THREE.Mesh[]|null>(null);
  const previousRobber=useRef<{board:Board;tile?:string}|null>(null);
+ const buildingBatchCache=useRef<{board:Board;key:string;meshes:THREE.InstancedMesh[]}|null>(null);
  const pieceCache=useRef<{board:Board;entries:Map<string,{objects:THREE.Object3D[];pick:THREE.Object3D}>}|null>(null);
  const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
  const cameraPose=useRef({zoom:1,azimuth:0,panX:0,panY:0});
@@ -202,12 +203,18 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    add(new THREE.BoxGeometry(length*.94,.095,.22),'#807564',(a.x+b.x)/2,.1675,(a.y+b.y)/2).rotation.y=-angle;
    const pick=add(new THREE.BoxGeometry(length*.88,.045,.15),road.color,(a.x+b.x)/2,.2375,(a.y+b.y)/2);pick.rotation.y=-angle;pick.userData={selection:{kind:'edge',id:edge.id}};selectable.push(pick);groupNew('road:'+road.edgeId,start,(a.x+b.x)/2,(a.y+b.y)/2);entries.set(cacheKey,{objects:desired.slice(start),pick});
   }
+  const settledBuildings=display.buildings.filter(building=>!animate||prior?.keys.has(building.kind+':'+building.vertexId));
+  const buildingKey=JSON.stringify(settledBuildings.map(v=>[v.kind,v.vertexId,v.color]).sort((a,b)=>a[1].localeCompare(b[1])));
+  const cachedBuildings=buildingBatchCache.current?.board===board&&buildingBatchCache.current.key===buildingKey?buildingBatchCache.current:null;
+  const settledParts:THREE.Mesh[]=[];
   for(const building of display.buildings){const p=vertices.get(building.vertexId);if(!p)continue;
-   const cacheKey=building.kind+':'+building.vertexId+':'+building.color;if(reuse(cacheKey))continue;
+   const cacheKey=building.kind+':'+building.vertexId+':'+building.color;
+   const settled=!animate||prior?.keys.has(building.kind+':'+building.vertexId);
+   if(settled){entries.delete(cacheKey);if(cachedBuildings)continue;}else if(reuse(cacheKey))continue;
    const start=desired.length;
    // The plinth and roof identify the owner from every camera angle.
    // A gabled cottage uses the same three meshes as the old pyramid house.
-   const pick=add(new THREE.BoxGeometry(.49,.07,.43),building.color,p.x,.17,p.y);pick.userData={selection:{kind:'vertex',id:building.vertexId}};selectable.push(pick);
+   const pick=add(new THREE.BoxGeometry(.49,.07,.43),building.color,p.x,.17,p.y);pick.userData={selection:{kind:'vertex',id:building.vertexId}};if(!settled)selectable.push(pick);
    const house=(x:number,z:number,w:number,h:number)=>{
     add(new THREE.BoxGeometry(w,h,w*.85),'#d8c5a2',x,.21+h/2,z);
     const r=w*.65;
@@ -222,8 +229,32 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
     add(new THREE.BoxGeometry(.055,.11,.018),'#514b40',x,.21+h*.68,z+w*.51);
    };
    if(building.kind==='city'){tower(p.x-.12,p.y-.015);house(p.x+.13,p.y+.025,.25,.23);}else house(p.x,p.y,.30,.23);
-   groupNew(building.kind+':'+building.vertexId,start,p.x,p.y);entries.set(cacheKey,{objects:desired.slice(start),pick});
+   if(settled){
+    for(const mesh of desired.slice(start)){
+     if(mesh instanceof THREE.Mesh){settledParts.push(mesh);scene.remove(mesh);exclude(mesh);}
+    }
+   }else{
+    groupNew(building.kind+':'+building.vertexId,start,p.x,p.y);entries.set(cacheKey,{objects:desired.slice(start),pick});
+   }
   }
+  // Settled structures reuse the same source geometry as animated structures.
+  // A neutral shared material with instance colors preserves all player and stone colors.
+  if(!cachedBuildings){
+   buildingBatchCache.current?.meshes.forEach(m=>m.dispose());
+   const groups=new Map<string,THREE.Mesh[]>();
+   for(const mesh of settledParts){const list=groups.get(mesh.geometry.uuid)??[];list.push(mesh);groups.set(mesh.geometry.uuid,list);}
+   let material=sharedMaterials.current.get('building-instance-neutral');
+   if(!material){material=new THREE.MeshStandardMaterial({color:'#ffffff',flatShading:true,roughness:1});sharedMaterials.current.set('building-instance-neutral',material);}
+   const meshes:THREE.InstancedMesh[]=[];
+   for(const items of groups.values()){
+    const batch=new THREE.InstancedMesh(items[0].geometry,material,items.length);
+    items.forEach((mesh,i)=>{mesh.updateMatrix();batch.setMatrixAt(i,mesh.matrix);batch.setColorAt(i,(mesh.material as THREE.MeshStandardMaterial).color);});
+    batch.instanceMatrix.needsUpdate=true;if(batch.instanceColor)batch.instanceColor.needsUpdate=true;
+    batch.computeBoundingBox();batch.computeBoundingSphere();meshes.push(batch);
+   }
+   buildingBatchCache.current={board,key:buildingKey,meshes};
+  }
+  include(...buildingBatchCache.current!.meshes);
   // Invisible selection volumes cover every buildable graph location, including empty sites.
   // Keep them separate from visible meshes so construction remains possible before ownership.
   const legalVertexSet=new Set(legalVertices??[]),legalEdgeSet=new Set(legalEdges??[]);
