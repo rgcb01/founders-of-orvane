@@ -58,6 +58,11 @@ try{
  const pause=menu.getByRole('button',{name:'⏸ Pause bots',exact:true});if(await pause.isVisible())await pause.click();
  await menu.getByRole('button',{name:'▶ Resume game',exact:true}).click();
  await page.getByLabel('Graphics quality').selectOption('low');await button('Reset view').click();await sleep(800);
+ // Capture normal gameplay UI without the benchmark-only graphics control.
+ const diagnostic=page.getByLabel('Graphics quality');
+ await diagnostic.selectOption('high');await button('Reset view').click();await sleep(500);
+ await page.screenshot({path:'artifacts/stability3d/active-match-diagnostic.png'});
+ await diagnostic.selectOption('low');
  const settled=await sample('setup-complete');
  for(const key of ['scene','firstToken','firstPick','firstBatch'])assert.equal(settled[key],initial[key],'persistent '+key);
  for(let i=0;i<cycles;i++){
@@ -74,6 +79,15 @@ try{
  await page.getByRole('dialog',{name:'Pause menu'}).getByRole('button',{name:'💾 Save & exit to menu',exact:true}).click();
  await page.getByRole('button',{name:/Continue/}).first().click();await canvas.waitFor({timeout:30000});
  const recovered=await readMatch(page);assert.deepEqual(recovered.game,saved.game,'saved game recovered unchanged');
+ // Reopen the saved real match without diagnostic URL flags to review the normal UI.
+ await page.goto(url);
+ await page.getByRole('button',{name:/Continue/}).first().click();
+ const normalCanvas=page.locator('.tabletop-world canvas');await normalCanvas.waitFor({timeout:30000});
+ const normalCoach=page.getByRole('complementary',{name:'Interactive tutorial'});if(await normalCoach.isVisible())await normalCoach.getByRole('button',{name:'Hide tutorial'}).click();
+ assert.equal(await page.getByLabel('Graphics quality').count(),0,'normal gameplay hides graphics dropdown');
+ await button('Reset view').click();
+ await sleep(500);
+ await page.screenshot({path:'artifacts/stability3d/active-match-normal.png'});
  assert.deepEqual(errors,[]);
  await mkdir('artifacts/stability3d',{recursive:true});await writeFile('artifacts/stability3d/results.json',JSON.stringify({cycles,players:6,setupSettlements:12,setupRoads:12,snapshots,notes:'Software WebGL; repeated quality/camera changes on stable board after actual setup, not a complete match or physical-device soak.'},null,2));
  console.log('3D stability passed',JSON.stringify({cycles,initial,settled,final:snapshots.at(-1)}));
