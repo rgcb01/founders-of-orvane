@@ -182,3 +182,15 @@
 .dev-art small{color:#cbd8c9;line-height:1.3}
 .event-card .dev-art .dev-emblem{max-height:42px}
 .in-match .seat-stats svg,.in-match .seat-score svg,.in-match .seat-award svg{vertical-align:-2px;flex-shrink:0}
+
+/* Compact desktop HUD leaves more space for the island; touch layouts stay intact. */
+@media(min-width:1000px) and (min-height:600px){
+ .in-match>.player-strip.game-players{width:clamp(132px,11.5vw,166px);gap:5px}
+ .in-match .player-strip .player-seat{grid-template-columns:28px minmax(0,1fr);padding:5px 7px;gap:2px 6px;min-height:48px}
+ .in-match .player-strip .seat-avatar{width:28px;height:28px}
+ .in-match .player-strip .seat-main strong{font-size:.73rem}
+ .in-match .player-strip .seat-stats{font-size:.62rem}
+ .in-match .dock-actions button{min-height:36px;padding:5px 9px;font-size:.78rem}
+ .in-match .dock-actions button:last-child{min-height:43px}
+}
+.in-match .board-panel .map-confirm button:not(:disabled){background:linear-gradient(180deg,#ecd399,#cba46a);color:#20322e;border:1px solid #f0d8a0;font-weight:750;border-radius:7px}
