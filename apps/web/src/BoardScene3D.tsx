@@ -355,7 +355,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   }
   include(...legalMarkerCache.current.meshes);
   // One texture/material per dice number, rather than per tile or scene update.
-  const tokens=tokenResources.current??(tokenResources.current={geometry:new THREE.CircleGeometry(.21,32),materials:new Map()});
+  const tokens=tokenResources.current??(tokenResources.current={geometry:new THREE.CircleGeometry(.26,32),materials:new Map()});
   if(tokenObjects.current?.board===board){include(...tokenObjects.current.objects);}else{
    tokenObjects.current?.objects.forEach(mesh=>mesh.dispose());
    const groups=new Map<string,THREE.Mesh[]>();let numberTokens=0;
@@ -365,12 +365,17 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
     const number=tile.number;let material=tokens.materials.get(number);
     if(!material){
      const canvas=document.createElement('canvas');canvas.width=128;canvas.height=128;const ctx=canvas.getContext('2d');if(!ctx)continue;
-     ctx.fillStyle='#f3e6c8';ctx.fillRect(0,0,128,128);ctx.fillStyle=number===6||number===8?'#a43e32':'#39352e';ctx.font='bold 76px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(number),64,68);
+     const ink=number===6||number===8?'#922e27':'#292820';
+     ctx.fillStyle='#f9edce';ctx.fillRect(0,0,128,128);
+     ctx.strokeStyle='#a78b56';ctx.lineWidth=4;ctx.beginPath();ctx.arc(64,64,58,0,Math.PI*2);ctx.stroke();
+     ctx.fillStyle=ink;ctx.font='bold 72px Georgia, serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(number),64,51);
+     const pips=6-Math.abs(7-number);
+     for(let i=0;i<pips;i++){ctx.beginPath();ctx.arc(64+(i-(pips-1)/2)*13,94,4,0,Math.PI*2);ctx.fill();}
      const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
      material=new THREE.MeshBasicMaterial({map:texture});tokens.materials.set(number,material);
     }
-    const base=add(new THREE.CylinderGeometry(.23,.23,.06,32),'#cbbd9f',p.x,.18,p.y+.62);exclude(base);groupToken(base);
-    const token=new THREE.Mesh(tokens.geometry,material);token.rotation.x=-Math.PI/2;token.position.set(p.x,.215,p.y+.62);groupToken(token);numberTokens++;
+    const base=add(new THREE.CylinderGeometry(.28,.28,.09,32),'#cbb083',p.x,.205,p.y+.48);exclude(base);groupToken(base);
+    const token=new THREE.Mesh(tokens.geometry,material);token.rotation.x=-Math.PI/2;token.position.set(p.x,.253,p.y+.48);groupToken(token);numberTokens++;
    }
    const objects:THREE.InstancedMesh[]=[];
    for(const items of groups.values()){const first=items[0];const batch=new THREE.InstancedMesh(first.geometry,first.material,items.length);items.forEach((mesh,i)=>{mesh.updateMatrix();batch.setMatrixAt(i,mesh.matrix);});batch.instanceMatrix.needsUpdate=true;batch.computeBoundingBox();batch.computeBoundingSphere();include(batch);objects.push(batch);}
