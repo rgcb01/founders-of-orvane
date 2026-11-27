@@ -33,7 +33,7 @@ import {needsHandoff,privateHandSeat} from './privateHandoff';
 import {TutorialCoach} from './TutorialCoach';
 import {advanceTutorial,currentLesson,newTutorial,setTutorialEnabled,tutorialTip,TUTORIAL_SEEN_KEY,type TutorialProgress,type TutorTarget} from './tutorial';
 import {usePwa} from './pwa';
-import {HomeMenu,Guide,ExpansionRoadmap,PlayerStrip,ResourceHand,BuildMenu,requiredPanel,visiblePanel,type Panel} from './GameUI';
+import {HomeMenu,Guide,ExpansionRoadmap,PlayerStrip,ResourceHand,ConstructionTray,BuildMenu,requiredPanel,visiblePanel,type Panel} from './GameUI';
 
 const terrain:Record<Terrain,{name:string;icon:string;color:string;resource:string}>={
  forest:{name:'Forest',icon:'🌲',color:TERRAIN_COLORS.forest,resource:'Lumber'},
@@ -317,6 +317,43 @@ function App(){
  };
  const setBoard=(s:BoardSize,seed:string)=>{setSize(s);setGame(null);setSetup(null);setBotError('');setActivity([]);setVisualQueue([]);setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};setSeed(seed);setDraft(seed);setSelection(null);setPan({x:0,y:0});setZoom(1);setRevealedSeat(null);previousDecision.current=null;};
  const select=(kind:Selection['kind'],id:string)=>setSelection({kind,id});
+ const constructionSites=(kind:BuildKind):string[]=>{
+  if(game)return humanActive&&game.phase==='action'?legalBuilds(board,game,kind):[];
+  if(!setup||!humanDecision)return [];
+  return kind==='road'&&setup.phase==='road'?legalRoads(board,setup):kind==='settlement'&&setup.phase==='settlement'?legalSettlements(board,setup):[];
+ };
+ const locateConstruction=(kind:BuildKind,x:number,y:number)=>{
+  const rect=(active3D?document.querySelector('.tabletop-world canvas'):svg.current)?.getBoundingClientRect();
+  if(!rect||x<rect.left||x>rect.right||y<rect.top||y>rect.bottom)return undefined;
+  const surface=document.elementFromPoint(x,y);
+  if(!surface?.closest('.tabletop-world,svg[data-board-root]'))return undefined;
+  const project=(type:'edge'|'vertex',id:string)=>{
+   if(active3D)return camera3D.current?.project(type,id);
+   const matrix=svg.current?.getScreenCTM();if(!matrix)return undefined;
+   const edge=type==='edge'?board.edges.find(e=>e.id===id):undefined;
+   const a=edge&&points.get(edge.a),b=edge&&points.get(edge.b);
+   const p=type==='vertex'?points.get(id):a&&b?{x:(a.x+b.x)/2,y:(a.y+b.y)/2}:undefined;
+   return p?new DOMPoint(p.x,p.y).matrixTransform(matrix):undefined;
+  };
+  let best:{id:string;x:number;y:number;angle?:number}|undefined,distance=30;
+  for(const id of constructionSites(kind)){
+   const p=project(kind==='road'?'edge':'vertex',id);if(!p)continue;
+   const d=Math.hypot(p.x-x,p.y-y);if(d>distance)continue;
+   const edge=kind==='road'?board.edges.find(e=>e.id===id):undefined;
+   const a=edge&&project('vertex',edge.a),b=edge&&project('vertex',edge.b);
+   distance=d;best={id,x:p.x,y:p.y,angle:a&&b?Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI+25:undefined};
+  }
+  return best;
+ };
+ const placeConstruction=(kind:BuildKind,id:string)=>{
+  if(playerId===null||!constructionSites(kind).includes(id))return;
+  if(game)setGame(applyGame(board,game,{kind:'build',playerId,build:kind,id}));
+  else if(setup&&kind!=='city')setSetup(applySetup(board,setup,{kind,id,playerId}));
+  setSelection(null);
+ };
+ const pieceCounts:Record<BuildKind,number>={road:15-(view?.roads.filter(r=>r.playerId===myHand?.id).length??0),settlement:5-(view?.settlements.filter(v=>v.playerId===myHand?.id&&(!game||!game.settlements.some(b=>b.vertexId===v.vertexId&&b.kind==='city'))).length??0),city:4-(game?.settlements.filter(v=>v.playerId===myHand?.id&&v.kind==='city').length??0)};
+ const pieceAvailable:Record<BuildKind,boolean>={road:constructionSites('road').length>0,settlement:constructionSites('settlement').length>0,city:constructionSites('city').length>0};
+
  const keySelect=(event:KeyboardEvent,kind:Selection['kind'],id:string)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select(kind,id);}};
  function start(e:PointerEvent<SVGSVGElement>){
    if(e.pointerType==='mouse'&&e.button!==0||!svg.current)return;
@@ -441,6 +478,7 @@ function App(){
    <section className="panel terrain-legend"><h2>Terrain</h2>{(Object.keys(terrain) as Terrain[]).map(t=><div key={t} className="legend"><span style={{background:terrain[t].color}} className="swatch"/><span>{terrain[t].name}</span><span>{board.tiles.filter(x=>x.terrain===t).length}</span></div>)}</section>{activity.length>0&&<details className="panel activity"><summary>📜 Activity</summary>{activity.slice(0,24).map((a,i)=><p key={i}>{a}</p>)}</details>}</div>}
    </aside>
   </div>
+  {view&&myHand&&<ConstructionTray color={myHand.color} counts={pieceCounts} available={pieceAvailable} selected={build} onSelect={kind=>{setBuild(kind);setSelection(null);setBuildOpen(false);setDrawerOpen(false);}} onLocate={locateConstruction} onPlace={placeConstruction}/>}
   {view&&<nav className="match-dock" aria-label="Match controls"><div className="desktop-hand-label">{myHand?myHand.name+" · Your hand":"Private hand"}</div>{myHand?<ResourceHand key={myHand.id} resources={myHand.resources} queue={visualQueue} solo={humans===1} canDrag={humanDecision&&humanActive&&game?.phase==='action'&&!game.offer}/>:<div className="hand-strip">{handoffPending?"🔒 Hand hidden · pass device":"🤖 Opponent turn"}</div>}<div className="dock-actions"><button onClick={()=>setDrawerOpen(false)} aria-label="Map"><ControlIcon name="map"/> Map</button>{game&&humanActive&&game.phase==="action"&&<button onClick={()=>{setDrawerOpen(false);setBuildOpen(v=>!v);}} aria-expanded={buildOpen} aria-label="Build"><ControlIcon name="build"/> Build</button>}{game&&humanDecision&&game.phase==="action"&&<button onClick={()=>openPanel('trade')} aria-label="Trade"><ControlIcon name="trade"/> Trade</button>}{game&&humanDecision&&!game.offer&&<button onClick={()=>openPanel('cards')} aria-label="Cards"><ControlIcon name="cards"/> Cards</button>}{!game&&setup?.phase==="complete"?<span role="status">Starting the match…</span>:!game&&humanDecision&&setup?.phase!=="complete"?<button disabled={!selectionLegal} onClick={confirmPlacement}>✓ Place</button>:game&&humanActive&&game.phase==="roll"?<button data-coach-target="roll" onClick={()=>{setGame(applyGame(board,game,{kind:"roll",playerId:game.active,dice:rollDice()}));setSelection(null);}}><ControlIcon name="roll"/> Roll</button>:game&&humanActive&&game.phase==="action"?<button disabled={!!game.offer} onClick={()=>{setGame(applyGame(board,game,{kind:"end",playerId:game.active}));setSelection(null);}}><ControlIcon name="end"/> End turn</button>:<button onClick={()=>setPauseMenuOpen(true)}><ControlIcon name="menu"/> Menu</button>}</div></nav>}
   {handoffPending&&view&&decision!==null&&<div className="handoff-curtain" role="presentation"><section className="handoff-window" role="dialog" aria-modal="true" aria-label="Pass the device"><span className="handoff-sigil" aria-hidden="true">♜</span><p className="eyebrow">PRIVATE PLAYER TURN</p><h2>Pass the device</h2><p>Hand the screen to <strong>{view.players.find(p=>p.id===decision)?.name??'the next player'}</strong>.</p><p className="muted">Your cards and private actions remain hidden until you are ready.</p><button className="primary-action" autoFocus onClick={()=>{setRevealedSeat(decision);setSelection(null);setDrawerOpen(false);}}>✓ I'm ready</button></section></div>}
    {view&&pauseMenuOpen&&<div className="pause-curtain" onClick={()=>setPauseMenuOpen(false)}><section className="pause-window" role="dialog" aria-modal="true" aria-label="Pause menu" onClick={e=>e.stopPropagation()}><span className="pause-sigil">♜</span><p className="eyebrow">FOUNDERS OF ORVANE</p><h2>Game menu</h2><small aria-label="Build version">v1.1.0-beta.1</small><p className="muted">Bots pause while this menu is open.</p>
