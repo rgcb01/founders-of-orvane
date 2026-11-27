@@ -8,7 +8,7 @@ export type GraphicsQuality='auto'|'low'|'medium'|'high';
 export function readGraphicsQuality():GraphicsQuality{try{const q=localStorage.getItem('orvane.graphics');return q==='low'||q==='medium'||q==='high'?q:'auto';}catch{return 'auto';}}
 export function GraphicsQualitySelect({value,onChange}:{value:GraphicsQuality;onChange:(q:GraphicsQuality)=>void}){return <select aria-label="Graphics quality" value={value} onChange={e=>onChange(e.target.value as GraphicsQuality)}><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>;}
 export function persistGraphicsQuality(q:GraphicsQuality){try{localStorage.setItem('orvane.graphics',q);}catch{}}
-export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void;project:(kind:'tile'|'vertex'|'edge',id:string)=>{x:number;y:number}|undefined};
+export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void;project:(kind:'tile'|'vertex'|'edge',id:string)=>{x:number;y:number}|undefined;previewPiece:(piece:{kind:'road'|'settlement'|'city';id:string;color:string}|null)=>void};
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type BoatBatch={mesh:THREE.InstancedMesh;parts:{boat:THREE.Group;local:THREE.Matrix4}[]};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
@@ -557,7 +557,45 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const wheel=(e:WheelEvent)=>{e.preventDefault();zoom=Math.max(.65,Math.min(3,zoom*Math.exp(-e.deltaY*.001)));cameraPose.current={zoom,azimuth,panX,panY};scheduleCameraDraw();};
   canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);canvas.addEventListener('wheel',wheel,{passive:false});
   resetCamera.current=()=>{zoom=1;azimuth=0;panX=0;panY=0;cameraPose.current={zoom,azimuth,panX,panY};draw();};
-  const controls:BoardCameraControls={reset:resetCamera.current,project:(kind,id)=>{
+  // Transient preview shares the board camera, never participates in picking or shadows.
+  let preview:THREE.Group|null=null,previewKey='';
+  const clearPreview=()=>{if(!preview)return;scene.remove(preview);preview.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();(o.material as THREE.Material).dispose();}});preview=null;previewKey='';};
+  const previewPiece:BoardCameraControls['previewPiece']=piece=>{
+   const key=piece?piece.kind+':'+piece.id+':'+piece.color:'';
+   if(key===previewKey)return;
+   clearPreview();
+   if(piece){
+    const group=new THREE.Group();
+    const mesh=(geometry:THREE.BufferGeometry,color:string,x:number,y:number,z:number)=>{
+     const m=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color,transparent:true,opacity:.68,depthWrite:false,roughness:1,flatShading:true}));m.position.set(x,y,z);m.renderOrder=11;group.add(m);return m;
+    };
+    if(piece.kind==='road'){
+     const edge=board.edges.find(e=>e.id===piece.id),a=edge&&vertices.get(edge.a),b=edge&&vertices.get(edge.b);
+     if(!a||!b)return;
+     const len=Math.hypot(b.x-a.x,b.y-a.y);group.position.set((a.x+b.x)/2,0,(a.y+b.y)/2);group.rotation.y=-Math.atan2(b.y-a.y,b.x-a.x);
+     mesh(new THREE.BoxGeometry(len*.94,.095,.22),'#807564',0,.1675,0);
+     mesh(new THREE.BoxGeometry(len*.88,.045,.15),piece.color,0,.2375,0);
+    }else{
+     const p=vertices.get(piece.id);if(!p)return;group.position.set(p.x,0,p.y);
+     mesh(new THREE.BoxGeometry(.49,.07,.43),piece.color,0,.17,0);
+     const house=(x:number,z:number,w:number,h:number)=>{
+      mesh(new THREE.BoxGeometry(w,h,w*.85),'#d8c5a2',x,.21+h/2,z);
+      const r=w*.65;mesh(new THREE.CylinderGeometry(r,r,w*.98,3,1),piece.color,x,.21+h+r*.5,z).rotation.x=-Math.PI/2;
+      mesh(new THREE.BoxGeometry(w*.25,h*.65,.025),'#594637',x,.21+h*.325,z+w*.43);
+     };
+     if(piece.kind==='city'){
+      const w=.22,h=.41,x=-.12,z=-.015;
+      mesh(new THREE.CylinderGeometry(w*.48,w*.58,h,6),'#aaa38c',x,.21+h/2,z);
+      mesh(new THREE.ConeGeometry(w*.69,.19,6),piece.color,x,.21+h+.095,z);
+      mesh(new THREE.BoxGeometry(.055,.11,.018),'#514b40',x,.21+h*.68,z+w*.51);
+      house(.13,.025,.25,.23);
+     }else house(0,0,.30,.23);
+    }
+    preview=group;previewKey=key;scene.add(group);
+   }
+   scheduleCameraDraw();
+  };
+  const controls:BoardCameraControls={reset:resetCamera.current,previewPiece,project:(kind,id)=>{
    let point:THREE.Vector3|undefined;
    if(kind==='tile'){const p=positions.find(t=>t.tile.id===id)?.p;if(p)point=new THREE.Vector3(p.x,.3,p.y+.48);}
    else if(kind==='vertex'){const p=vertices.get(id);if(p)point=new THREE.Vector3(p.x,.32,p.y);}
@@ -652,7 +690,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   draw();if(animated.length||movingRobber||productionRings.length)frame=requestAnimationFrame(tick);
   syncAmbient();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
-  return()=>{document.removeEventListener('visibilitychange',visibilityChanged);motion.removeEventListener('change',syncAmbient);if(ambientControl.current===syncAmbient)ambientControl.current=null;if(cameraControls?.current===controls)cameraControls.current=null;observer.disconnect();cancelAnimationFrame(ambientFrame);cancelAnimationFrame(frame);cancelAnimationFrame(cameraFrame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);};
+  return()=>{clearPreview();document.removeEventListener('visibilitychange',visibilityChanged);motion.removeEventListener('change',syncAmbient);if(ambientControl.current===syncAmbient)ambientControl.current=null;if(cameraControls?.current===controls)cameraControls.current=null;observer.disconnect();cancelAnimationFrame(ambientFrame);cancelAnimationFrame(frame);cancelAnimationFrame(cameraFrame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);};
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile,productionKey,quality,cameraControls]);
  return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/><div ref={harborLabels} role="group" aria-label="Harbor exchange rates" style={{position:'absolute',inset:0,pointerEvents:'none',overflow:'hidden'}}>{board.harbors.map(h=><span key={h.edgeId} data-harbor-edge={h.edgeId} aria-label={`${h.resource??'Generic'} harbor ${h.rate}:1`} style={{position:'absolute',visibility:'hidden',transform:'translate(-50%,-100%)',whiteSpace:'nowrap',background:'#26362de6',color:'#f4e4bd',border:'1px solid #a88b59',borderRadius:2,padding:'3px 5px',fontSize:10,fontWeight:700,lineHeight:1.15,letterSpacing:'.035em',textTransform:'uppercase',boxShadow:'0 2px 3px #132c3480'}}>{h.resource??'Any'} {h.rate}:1</span>)}</div>{(!cameraControls||diagnosticQuality)&&<div style={{position:'absolute',right:12,top:12,zIndex:2}}><GraphicsQualitySelect value={quality} onChange={changeQuality}/></div>}{!cameraControls&&<button type="button" aria-label="Reset 3D camera" onClick={()=>resetCamera.current()} style={{position:'absolute',right:12,bottom:12,zIndex:2}}>⌂</button>}{showPerf&&<output ref={perfHud} aria-label="3D performance" style={{position:'absolute',left:8,top:8,zIndex:3,background:'#142c35',color:'#fff',padding:'5px 8px',borderRadius:4,fontSize:11,pointerEvents:'none',fontVariantNumeric:'tabular-nums'}}>Measuring FPS…</output>}{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
