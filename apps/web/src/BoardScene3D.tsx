@@ -8,7 +8,7 @@ export type GraphicsQuality='auto'|'low'|'medium'|'high';
 export function readGraphicsQuality():GraphicsQuality{try{const q=localStorage.getItem('orvane.graphics');return q==='low'||q==='medium'||q==='high'?q:'auto';}catch{return 'auto';}}
 export function GraphicsQualitySelect({value,onChange}:{value:GraphicsQuality;onChange:(q:GraphicsQuality)=>void}){return <select aria-label="Graphics quality" value={value} onChange={e=>onChange(e.target.value as GraphicsQuality)}><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>;}
 export function persistGraphicsQuality(q:GraphicsQuality){try{localStorage.setItem('orvane.graphics',q);}catch{}}
-export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void};
+export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void;project:(kind:'tile'|'vertex'|'edge',id:string)=>{x:number;y:number}|undefined};
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type BoatBatch={mesh:THREE.InstancedMesh;parts:{boat:THREE.Group;local:THREE.Matrix4}[]};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
@@ -557,7 +557,16 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const wheel=(e:WheelEvent)=>{e.preventDefault();zoom=Math.max(.65,Math.min(3,zoom*Math.exp(-e.deltaY*.001)));cameraPose.current={zoom,azimuth,panX,panY};scheduleCameraDraw();};
   canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);canvas.addEventListener('wheel',wheel,{passive:false});
   resetCamera.current=()=>{zoom=1;azimuth=0;panX=0;panY=0;cameraPose.current={zoom,azimuth,panX,panY};draw();};
-  const controls:BoardCameraControls={reset:resetCamera.current,zoomBy:delta=>{zoom=THREE.MathUtils.clamp(zoom+delta,.65,3);cameraPose.current={zoom,azimuth,panX,panY};draw();}};
+  const controls:BoardCameraControls={reset:resetCamera.current,project:(kind,id)=>{
+   let point:THREE.Vector3|undefined;
+   if(kind==='tile'){const p=positions.find(t=>t.tile.id===id)?.p;if(p)point=new THREE.Vector3(p.x,.3,p.y+.48);}
+   else if(kind==='vertex'){const p=vertices.get(id);if(p)point=new THREE.Vector3(p.x,.32,p.y);}
+   else{const edge=board.edges.find(e=>e.id===id),a=edge&&vertices.get(edge.a),b=edge&&vertices.get(edge.b);if(a&&b)point=new THREE.Vector3((a.x+b.x)/2,.29,(a.y+b.y)/2);}
+   if(!point||!updateCamera())return undefined;
+   const q=point.project(camera),rect=canvas.getBoundingClientRect();
+   if(!rect.width||!rect.height||Math.abs(q.z)>1)return undefined;
+   return {x:rect.left+(q.x+1)*rect.width/2,y:rect.top+(1-q.y)*rect.height/2};
+  },zoomBy:delta=>{zoom=THREE.MathUtils.clamp(zoom+delta,.65,3);cameraPose.current={zoom,azimuth,panX,panY};draw();}};
   if(cameraControls)cameraControls.current=controls;
   const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
   let ambientFrame=0,nextDue=0,frame=0,lastAnimationTime=-1;const ambientStart=performance.now();
