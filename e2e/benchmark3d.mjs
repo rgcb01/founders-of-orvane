@@ -122,6 +122,10 @@ try{
    const row={level,...after.load,drawCalls:last.drawCalls,triangles:last.triangles,geometries:end.stats.geometries,textures:end.stats.textures,ambientFps:(after.counts.ambientFrames-before.counts.ambientFrames)/seconds,ambientCpuP50Ms:quantile(samples.map(s=>s.ms),.5),ambientCpuP95Ms:quantile(samples.map(s=>s.ms),.95)};
    assert.ok(row.drawCalls<=120,'settled board draw call budget');
    assert.deepEqual(errors,[]);stressCases.push(row);console.log('STRESS3D '+JSON.stringify(row));
+   // Restore the initial framing after the zoom interaction measurement.
+   await page.getByRole('button',{name:'Zoom out',exact:true}).click();
+   const pose=await canvas.evaluate(c=>JSON.parse(c.dataset.cameraPose));
+   assert.ok(Math.abs(pose.zoom-1)<1e-6,'visual reference uses default camera zoom');
    await mkdir('artifacts/benchmark3d',{recursive:true});await page.screenshot({path:'artifacts/benchmark3d/stress-'+level+'.png'});
   }finally{await ctx.close();}
  }
