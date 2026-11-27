@@ -6,6 +6,13 @@ export function loadDicePhysics(){return loading??=import('@dimforge/rapier3d-co
 export type DiceObstacle={x:number;y:number;z:number;hx:number;hy:number;hz:number};
 const normals=[new THREE.Vector3(1,0,0),new THREE.Vector3(-1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(0,-1,0),new THREE.Vector3(0,0,1),new THREE.Vector3(0,0,-1)];
 const values=[3,4,1,6,2,5];
+export function diceFaceOrder(rotation:THREE.Quaternion,value:number):number[]{
+ let top=0,best=-Infinity;
+ normals.forEach((n,i)=>{const score=n.clone().applyQuaternion(rotation).y;if(score>best){best=score;top=i;}});
+ const inverse=new THREE.Quaternion().setFromUnitVectors(normals[values.indexOf(value)],normals[top]).invert();
+ return normals.map(n=>{const old=n.clone().applyQuaternion(inverse);let index=0;normals.forEach((v,i)=>{if(v.dot(old)>normals[index].dot(old))index=i;});return index;});
+}
+
 const dots:Record<number,number[][]>={1:[[0,0]],2:[[-1,-1],[1,1]],3:[[-1,-1],[0,0],[1,1]],4:[[-1,-1],[1,-1],[-1,1],[1,1]],5:[[-1,-1],[1,-1],[0,0],[-1,1],[1,1]],6:[[-1,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1]]};
 function faceMaterial(n:number){const canvas=document.createElement('canvas');canvas.width=128;canvas.height=128;const c=canvas.getContext('2d')!;c.fillStyle='#efe2c6';c.fillRect(0,0,128,128);c.strokeStyle='#b9a480';c.lineWidth=5;c.strokeRect(3,3,122,122);for(const [x,y] of dots[n]){c.beginPath();c.arc(64+x*32,64+y*32,10,0,Math.PI*2);c.fillStyle='#39362d';c.fill();}const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;return new THREE.MeshStandardMaterial({map:texture,roughness:.65});}
 export function createPhysicalDice(R:Physics,scene:THREE.Scene,center:{x:number;z:number},extent:{x:number;z:number},result:readonly [number,number],obstacles:DiceObstacle[],duration:number){
@@ -22,16 +29,7 @@ export function createPhysicalDice(R:Physics,scene:THREE.Scene,center:{x:number;
  });
  let elapsed=0,accumulator=0,finished=false;
  const limit=Math.max(.25,duration/1000*.78);
- const q=new THREE.Quaternion();
- // Preserve the game's preselected fair roll: at rest relabel the cube using a
- // proper cube rotation, not a changed physical pose or an impossible face pair.
- const alignFaces=(d:typeof bodies[number])=>{
-  const rotation=d.mesh.quaternion;let top=0,best=-Infinity;normals.forEach((n,i)=>{const score=n.clone().applyQuaternion(rotation).y;if(score>best){best=score;top=i;}});
-  const source=normals[values.indexOf(d.value)],target=normals[top];
-  q.setFromUnitVectors(source,target);
-  const inverse=q.clone().invert();
-  d.mesh.material=normals.map(n=>{const old=n.clone().applyQuaternion(inverse);let index=0;normals.forEach((v,i)=>{if(v.dot(old)>normals[index].dot(old))index=i;});return d.mats[index];});
- };
+ const alignFaces=(d:typeof bodies[number])=>{d.mesh.material=diceFaceOrder(d.mesh.quaternion,d.value).map(i=>d.mats[i]);};
  const step=(dt:number)=>{if(finished)return false;accumulator+=Math.min(Math.max(dt,0),.1);while(accumulator>=1/120){world.step();accumulator-=1/120;elapsed+=1/120;}
   for(const d of bodies){const p=d.body.translation(),r=d.body.rotation();d.mesh.position.set(p.x,p.y,p.z);d.mesh.quaternion.set(r.x,r.y,r.z,r.w);}
   if(elapsed>=limit&&bodies.every(d=>{const v=d.body.linvel(),w=d.body.angvel();return Math.hypot(v.x,v.y,v.z)<.35&&Math.hypot(w.x,w.y,w.z)<.65;})){for(const d of bodies){alignFaces(d);d.body.setLinvel({x:0,y:0,z:0},false);d.body.setAngvel({x:0,y:0,z:0},false);}finished=true;}
