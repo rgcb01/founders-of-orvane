@@ -15,14 +15,14 @@ export function createPhysicalDice(R:Physics,scene:THREE.Scene,center:{x:number;
  staticBox(center.x,-.25,center.z,extent.x,.25,extent.z);
  for(const o of obstacles)staticBox(o.x,o.y,o.z,o.hx,o.hy,o.hz);
  const bodies=result.map((value,i)=>{
-  const body=world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(center.x+(i? .45:-.45),2.4+i*.35,center.z+extent.z*.48).setLinvel((i?-.65:.65),-1,-3.5).setAngvel(10+i*3,8-i*4,12-i*2).setLinearDamping(.65).setAngularDamping(.8).setCcdEnabled(true));
+  const body=world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(center.x+(i? .45:-.45),2.4+i*.35,center.z+extent.z*.48).setLinvel((i?-.65:.65),-1,-3.5).setAngvel({x:10+i*3,y:8-i*4,z:12-i*2}).setLinearDamping(.65).setAngularDamping(.8).setCcdEnabled(true));
   world.createCollider(R.ColliderDesc.cuboid(half,half,half).setDensity(1.2).setFriction(.74).setRestitution(.42),body);
   const mats=values.map(faceMaterial);const mesh=new THREE.Mesh(new THREE.BoxGeometry(half*2,half*2,half*2),mats);scene.add(mesh);
   return {body,mesh,value,mats};
  });
  let elapsed=0,accumulator=0,finished=false;
  const limit=Math.max(.25,duration/1000*.78);
- const q=new THREE.Quaternion(),up=new THREE.Vector3(0,1,0);
+ const q=new THREE.Quaternion();
  // Preserve the game's preselected fair roll: at rest relabel the cube using a
  // proper cube rotation, not a changed physical pose or an impossible face pair.
  const alignFaces=(d:typeof bodies[number])=>{
@@ -32,9 +32,9 @@ export function createPhysicalDice(R:Physics,scene:THREE.Scene,center:{x:number;
   const inverse=q.clone().invert();
   d.mesh.material=normals.map(n=>{const old=n.clone().applyQuaternion(inverse);let index=0;normals.forEach((v,i)=>{if(v.dot(old)>normals[index].dot(old))index=i;});return d.mats[index];});
  };
- const step=(dt:number)=>{if(finished)return false;elapsed+=dt;accumulator+=Math.min(dt,.1);while(accumulator>=1/120){world.step();accumulator-=1/120;}
+ const step=(dt:number)=>{if(finished)return false;accumulator+=Math.min(Math.max(dt,0),.1);while(accumulator>=1/120){world.step();accumulator-=1/120;elapsed+=1/120;}
   for(const d of bodies){const p=d.body.translation(),r=d.body.rotation();d.mesh.position.set(p.x,p.y,p.z);d.mesh.quaternion.set(r.x,r.y,r.z,r.w);}
-  if(elapsed>=limit){for(const d of bodies){alignFaces(d);d.body.setLinvel({x:0,y:0,z:0},false);d.body.setAngvel({x:0,y:0,z:0},false);}finished=true;}
+  if(elapsed>=limit&&bodies.every(d=>{const v=d.body.linvel(),w=d.body.angvel();return Math.hypot(v.x,v.y,v.z)<.35&&Math.hypot(w.x,w.y,w.z)<.65;})){for(const d of bodies){alignFaces(d);d.body.setLinvel({x:0,y:0,z:0},false);d.body.setAngvel({x:0,y:0,z:0},false);}finished=true;}
   return !finished;
  };
  return {step,dispose(){for(const d of bodies){scene.remove(d.mesh);d.mesh.geometry.dispose();d.mats.forEach(m=>{m.map?.dispose();m.dispose();});}world.free();}};
