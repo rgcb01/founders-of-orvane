@@ -185,10 +185,23 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    if(!edge)continue;occupied.add(edge.a);occupied.add(edge.b);
    sample.roads.push({edgeId:edge.id,color});sample.buildings.push({vertexId:edge.a,color,kind:i%2?'city':'settlement'});
   }
-  const display=pieces??sample;
+  // Synthetic render-only workload, opt-in solely through the benchmark URL.
+  // Never writes to game state or the save. Counts are capped by board topology.
+  const params=new URLSearchParams(window.location.search);
+  const stress=params.get('benchmark3d')==='1'?params.get('stress3d'):null;
+  const levels:Record<string,[number,number,number]>={early:[12,12,0],mid:[35,18,6],late:[60,20,18],max:[90,30,24]};
+  const load=stress&&Object.prototype.hasOwnProperty.call(levels,stress)?levels[stress]:null;
+  const stressColors=['#bd5145','#4189b8','#e9d8b4','#de963f','#56885a','#8c629f'];
+  const synthetic:Pieces|null=load?{
+   roads:board.edges.slice(0,load[0]).map((edge,i)=>({edgeId:edge.id,color:stressColors[i%6]})),
+   buildings:board.vertices.slice(0,load[1]+load[2]).map((vertex,i)=>({vertexId:vertex.id,color:stressColors[i%6],kind:i<load[1]?'settlement':'city'}))
+  }:null;
+  const display=synthetic??pieces??sample;
+  if(synthetic)renderer.domElement.dataset.stress3d=JSON.stringify({level:stress,roads:synthetic.roads.length,settlements:synthetic.buildings.filter(b=>b.kind==='settlement').length,cities:synthetic.buildings.filter(b=>b.kind==='city').length});
+  else delete renderer.domElement.dataset.stress3d;
   const keys=new Set([...display.roads.map(r=>'road:'+r.edgeId),...display.buildings.map(b=>b.kind+':'+b.vertexId)]);
   const prior=previousPieces.current;previousPieces.current={board,keys};
-  const animate=!!pieces&&prior?.board===board&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const animate=!synthetic&&!!pieces&&prior?.board===board&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(pieceCache.current?.board!==board)pieceCache.current={board,entries:new Map()};
   const entries=pieceCache.current.entries;
   const activeKeys=new Set([...display.roads.map(r=>'road:'+r.edgeId+':'+r.color),...display.buildings.map(b=>b.kind+':'+b.vertexId+':'+b.color)]);
