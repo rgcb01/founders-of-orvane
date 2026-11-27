@@ -1,27 +1,30 @@
 import {useLayoutEffect,useState,type RefObject,type CSSProperties} from 'react';
 import {createPortal} from 'react-dom';
+import type {BoardCameraControls} from './BoardScene3D';
 import type {VisualEvent} from './visualEvents';
 import {ResourceFace} from './ResourceArt';
 import type {Resource} from '@orvane/engine';
 type Point={x:number;y:number};
 type FlightStyle={resource:Resource;style:CSSProperties};
-export function IncomeFlights({event,svg,points,duration,spendPoint}:{event:VisualEvent;svg:RefObject<SVGSVGElement|null>;points:Map<string,Point>;duration:number;spendPoint?:Point}){
+export function IncomeFlights({event,svg,points,duration,spendPoint,camera3D}:{event:VisualEvent;svg:RefObject<SVGSVGElement|null>;points:Map<string,Point>;duration:number;spendPoint?:Point;camera3D?:RefObject<BoardCameraControls|null>}){
  const [items,setItems]=useState<FlightStyle[]>([]);
  useLayoutEffect(()=>{
-   if((event.kind!=='income'&&event.kind!=='spend')||!svg.current)return;
-   const matrix=svg.current.getScreenCTM();if(!matrix)return;
+   if((event.kind!=='income'&&event.kind!=='spend') )return;
+   const matrix=svg.current?.getScreenCTM();if(!camera3D&&!matrix)return;
    const result:FlightStyle[]=[];
    for(const f of event.kind==='income'?event.flights:Object.entries(event.resources).filter(([,n])=>n>0).map(([resource,count])=>({resource:resource as Resource,count,vertexId:event.id}))){
-     const p=event.kind==='spend'?spendPoint:points.get(f.vertexId);if(!p)continue;
+     const p=event.kind==='spend'?spendPoint:points.get(f.vertexId);
+     const from=camera3D?camera3D.current?.project(event.kind==='income'?'tile':event.build==='road'?'edge':'vertex',event.kind==='income'?('tileId' in f?String(f.tileId):''):event.id):p&&matrix?new DOMPoint(p.x,p.y).matrixTransform(matrix):undefined;
+     if(!from)continue;
      const targets=Array.from(document.querySelectorAll<HTMLElement>('[data-income-target="'+f.resource+'"]'));
      const target=targets.reverse().find(t=>{const b=t.getBoundingClientRect();return b.width>0&&b.height>0&&b.bottom>0&&b.top<window.innerHeight;});
      if(!target)continue;
-     const to=target.getBoundingClientRect(),from=new DOMPoint(p.x,p.y).matrixTransform(matrix);
+     const to=target.getBoundingClientRect();
      const x=Math.max(16,Math.min(window.innerWidth-16,from.x)),y=Math.max(16,Math.min(window.innerHeight-16,from.y));
      const tx=to.x+to.width/2,ty=to.y+to.height/2,spend=event.kind==='spend';
      for(let i=0;i<f.count;i++){const delay=Math.min(duration*.35,i*65);result.push({resource:f.resource,style:{left:spend?tx:x,top:spend?ty:y,'--dx':(spend?x-tx:tx-x)+'px','--dy':(spend?y-ty:ty-y)+'px',animationDelay:delay+'ms',animationDuration:(duration-delay)+'ms'} as CSSProperties});}
    }
    setItems(result);
- },[event,svg,points,duration,spendPoint?.x,spendPoint?.y]);
+ },[event,svg,points,duration,spendPoint?.x,spendPoint?.y,camera3D]);
  return createPortal(<div className="income-layer" aria-hidden="true">{items.map((f,i)=><span key={i} className={"income-flight card-flight "+(event.kind==="spend"?"card-spend":"card-gain")} style={f.style}><ResourceFace resource={f.resource}/></span>)}</div>,document.body);
 }
