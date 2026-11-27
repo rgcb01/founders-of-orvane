@@ -1,4 +1,5 @@
 import {useState,useEffect,useRef} from 'react';
+import {createPortal} from 'react-dom';
 import {botPersonality,PERSONALITIES,RESOURCES,COSTS,legalBuilds,playerScore,VICTORY_TARGET,type Board,type GameState,type SetupState,type BuildKind,type Resources,type Resource} from '@orvane/engine';
 import {resourceName} from './resources';
 import {ResourceIcon,ResourceFace} from './ResourceArt';
@@ -65,6 +66,22 @@ function SeatGlyph({kind}:{kind:'cards'|'victory'|'road'|'army'}){
 }
 export function PlayerStrip({view,game,active,humans,showHand,soloAvatar,soloTitle,seed}:{seed?:string;soloTitle?:string;soloAvatar?:string;view:GameState|SetupState;game:GameState|null;active:number|null;humans:number;showHand:number|null}){
  return <section className="player-strip game-players" aria-label="Players">{view.players.map(p=>{const personality=p.id>=humans&&seed!==undefined?PERSONALITIES[botPersonality(seed,p.id)]:null;const score=game?playerScore(game,p.id,p.id===showHand||game.phase==='finished').total:null;const details=[soloTitle&&p.id===0&&humans===1?soloTitle:null,personality?.label,game?`Road: ${game.awards.roadLengths[p.id]} · Knights: ${game.development.knights[p.id]}`:null].filter(Boolean).join(" · ");return <div key={p.id} className={'player player-seat'+(p.id===active?' active':'')} style={{borderInlineStartColor:p.color}} aria-label={p.name+(p.id===active?', active player':'')}><span className="seat-avatar" style={{background:p.color}}>{p.id<humans&&humans===1&&soloAvatar&&soloAvatar!=='👤'?soloAvatar:<FounderAvatar id={p.id} bot={p.id>=humans} color={p.color}/>}</span><div className="seat-main" title={details}><strong>{p.name.replace('🤖 ','')}</strong><div className="seat-stats"><span title="Resource cards"><SeatGlyph kind="cards"/> {Object.values(p.resources).reduce((a,b)=>a+b,0)}</span></div></div>{score!==null&&<span className="seat-score" title={score+' of '+VICTORY_TARGET+' victory points'}><SeatGlyph kind="victory"/> {score}<small>/{VICTORY_TARGET}</small></span>}{game&&(game.awards.longestRoad===p.id||game.awards.largestArmy===p.id)&&<span className="seat-award" title="Award holder">{game.awards.longestRoad===p.id?<SeatGlyph kind="road"/>:null}{game.awards.largestArmy===p.id?<SeatGlyph kind="army"/>:null}</span>}</div>;})}</section>;
+}
+type PiecePoint={x:number;y:number};
+export function ConstructionTray({color,counts,available,selected,onSelect,onLocate,onPlace}:{color:string;counts:Record<BuildKind,number>;available:Record<BuildKind,boolean>;selected:BuildKind;onSelect:(kind:BuildKind)=>void;onLocate:(kind:BuildKind,x:number,y:number)=>({id:string;x:number;y:number;angle?:number}|undefined);onPlace:(kind:BuildKind,id:string)=>void}){
+ const gesture=useRef<{pointer:number;kind:BuildKind;start:PiecePoint;moved:boolean}|null>(null);
+ const suppress=useRef(false);
+ const [ghost,setGhost]=useState<{kind:BuildKind;x:number;y:number;valid:boolean;angle?:number}|null>(null);
+ const art=(kind:BuildKind)=><svg viewBox="-23 -23 46 40" aria-hidden="true">{kind==='road'?<RoadArt a={{x:-13,y:6}} b={{x:13,y:-6}} color={color} styleId="classic"/>:<BuildingArt p={{x:0,y:0}} city={kind==='city'} color={color} styleId="classic"/>}</svg>;
+ return <section className="construction-tray" aria-label="Construction pieces" data-coach-target="build">
+ {(Object.keys(BUILD_ART) as BuildKind[]).map(kind=><button key={kind} type="button" disabled={!available[kind]} aria-label={'Place '+BUILD_ART[kind].label+' ('+counts[kind]+' remaining)'} aria-pressed={selected===kind} title={BUILD_ART[kind].label+' · '+counts[kind]+' remaining'+(!available[kind]?' · Unavailable':' · Drag onto the board')} onClick={()=>{if(suppress.current){suppress.current=false;return;}onSelect(kind);}}
+ onPointerDown={e=>{if(e.button!==0)return;suppress.current=false;gesture.current={pointer:e.pointerId,kind,start:{x:e.clientX,y:e.clientY},moved:false};e.currentTarget.setPointerCapture(e.pointerId);onSelect(kind);}}
+ onPointerMove={e=>{const g=gesture.current;if(!g||g.pointer!==e.pointerId)return;if(!g.moved&&Math.hypot(e.clientX-g.start.x,e.clientY-g.start.y)<7)return;g.moved=true;const hit=onLocate(kind,e.clientX,e.clientY);setGhost({kind,x:hit?.x??e.clientX,y:hit?.y??e.clientY,valid:!!hit,angle:hit?.angle});}}
+ onPointerUp={e=>{const g=gesture.current;gesture.current=null;setGhost(null);if(!g?.moved||g.pointer!==e.pointerId)return;suppress.current=true;const hit=onLocate(kind,e.clientX,e.clientY);if(hit)onPlace(kind,hit.id);}}
+ onPointerCancel={()=>{gesture.current=null;setGhost(null);}} onLostPointerCapture={()=>{gesture.current=null;setGhost(null);}}>
+ {art(kind)}<span>{BUILD_ART[kind].label}</span><b>{counts[kind]}</b></button>)}
+ {ghost&&createPortal(<div className={'construction-ghost'+(ghost.valid?' valid':'')} aria-hidden="true" style={{left:ghost.x,top:ghost.y,transform:'translate(-50%,-50%) rotate('+(ghost.angle??0)+'deg)'}}>{art(ghost.kind)}</div>,document.body)}
+ </section>;
 }
 export function BuildMenu({board,game,build,onSelect,onClose}:{onClose?:()=>void;board:Board;game:GameState;build:BuildKind;onSelect:(k:BuildKind)=>void}){
  const actor=game.players.find(p=>p.id===game.active)!;
