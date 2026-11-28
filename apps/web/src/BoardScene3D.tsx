@@ -9,7 +9,7 @@ export type GraphicsQuality='auto'|'low'|'medium'|'high';
 export function readGraphicsQuality():GraphicsQuality{try{const q=localStorage.getItem('orvane.graphics');return q==='low'||q==='medium'||q==='high'?q:'auto';}catch{return 'auto';}}
 export function GraphicsQualitySelect({value,onChange}:{value:GraphicsQuality;onChange:(q:GraphicsQuality)=>void}){return <select aria-label="Graphics quality" value={value} onChange={e=>onChange(e.target.value as GraphicsQuality)}><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select>;}
 export function persistGraphicsQuality(q:GraphicsQuality){try{localStorage.setItem('orvane.graphics',q);}catch{}}
-export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void;project:(kind:'tile'|'vertex'|'edge',id:string)=>{x:number;y:number}|undefined;throwVector:(dx:number,dy:number)=>DiceImpulse;previewPiece:(piece:{kind:'road'|'settlement'|'city';id:string;color:string}|null)=>void};
+export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void;project:(kind:'tile'|'vertex'|'edge',id:string)=>{x:number;y:number}|undefined;throwVector:(dx:number,dy:number,releaseX?:number,releaseY?:number)=>DiceImpulse;previewPiece:(piece:{kind:'road'|'settlement'|'city';id:string;color:string}|null)=>void};
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type BoatBatch={mesh:THREE.InstancedMesh;parts:{boat:THREE.Group;local:THREE.Matrix4}[]};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
@@ -598,7 +598,14 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    }
    scheduleCameraDraw();
   };
-  const controls:BoardCameraControls={reset:resetCamera.current,previewPiece,throwVector:(dx,dy)=>{const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);const forward=new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion);const v=right.multiplyScalar(dx).addScaledVector(forward,-dy);v.y=0;if(v.length()>7)v.setLength(7);return {x:v.x,z:v.z};},project:(kind,id)=>{
+  const controls:BoardCameraControls={reset:resetCamera.current,previewPiece,throwVector:(dx,dy,releaseX,releaseY)=>{const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);const forward=new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion);const v=right.multiplyScalar(dx).addScaledVector(forward,-dy);v.y=0;if(v.length()>7)v.setLength(7);
+   const rect=canvas.getBoundingClientRect();let origin:DiceImpulse['origin'];
+   if(releaseX!==undefined&&releaseY!==undefined&&rect.width>0&&rect.height>0&&releaseX>=rect.left&&releaseX<=rect.right&&releaseY>=rect.top&&releaseY<=rect.bottom){
+    const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((releaseX-rect.left)/rect.width*2-1,1-(releaseY-rect.top)/rect.height*2),camera);
+    const hit=ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),-2.4),new THREE.Vector3());
+    if(hit)origin={x:THREE.MathUtils.clamp(hit.x,center.x-size.x/2+.5,center.x+size.x/2-.5),z:THREE.MathUtils.clamp(hit.z,center.z-size.z/2+.5,center.z+size.z/2-.5)};
+   }
+   return {x:v.x,z:v.z,origin};},project:(kind,id)=>{
    let point:THREE.Vector3|undefined;
    if(kind==='tile'){const p=positions.find(t=>t.tile.id===id)?.p;if(p)point=new THREE.Vector3(p.x,.3,p.y+.48);}
    else if(kind==='vertex'){const p=vertices.get(id);if(p)point=new THREE.Vector3(p.x,.32,p.y);}
