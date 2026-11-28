@@ -1,3 +1,4 @@
+import {placementPose} from './placementMotion';
 import {useEffect,useRef,useState,type RefObject} from 'react';
 import * as THREE from 'three';
 import {loadDicePhysics,createPhysicalDice,type DiceObstacle,type DiceImpulse} from './PhysicalDice';
@@ -66,7 +67,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   let renderer:THREE.WebGLRenderer;
   try{renderer=rendererRef.current??new THREE.WebGLRenderer({antialias:true,alpha:false});rendererRef.current=renderer;renderer.shadowMap.autoUpdate=false;}catch{fallback.current();return;}
   const tier=quality==='auto'?(window.matchMedia('(pointer: coarse)').matches?'medium':'high'):quality;
-  if(!sceneResources.current){const scene=new THREE.Scene();scene.background=new THREE.Color('#183e49');sceneResources.current={scene,camera:new THREE.OrthographicCamera(-1,1,1,-1,.1,500),hemisphere:new THREE.HemisphereLight('#fff4df','#577481',1.55),sun:new THREE.DirectionalLight('#ffe7bc',2.15)};}
+  if(!sceneResources.current){const scene=new THREE.Scene();scene.background=new THREE.Color('#183e49');sceneResources.current={scene,camera:new THREE.OrthographicCamera(-1,1,1,-1,.1,500),hemisphere:new THREE.HemisphereLight('#fff0d9','#69808a',1.25),sun:new THREE.DirectionalLight('#ffe4ba',2.45)};}
   const {scene,camera,hemisphere,sun}=sceneResources.current;
   // Reconcile root membership without detaching unchanged objects from the live scene.
   const previousRoots=new Set(scene.children);
@@ -217,7 +218,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const entries=pieceCache.current.entries;
   const activeKeys=new Set([...display.roads.map(r=>'road:'+r.edgeId+':'+r.color),...display.buildings.map(b=>b.kind+':'+b.vertexId+':'+b.color)]);
   for(const key of entries.keys())if(!activeKeys.has(key))entries.delete(key);
-  const reuse=(key:string)=>{const entry=entries.get(key);if(!entry)return false;for(const object of entry.objects){object.scale.y=object instanceof THREE.Group?1:object.scale.y;include(object);}selectable.push(entry.pick);return true;};
+  const reuse=(key:string)=>{const entry=entries.get(key);if(!entry)return false;for(const object of entry.objects){if(object instanceof THREE.Group){object.scale.y=1;object.position.y=.12;}include(object);}selectable.push(entry.pick);return true;};
   const animated:THREE.Group[]=[];
   const groupNew=(key:string,start:number,x:number,z:number)=>{if(!animate||prior?.keys.has(key))return;const group=new THREE.Group();group.position.set(x,.12,z);groupSince(group,start);animated.push(group);};
   const settledRoads:{id:string;color:string;length:number;x:number;z:number;angle:number}[]=[];
@@ -230,7 +231,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    if(reuse(cacheKey))continue;
    const start=desired.length;
    // A stone verge and a raised, owner-coloured road surface retain the same two meshes.
-   add(new THREE.BoxGeometry(length*.94,.095,.22),'#807564',(a.x+b.x)/2,.1675,(a.y+b.y)/2).rotation.y=-angle;
+   add(new THREE.BoxGeometry(length*.94,.095,.22),'#97846a',(a.x+b.x)/2,.1675,(a.y+b.y)/2).rotation.y=-angle;
    const pick=add(new THREE.BoxGeometry(length*.88,.045,.15),road.color,(a.x+b.x)/2,.2375,(a.y+b.y)/2);pick.rotation.y=-angle;pick.userData={selection:{kind:'edge',id:edge.id}};selectable.push(pick);groupNew('road:'+road.edgeId,start,(a.x+b.x)/2,(a.y+b.y)/2);entries.set(cacheKey,{objects:desired.slice(start),pick});
   }
   // Settled roads have two shared unit geometries and per-instance owner colours.
@@ -241,7 +242,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    const meshes:THREE.InstancedMesh[]=[];
    if(settledRoads.length){
     const dummy=new THREE.Object3D();
-    for(const layer of [{y:.1675,h:.095,w:.22,l:.94,color:'#807564'},{y:.2375,h:.045,w:.15,l:.88,color:null}]){
+    for(const layer of [{y:.1675,h:.095,w:.22,l:.94,color:'#97846a'},{y:.2375,h:.045,w:.15,l:.88,color:null}]){
      const source=add(new THREE.BoxGeometry(1,layer.h,layer.w),'#ffffff',0,0,0);
      scene.remove(source);exclude(source);
      const batch=new THREE.InstancedMesh(source.geometry,source.material,settledRoads.length);
@@ -269,17 +270,19 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    // A gabled cottage uses the same three meshes as the old pyramid house.
    const pick=add(new THREE.BoxGeometry(.49,.07,.43),building.color,p.x,.17,p.y);pick.userData={selection:{kind:'vertex',id:building.vertexId}};if(!settled)selectable.push(pick);
    const house=(x:number,z:number,w:number,h:number)=>{
-    add(new THREE.BoxGeometry(w,h,w*.85),'#d8c5a2',x,.21+h/2,z);
+    add(new THREE.BoxGeometry(w,h,w*.85),'#e1c9a3',x,.21+h/2,z);
     const r=w*.65;
     const roof=add(new THREE.CylinderGeometry(r,r,w*.98,3,1),building.color,x,.21+h+r*.5,z);
     roof.rotation.x=-Math.PI/2;
-    add(new THREE.BoxGeometry(w*.25,h*.65,.025),'#594637',x,.21+h*.325,z+w*.43);
+    add(new THREE.BoxGeometry(w*.25,h*.65,.025),'#493a30',x,.21+h*.325,z+w*.43);
+    for(const side of [-1,1]){const window=add(new THREE.BoxGeometry(.018,.065,.065),'#675c48',x+side*w*.505,.21+h*.65,z);window.rotation.y=0;}
    };
    const tower=(x:number,z:number)=>{
     const w=.22,h=.41;
-    add(new THREE.CylinderGeometry(w*.48,w*.58,h,6),'#aaa38c',x,.21+h/2,z);
+    add(new THREE.CylinderGeometry(w*.48,w*.58,h,6),'#b7ad96',x,.21+h/2,z);
     add(new THREE.ConeGeometry(w*.69,.19,6),building.color,x,.21+h+.095,z);
     add(new THREE.BoxGeometry(.055,.11,.018),'#514b40',x,.21+h*.68,z+w*.51);
+    add(new THREE.CylinderGeometry(.13,.13,.035,6),'#d6c7a6',x,.21+h*.80,z);
    };
    if(building.kind==='city'){tower(p.x-.12,p.y-.015);house(p.x+.13,p.y+.025,.25,.23);}else house(p.x,p.y,.30,.23);
    if(settled){
@@ -501,10 +504,10 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    waterPosition.needsUpdate=true;waterNormal.needsUpdate=true;
   };
   include(hemisphere);
-  sun.position.set(center.x-5,12,center.z+6);sun.target.position.copy(center);include(sun,sun.target);
+  sun.position.set(center.x-7,12,center.z+5);sun.target.position.copy(center);include(sun,sun.target);
   if(quality!=='auto'||ambientSampling.current?.quality!=='auto')autoShadows.current={enabled:true,slow:0,fast:0};
   renderer.shadowMap.enabled=tier!=='low'&&(quality!=='auto'||autoShadows.current.enabled);renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-  sun.castShadow=true;const shadowSize=tier==='high'?1024:512;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.map?.dispose();sun.shadow.map=null;sun.shadow.mapSize.set(shadowSize,shadowSize);}sun.shadow.camera.left=-span;sun.shadow.camera.right=span;sun.shadow.camera.top=span;sun.shadow.camera.bottom=-span;sun.shadow.camera.near=.5;sun.shadow.camera.far=span*4+20;sun.shadow.normalBias=.025;sun.shadow.bias=-.0002;sun.shadow.camera.updateProjectionMatrix();
+  sun.castShadow=true;const shadowSize=tier==='high'?1024:512;if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.map?.dispose();sun.shadow.map=null;sun.shadow.mapSize.set(shadowSize,shadowSize);}sun.shadow.camera.left=-span;sun.shadow.camera.right=span;sun.shadow.camera.top=span;sun.shadow.camera.bottom=-span;sun.shadow.camera.near=.5;sun.shadow.camera.far=span*4+20;sun.shadow.normalBias=.018;sun.shadow.bias=-.0002;sun.shadow.camera.updateProjectionMatrix();
   for(const root of desired)if(!previousRoots.has(root))root.traverse(object=>{if(object instanceof THREE.Mesh&&object!==water&&object.material instanceof THREE.MeshStandardMaterial){object.castShadow=true;object.receiveShadow=true;}});
   camera.position.set(center.x,span*1.3,center.z+span);camera.lookAt(center);camera.updateMatrixWorld(true);
   const projected=new THREE.Box3();for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z])projected.expandByPoint(new THREE.Vector3(x,y,z).applyMatrix4(camera.matrixWorldInverse));
@@ -589,21 +592,23 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
      const edge=board.edges.find(e=>e.id===piece.id),a=edge&&vertices.get(edge.a),b=edge&&vertices.get(edge.b);
      if(!a||!b)return;
      const len=Math.hypot(b.x-a.x,b.y-a.y);group.position.set((a.x+b.x)/2,0,(a.y+b.y)/2);group.rotation.y=-Math.atan2(b.y-a.y,b.x-a.x);
-     mesh(new THREE.BoxGeometry(len*.94,.095,.22),'#807564',0,.1675,0);
+     mesh(new THREE.BoxGeometry(len*.94,.095,.22),'#97846a',0,.1675,0);
      mesh(new THREE.BoxGeometry(len*.88,.045,.15),piece.color,0,.2375,0);
     }else{
      const p=vertices.get(piece.id);if(!p)return;group.position.set(p.x,0,p.y);
      mesh(new THREE.BoxGeometry(.49,.07,.43),piece.color,0,.17,0);
      const house=(x:number,z:number,w:number,h:number)=>{
-      mesh(new THREE.BoxGeometry(w,h,w*.85),'#d8c5a2',x,.21+h/2,z);
+      mesh(new THREE.BoxGeometry(w,h,w*.85),'#e1c9a3',x,.21+h/2,z);
       const r=w*.65;mesh(new THREE.CylinderGeometry(r,r,w*.98,3,1),piece.color,x,.21+h+r*.5,z).rotation.x=-Math.PI/2;
-      mesh(new THREE.BoxGeometry(w*.25,h*.65,.025),'#594637',x,.21+h*.325,z+w*.43);
+      mesh(new THREE.BoxGeometry(w*.25,h*.65,.025),'#493a30',x,.21+h*.325,z+w*.43);
+      for(const side of [-1,1])mesh(new THREE.BoxGeometry(.018,.065,.065),'#675c48',x+side*w*.505,.21+h*.65,z);
      };
      if(piece.kind==='city'){
       const w=.22,h=.41,x=-.12,z=-.015;
-      mesh(new THREE.CylinderGeometry(w*.48,w*.58,h,6),'#aaa38c',x,.21+h/2,z);
+      mesh(new THREE.CylinderGeometry(w*.48,w*.58,h,6),'#b7ad96',x,.21+h/2,z);
       mesh(new THREE.ConeGeometry(w*.69,.19,6),piece.color,x,.21+h+.095,z);
       mesh(new THREE.BoxGeometry(.055,.11,.018),'#514b40',x,.21+h*.68,z+w*.51);
+      mesh(new THREE.CylinderGeometry(.13,.13,.035,6),'#d6c7a6',x,.21+h*.80,z);
       house(.13,.025,.25,.23);
      }else house(0,0,.30,.23);
     }
@@ -695,7 +700,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const observer=new ResizeObserver(draw);observer.observe(el);const started=performance.now();
   const robberTargets=robberMeshes.map(mesh=>mesh.position.clone());
   const movingRobber=!!origin&&!!robber&&robberMeshes.length>0;
-  const tick=(now:number)=>{frame=0;lastAnimationTime=now;const begin=performance.now(),elapsed=document.hidden?Infinity:now-started,t=Math.min(1,elapsed/380),ease=1-Math.pow(1-t,3);for(const group of animated)group.scale.set(1,Math.max(.05,ease),1);
+  const tick=(now:number)=>{frame=0;lastAnimationTime=now;const begin=performance.now(),elapsed=document.hidden?Infinity:now-started,t=Math.min(1,elapsed/380);for(const group of animated){const pose=placementPose(t);group.position.y=.12+pose.lift;group.scale.set(1,pose.scaleY,1);}
    const u=Math.min(1,elapsed/520),smooth=u*u*(3-2*u);
    if(movingRobber&&origin&&robber){robberMeshes.forEach((mesh,i)=>{const dest=robberTargets[i];mesh.position.set(dest.x+(origin.p.x-robber.p.x)*(1-smooth),dest.y+Math.sin(Math.PI*u)*.48,dest.z+(origin.p.y-robber.p.y)*(1-smooth));});}
    const pulse=Math.min(1,elapsed/650);for(const ring of productionRings)ring.scale.setScalar(.85+.15*Math.sin(Math.PI*pulse));productionMaterial.opacity=.85*(1-pulse);
@@ -709,7 +714,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    if(pending)frame=requestAnimationFrame(tick);
   };
   // One initial layout draw, then lightweight animation-only renders.
-  for(const group of animated)group.scale.y=.05;
+  for(const group of animated){const pose=placementPose(0);group.position.y=.12+pose.lift;group.scale.y=pose.scaleY;}
   draw();if(animated.length||movingRobber||productionRings.length)frame=requestAnimationFrame(tick);
   let diceFrame=0,diceCompleteTimer=0,diceCancelled=false,diceSimulation:ReturnType<typeof createPhysicalDice>|undefined;
   if(diceRoll&&diceRoll.duration>0&&!motion.matches){
