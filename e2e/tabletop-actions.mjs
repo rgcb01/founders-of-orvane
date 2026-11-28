@@ -39,12 +39,12 @@ try {
   assert.equal(await page.getByRole('button',{name:/Begin game/}).count(),0);
   if(mode.startsWith('panels')){
    assert.equal(await page.locator('.fan-card').count(),25,'individual resource cards by default');
-   await page.getByRole('button',{name:'Build',exact:true}).click();
-   assert.equal(await page.locator('.build-option').count(),3);
-   const hand=await page.locator('.resource-hand').boundingBox(),build=await page.locator('.build-menu').boundingBox();
-   assert.ok(build.y+build.height<hand.y,'construction leaves the hand free');
+   const reserve=page.getByRole('region',{name:'Construction pieces'});
+   assert.equal(await reserve.getByRole('button').count(),3);
+   assert.equal(await page.getByRole('button',{name:'Build',exact:true}).count(),0);
+   const hand=await page.locator('.resource-hand').boundingBox();
+   await reserve.getByRole('button',{name:/Place Road/}).click();
    await page.screenshot({path:`/tmp/orvane-construction-${mode}.png`});
-   await page.getByRole('button',{name:'Close construction',exact:true}).click();
    const road=page.locator('g.edge.legal-site').first();await road.focus();await road.press('Enter');
    await page.getByRole('button',{name:'✓ Build road',exact:true}).click();
    await page.waitForFunction(()=>JSON.parse(localStorage.getItem('orvane.library.v1')).matches[0].game.roads.length===7);
