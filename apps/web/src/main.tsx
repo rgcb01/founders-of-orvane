@@ -33,7 +33,7 @@ import {needsHandoff,privateHandSeat} from './privateHandoff';
 import {TutorialCoach} from './TutorialCoach';
 import {advanceTutorial,currentLesson,newTutorial,setTutorialEnabled,tutorialTip,TUTORIAL_SEEN_KEY,type TutorialProgress,type TutorTarget} from './tutorial';
 import {usePwa} from './pwa';
-import {HomeMenu,Guide,ExpansionRoadmap,PlayerStrip,ResourceHand,ConstructionTray,BuildMenu,requiredPanel,visiblePanel,type Panel} from './GameUI';
+import {HomeMenu,Guide,ExpansionRoadmap,PlayerStrip,ResourceHand,ConstructionTray,requiredPanel,visiblePanel,type Panel} from './GameUI';
 
 const terrain:Record<Terrain,{name:string;icon:string;color:string;resource:string}>={
  forest:{name:'Forest',icon:'🌲',color:TERRAIN_COLORS.forest,resource:'Lumber'},
@@ -101,7 +101,6 @@ function App(){
  const [setup,setSetup]=useState<SetupState|null>(null);
  const [game,setGame]=useState<GameState|null>(null);
  const [build,setBuild]=useState<BuildKind>('road');
- const [buildOpen,setBuildOpen]=useState(false);
  const [seed,setSeed]=useState('orvane-001');
  const [draft,setDraft]=useState(seed);
  const [selection,setSelection]=useState<Selection|null>(null);
@@ -128,7 +127,7 @@ function App(){
  useEffect(()=>{
    if(!setup||setup.phase!=='complete'||game)return;
    const started=startGame(board,setup);
-   setGame(current=>current??started);setSelection(null);setBuildOpen(false);
+   setGame(current=>current??started);setSelection(null);
  },[board,setup,game]);
  const view=game??setup;
  const active3D=!!view&&experimental3D&&!webglFailed;
@@ -184,7 +183,7 @@ function App(){
  const myHand=view?.players.find(p=>p.id===showHand);
  const forcedPanel=requiredPanel(game,humanDecision);
  const activePanel=visiblePanel(game,humanDecision,panel);
- const openPanel=(p:Panel)=>{setBuildOpen(false);setPanel(p);setDrawerOpen(true);};
+ const openPanel=(p:Panel)=>{setPanel(p);setDrawerOpen(true);};
  const tutorLesson=currentLesson(tutorial,setup,game,humanDecision);
  const activateTutorial=()=>{
    if(!tutorial.enabled)setTutorial(t=>setTutorialEnabled(t,true));
@@ -197,7 +196,7 @@ function App(){
  const showTutorTarget=()=>{
    if(!tutorLesson)return;
    const target=tutorLesson.target;setCoachFocus(target);
-   if(target==='build')setBuildOpen(true);
+   if(target==='build')document.querySelector<HTMLButtonElement>('.construction-tray button:not(:disabled)')?.focus();
    if(target==='trade'||target==='cards'||target==='info')openPanel(target==='trade'?'trade':target==='cards'?'cards':'info');
    else setDrawerOpen(false);
    requestAnimationFrame(()=>{
@@ -286,7 +285,7 @@ function App(){
     }
     if(typing||e.ctrlKey||e.metaKey||e.altKey||pauseMenuOpen)return;
     if(game&&humanActive&&game.phase==='action'&&['1','2','3'].includes(e.key)){
-      e.preventDefault();setBuildOpen(true);setBuild((['road','settlement','city'] as BuildKind[])[Number(e.key)-1]);setSelection(null);setDrawerOpen(false);
+      e.preventDefault();setBuild((['road','settlement','city'] as BuildKind[])[Number(e.key)-1]);setSelection(null);setDrawerOpen(false);
     }else if(e.key.toLowerCase()==='i'){e.preventDefault();openPanel('info');}
     else if(e.key.toLowerCase()==='c'&&game&&humanDecision){e.preventDefault();openPanel('cards');}
     else if(e.key.toLowerCase()==='t'&&game&&humanDecision&&game.phase==='action'){e.preventDefault();openPanel('trade');}
@@ -451,7 +450,6 @@ function App(){
     <div className="map-top"><span className="map-brand">ORVANE</span><div>{view&&<button aria-label="Open journal" aria-expanded={drawerOpen&&activePanel==="info"} onClick={()=>drawerOpen&&activePanel==="info"?setDrawerOpen(false):openPanel("info")}><ControlIcon name="journal"/> <span className="toolbar-label">Journal</span></button>}<button aria-label="Follow board events" aria-pressed={follow} onClick={()=>setFollow(f=>!f)}><ControlIcon name="follow"/></button><button aria-label="Zoom out" disabled={!active3D&&zoom<=.75} onClick={()=>{if(active3D)camera3D.current?.zoomBy(-.25);else setZoom(z=>Math.max(.75,z-.25));}}><ControlIcon name="minus"/></button><button aria-label="Reset view" onClick={()=>{if(active3D)camera3D.current?.reset();else{setZoom(1);setPan({x:0,y:0});}}}><ControlIcon name="fit"/></button><button aria-label="Zoom in" disabled={!active3D&&zoom>=2.5} onClick={()=>{if(active3D)camera3D.current?.zoomBy(.25);else setZoom(z=>Math.min(2.5,z+.25));}}><ControlIcon name="plus"/></button></div></div>
     {view&&coachOpen&&tutorial.enabled&&<TutorialCoach progress={tutorial} lesson={tutorLesson} tip={coachFocus===tutorLesson?.target&&tutorLesson?tutorialTip(tutorLesson):"Try the highlighted action. Your real moves advance the lesson."} onShow={showTutorTarget} onHide={()=>{setCoachOpen(false);setCoachFocus(null);}} onSkip={skipTutorial}/>}
      {view&&<div className="board-event-slot">{view&&visual&&duration>0&&<EventStage key={visualQueue.length+':'+visual.kind+':'+(game?.turn??setup?.step)} event={visual} effectId={loadout.effects} celebrate={visual.playerId<humans&&!reduced} name={view.players.find(p=>p.id===visual.playerId)?.name??'Player'} other={'other' in visual&&visual.other!==null?view.players.find(p=>p.id===visual.other)?.name??'Player':'🏦 Bank'} duration={duration} color={view.players.find(p=>p.id===visual.playerId)?.color??'#ffe39b'}/>}{(!visual||duration===0)&&<div className="event-idle"><span>{humanDecision?'👤':'🎲'}</span><strong>{view.players.find(p=>p.id===(decision??playerId))?.name??'Match'} </strong><span className="muted">{humanDecision?'Your action':paused?'Paused':'Watching the board'}</span></div>}</div>}
-    {game&&humanActive&&game.phase==='action'&&buildOpen&&<BuildMenu onClose={()=>setBuildOpen(false)} board={board} game={game} build={build} onSelect={k=>{setBuild(k);setSelection(null);}}/>}
     {active3D?<div className="tabletop-world" style={{position:'absolute',inset:0,top:54,bottom:45,zIndex:0}}><BoardScene3D board={board} diceRoll={visual?.kind==='dice'&&duration>0&&!reduced?{values:visual.dice,duration,impulse:throwImpulse.current?.values===visual.dice?throwImpulse.current.impulse:undefined,onImpact:strength=>audio.playDiceImpact(strength,visual.playerId>=humans),onComplete:()=>setVisualQueue(q=>q[0]===visual?q.slice(1):q)}:undefined} graphicsQuality={graphicsQuality} onGraphicsQualityChange={changeGraphicsQuality} cameraControls={camera3D} ambientPaused={paused||pauseMenuOpen||pace==='turbo'||reduced} robberTile={game?.development.robber} producingTiles={visual?.kind==='production'&&duration>0&&!reduced?visual.tiles:undefined} pieces={{roads:(view?.roads??[]).map(r=>({edgeId:r.edgeId,color:view?.players.find(p=>p.id===r.playerId)?.color??'#ffffff'})),buildings:(view?.settlements??[]).map(v=>({vertexId:v.vertexId,kind:game?.settlements.some(s=>s.vertexId===v.vertexId&&s.kind==='city')?'city' as const:'settlement' as const,color:view?.players.find(p=>p.id===v.playerId)?.color??'#ffffff'}))}} legalVertices={[...validVertices]} legalEdges={[...validEdges]} onSelect={v=>setSelection(v)} onUnavailable={()=>{setWebglFailed(true);setExperimental3D(false);}}/></div>:<>
     <svg ref={svg} data-board-root="true" viewBox={[bounds.x+(bounds.w-viewW)/2+pan.x,bounds.y+(bounds.h-viewH)/2+pan.y,viewW,viewH].join(' ')} onPointerDown={start} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onClickCapture={e=>{
          if(performance.now()-lastGestureEnd.current<320){e.preventDefault();e.stopPropagation();return;}
@@ -491,8 +489,8 @@ function App(){
    <section className="panel terrain-legend"><h2>Terrain</h2>{(Object.keys(terrain) as Terrain[]).map(t=><div key={t} className="legend"><span style={{background:terrain[t].color}} className="swatch"/><span>{terrain[t].name}</span><span>{board.tiles.filter(x=>x.terrain===t).length}</span></div>)}</section>{activity.length>0&&<details className="panel activity"><summary>📜 Activity</summary>{activity.slice(0,24).map((a,i)=><p key={i}>{a}</p>)}</details>}</div>}
    </aside>
   </div>
-  {view&&myHand&&<ConstructionTray color={myHand.color} counts={pieceCounts} available={pieceAvailable} selected={build} onSelect={kind=>{setBuild(kind);setSelection(null);setBuildOpen(false);setDrawerOpen(false);}} onLocate={locateConstruction} onPlace={placeConstruction} onPreview={active3D?(kind,id)=>camera3D.current?.previewPiece(id?{kind,id,color:myHand.color}:null):undefined}/>}
-  {view&&<nav className="match-dock" aria-label="Match controls"><div className="desktop-hand-label">{myHand?myHand.name+" · Your hand":"Private hand"}</div>{myHand?<ResourceHand key={myHand.id} resources={myHand.resources} queue={visualQueue} solo={humans===1} canDrag={humanDecision&&humanActive&&game?.phase==='action'&&!game.offer}/>:<div className="hand-strip">{handoffPending?"🔒 Hand hidden · pass device":"🤖 Opponent turn"}</div>}<div className="dock-actions"><button onClick={()=>setDrawerOpen(false)} aria-label="Map"><ControlIcon name="map"/> Map</button>{game&&humanActive&&game.phase==="action"&&<button onClick={()=>{setDrawerOpen(false);setBuildOpen(v=>!v);}} aria-expanded={buildOpen} aria-label="Build"><ControlIcon name="build"/> Build</button>}{game&&humanDecision&&game.phase==="action"&&<button onClick={()=>openPanel('trade')} aria-label="Trade"><ControlIcon name="trade"/> Trade</button>}{game&&humanDecision&&!game.offer&&<button onClick={()=>openPanel('cards')} aria-label="Cards"><ControlIcon name="cards"/> Cards</button>}{!game&&setup?.phase==="complete"?<span role="status">Starting the match…</span>:!game&&humanDecision&&setup?.phase!=="complete"?<button disabled={!selectionLegal} onClick={confirmPlacement}>✓ Place</button>:game&&humanActive&&game.phase==="roll"?<button data-coach-target="roll" onClick={()=>{setGame(applyGame(board,game,{kind:"roll",playerId:game.active,dice:rollDice()}));setSelection(null);}}><ControlIcon name="roll"/> Roll</button>:game&&humanActive&&game.phase==="action"?<button disabled={!!game.offer} onClick={()=>{setGame(applyGame(board,game,{kind:"end",playerId:game.active}));setSelection(null);}}><ControlIcon name="end"/> End turn</button>:<button onClick={()=>setPauseMenuOpen(true)}><ControlIcon name="menu"/> Menu</button>}</div></nav>}
+  {view&&myHand&&<ConstructionTray resources={game?myHand.resources:undefined} color={myHand.color} counts={pieceCounts} available={pieceAvailable} selected={build} onSelect={kind=>{setBuild(kind);setSelection(null);setDrawerOpen(false);}} onLocate={locateConstruction} onPlace={placeConstruction} onPreview={active3D?(kind,id)=>camera3D.current?.previewPiece(id?{kind,id,color:myHand.color}:null):undefined}/>}
+  {view&&<nav className="match-dock" aria-label="Match controls"><div className="desktop-hand-label">{myHand?myHand.name+" · Your hand":"Private hand"}</div>{myHand?<ResourceHand key={myHand.id} resources={myHand.resources} queue={visualQueue} solo={humans===1} canDrag={humanDecision&&humanActive&&game?.phase==='action'&&!game.offer}/>:<div className="hand-strip">{handoffPending?"🔒 Hand hidden · pass device":"🤖 Opponent turn"}</div>}<div className="dock-actions"><button onClick={()=>setDrawerOpen(false)} aria-label="Map"><ControlIcon name="map"/> Map</button>{game&&humanDecision&&game.phase==="action"&&<button onClick={()=>openPanel('trade')} aria-label="Trade"><ControlIcon name="trade"/> Trade</button>}{game&&humanDecision&&!game.offer&&<button onClick={()=>openPanel('cards')} aria-label="Cards"><ControlIcon name="cards"/> Cards</button>}{!game&&setup?.phase==="complete"?<span role="status">Starting the match…</span>:!game&&humanDecision&&setup?.phase!=="complete"?<button disabled={!selectionLegal} onClick={confirmPlacement}>✓ Place</button>:game&&humanActive&&game.phase==="roll"?<button data-coach-target="roll" onClick={()=>{setGame(applyGame(board,game,{kind:"roll",playerId:game.active,dice:rollDice()}));setSelection(null);}}><ControlIcon name="roll"/> Roll</button>:game&&humanActive&&game.phase==="action"?<button disabled={!!game.offer} onClick={()=>{setGame(applyGame(board,game,{kind:"end",playerId:game.active}));setSelection(null);}}><ControlIcon name="end"/> End turn</button>:<button onClick={()=>setPauseMenuOpen(true)}><ControlIcon name="menu"/> Menu</button>}</div></nav>}
   {handoffPending&&view&&decision!==null&&<div className="handoff-curtain" role="presentation"><section className="handoff-window" role="dialog" aria-modal="true" aria-label="Pass the device"><span className="handoff-sigil" aria-hidden="true">♜</span><p className="eyebrow">PRIVATE PLAYER TURN</p><h2>Pass the device</h2><p>Hand the screen to <strong>{view.players.find(p=>p.id===decision)?.name??'the next player'}</strong>.</p><p className="muted">Your cards and private actions remain hidden until you are ready.</p><button className="primary-action" autoFocus onClick={()=>{setRevealedSeat(decision);setSelection(null);setDrawerOpen(false);}}>✓ I'm ready</button></section></div>}
    {view&&pauseMenuOpen&&<div className="pause-curtain" onClick={()=>setPauseMenuOpen(false)}><section className="pause-window" role="dialog" aria-modal="true" aria-label="Pause menu" onClick={e=>e.stopPropagation()}><span className="pause-sigil">♜</span><p className="eyebrow">FOUNDERS OF ORVANE</p><h2>Game menu</h2><small aria-label="Build version">v1.1.0-beta.1</small><p className="muted">Bots pause while this menu is open.</p>
  <div className="mobile-pause-options tabletop-pause-options"><label>Bot pace <select aria-label="Pause menu bot pace" value={pace} onChange={e=>setPace(e.target.value as Pace)}>{(Object.keys(PACES) as Pace[]).map(p=><option key={p} value={p}>{PACES[p].label}</option>)}</select></label><button onClick={()=>{setPaused(v=>!v);setStepRequested(false);}}>{paused?'▶ Resume bots':'⏸ Pause bots'}</button>{paused&&<button disabled={!botBusy||stepRequested||!!visual} onClick={()=>{setPauseMenuOpen(false);setStepRequested(true);}}>Next action →</button>}{visual&&<button onClick={()=>setVisualQueue(q=>q.slice(1))}>Skip animation →</button>}</div>
