@@ -3,7 +3,7 @@ import type Rapier from '@dimforge/rapier3d-compat';
 type Physics=typeof Rapier;
 let loading:Promise<Physics>|undefined;
 export function loadDicePhysics(){return loading??=import('@dimforge/rapier3d-compat').then(async m=>{await m.default.init();return m.default;}).catch(e=>{loading=undefined;throw e;});}
-export type DiceImpulse={x:number;z:number};
+export type DiceImpulse={x:number;z:number;origin?:{x:number;z:number}};
 export type DiceObstacle={x:number;y:number;z:number;hx:number;hy:number;hz:number};
 const normals=[new THREE.Vector3(1,0,0),new THREE.Vector3(-1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(0,-1,0),new THREE.Vector3(0,0,1),new THREE.Vector3(0,0,-1)];
 const values=[3,4,1,6,2,5];
@@ -23,7 +23,7 @@ export function createPhysicalDice(R:Physics,scene:THREE.Scene,center:{x:number;
  staticBox(center.x,-.25,center.z,extent.x,.25,extent.z);
  for(const o of obstacles)staticBox(o.x,o.y,o.z,o.hx,o.hy,o.hz);
  const bodies=result.map((value,i)=>{
-  const body=world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(center.x+(i? .45:-.45),2.4+i*.35,center.z+extent.z*.48).setLinvel((impulse?.x??0)+(i?-.65:.65),-1,impulse?.z??-3.5).setAngvel({x:10+i*3+(impulse?.z??0),y:8-i*4,z:12-i*2-(impulse?.x??0)}).setLinearDamping(.65).setAngularDamping(.8).setCcdEnabled(true));
+  const body=world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation((impulse?.origin?.x??center.x)+(i? .45:-.45),2.4+i*.35,impulse?.origin?.z??center.z+extent.z*.48).setLinvel((impulse?.x??0)+(i?-.65:.65),-1,impulse?.z??-3.5).setAngvel({x:10+i*3+(impulse?.z??0),y:8-i*4,z:12-i*2-(impulse?.x??0)}).setLinearDamping(.65).setAngularDamping(.8).setCcdEnabled(true));
   world.createCollider(R.ColliderDesc.cuboid(half,half,half).setDensity(1.2).setFriction(.74).setRestitution(.42),body);
   const mats=values.map(faceMaterial);const mesh=new THREE.Mesh(new THREE.BoxGeometry(half*2,half*2,half*2),mats);scene.add(mesh);
   return {body,mesh,value,mats};
