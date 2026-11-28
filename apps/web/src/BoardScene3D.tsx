@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState,type RefObject} from 'react';
 import * as THREE from 'three';
+import {loadDicePhysics,createPhysicalDice,type DiceObstacle} from './PhysicalDice';
 import {tilePosition,vertexPosition,type Board} from '@orvane/engine';
 import {TERRAIN_COLORS} from './TerrainArt';
 import {adaptResolution,resolutionCap,resolutionStart,nextFrameDeadline,TARGET_FPS,canRecoverCadence,adaptShadows,type ResolutionState} from './adaptiveResolution';
@@ -12,7 +13,7 @@ export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void;proj
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type BoatBatch={mesh:THREE.InstancedMesh;parts:{boat:THREE.Group;local:THREE.Matrix4}[]};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
-export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges,robberTile,producingTiles,cameraControls,ambientPaused=false,graphicsQuality,onGraphicsQualityChange}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[];robberTile?:string;producingTiles?:readonly string[];cameraControls?:RefObject<BoardCameraControls|null>;ambientPaused?:boolean;graphicsQuality?:GraphicsQuality;onGraphicsQualityChange?:(q:GraphicsQuality)=>void}){
+export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges,robberTile,producingTiles,cameraControls,ambientPaused=false,graphicsQuality,onGraphicsQualityChange,diceRoll}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[];robberTile?:string;producingTiles?:readonly string[];cameraControls?:RefObject<BoardCameraControls|null>;ambientPaused?:boolean;graphicsQuality?:GraphicsQuality;onGraphicsQualityChange?:(q:GraphicsQuality)=>void;diceRoll?:{values:[number,number];duration:number;onComplete?:()=>void}}){
  const [localQuality,setLocalQuality]=useState<GraphicsQuality>(readGraphicsQuality);
  const quality=graphicsQuality??localQuality;
  const changeQuality=(q:GraphicsQuality)=>{if(onGraphicsQualityChange)onGraphicsQualityChange(q);else{setLocalQuality(q);persistGraphicsQuality(q);}};
@@ -50,6 +51,8 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
  const previousPieces=useRef<{board:Board;keys:Set<string>}|null>(null);
  const cameraPose=useRef({zoom:1,azimuth:0,panX:0,panY:0});
  // Parent game UI creates fresh arrays on every render; only rebuild WebGL when their content changes.
+ const diceKey=diceRoll?diceRoll.values.join(',')+':'+diceRoll.duration:'';
+ useEffect(()=>{void loadDicePhysics().catch(()=>{});},[]);
  const productionKey=(producingTiles??[]).join('|');
  const piecesKey=JSON.stringify(pieces??null);
  const legalVerticesKey=(legalVertices??[]).join('|');
@@ -688,10 +691,24 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   // One initial layout draw, then lightweight animation-only renders.
   for(const group of animated)group.scale.y=.05;
   draw();if(animated.length||movingRobber||productionRings.length)frame=requestAnimationFrame(tick);
+  let diceFrame=0,diceCompleteTimer=0,diceCancelled=false,diceSimulation:ReturnType<typeof createPhysicalDice>|undefined;
+  if(diceRoll&&diceRoll.duration>0&&!motion.matches){
+   const diceStarted=performance.now();
+   void loadDicePhysics().then(R=>{
+    if(diceCancelled)return;
+    const obstacles:DiceObstacle[]=positions.map(({p})=>({x:p.x,y:.06,z:p.y,hx:.78,hy:.06,hz:.78}));
+    for(const building of display.buildings){const p=vertices.get(building.vertexId);if(p){const h=building.kind==='city'?.8:.55;obstacles.push({x:p.x,y:.12+h/2,z:p.y,hx:.24,hy:h/2,hz:.23});}}
+    diceSimulation=createPhysicalDice(R,scene,center,{x:size.x/2+1,z:size.z/2+1},diceRoll.values,obstacles,Math.max(200,diceRoll.duration-(performance.now()-diceStarted)));
+    let previous=performance.now();
+    const rollTick=(now:number)=>{diceFrame=0;if(diceCancelled||!diceSimulation)return;const running=diceSimulation.step(document.hidden?0:Math.min((now-previous)/1000,.1));previous=now;lastAnimationTime=now;if(!document.hidden)render();if(running)diceFrame=requestAnimationFrame(rollTick);else diceCompleteTimer=window.setTimeout(()=>{if(!diceCancelled)diceRoll.onComplete?.();},450);};
+    diceFrame=requestAnimationFrame(rollTick);
+   }).catch(()=>{if(!diceCancelled)diceRoll.onComplete?.();});
+  }
+
   syncAmbient();
   const lost=(e:Event)=>{e.preventDefault();fallback.current();};renderer.domElement.addEventListener('webglcontextlost',lost);
-  return()=>{clearPreview();document.removeEventListener('visibilitychange',visibilityChanged);motion.removeEventListener('change',syncAmbient);if(ambientControl.current===syncAmbient)ambientControl.current=null;if(cameraControls?.current===controls)cameraControls.current=null;observer.disconnect();cancelAnimationFrame(ambientFrame);cancelAnimationFrame(frame);cancelAnimationFrame(cameraFrame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);};
+  return()=>{diceCancelled=true;window.clearTimeout(diceCompleteTimer);cancelAnimationFrame(diceFrame);diceSimulation?.dispose();clearPreview();document.removeEventListener('visibilitychange',visibilityChanged);motion.removeEventListener('change',syncAmbient);if(ambientControl.current===syncAmbient)ambientControl.current=null;if(cameraControls?.current===controls)cameraControls.current=null;observer.disconnect();cancelAnimationFrame(ambientFrame);cancelAnimationFrame(frame);cancelAnimationFrame(cameraFrame);productionGeometry.dispose();productionMaterial.dispose();markerGeometry.dispose();markerMaterial.dispose();canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointercancel',up);canvas.removeEventListener('wheel',wheel);renderer.domElement.removeEventListener('webglcontextlost',lost);};
  // eslint-disable-next-line react-hooks/exhaustive-deps
- },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile,productionKey,quality,cameraControls]);
+ },[board,piecesKey,legalVerticesKey,legalEdgesKey,robberTile,productionKey,quality,cameraControls,diceKey]);
  return <div style={{width:'100%',height:'100%',minHeight:240,position:'relative'}}><div ref={host} aria-label="Experimental 3D board preview" style={{width:'100%',height:'100%',minHeight:240}}/><div ref={harborLabels} role="group" aria-label="Harbor exchange rates" style={{position:'absolute',inset:0,pointerEvents:'none',overflow:'hidden'}}>{board.harbors.map(h=><span key={h.edgeId} data-harbor-edge={h.edgeId} aria-label={`${h.resource??'Generic'} harbor ${h.rate}:1`} style={{position:'absolute',visibility:'hidden',transform:'translate(-50%,-100%)',whiteSpace:'nowrap',background:'#26362de6',color:'#f4e4bd',border:'1px solid #a88b59',borderRadius:2,padding:'3px 5px',fontSize:10,fontWeight:700,lineHeight:1.15,letterSpacing:'.035em',textTransform:'uppercase',boxShadow:'0 2px 3px #132c3480'}}>{h.resource??'Any'} {h.rate}:1</span>)}</div>{(!cameraControls||diagnosticQuality)&&<div style={{position:'absolute',right:12,top:12,zIndex:2}}><GraphicsQualitySelect value={quality} onChange={changeQuality}/></div>}{!cameraControls&&<button type="button" aria-label="Reset 3D camera" onClick={()=>resetCamera.current()} style={{position:'absolute',right:12,bottom:12,zIndex:2}}>⌂</button>}{showPerf&&<output ref={perfHud} aria-label="3D performance" style={{position:'absolute',left:8,top:8,zIndex:3,background:'#142c35',color:'#fff',padding:'5px 8px',borderRadius:4,fontSize:11,pointerEvents:'none',fontVariantNumeric:'tabular-nums'}}>Measuring FPS…</output>}{selected&&<output aria-live="polite" style={{position:'absolute',left:12,bottom:12,background:'#19333c',color:'#fff',padding:'8px 12px',borderRadius:8,pointerEvents:'none'}}>Selected {selected.kind}: {selected.id}</output>}</div>;
 }
