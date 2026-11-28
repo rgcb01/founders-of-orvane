@@ -78,7 +78,8 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    const x=p.x,z=p.y;
    // Miniature terrain uses shared unit geometry and per-instance transforms.
    // Leave the southern token shelf and perimeter construction sites clear.
-   const rotation=((Math.round(p.x*100)*31+Math.round(p.y*100)*17)%17)*.045;
+   const variation=((Math.round(p.x*100)*31+Math.round(p.y*100)*17)%17+17)%17;
+   const rotation=(variation-8)*.085;
    const detail=(g:THREE.BufferGeometry,c:string,dx:number,y:number,dz:number,sx=1,sy=1,sz=1)=>{const m=add(g,c,x+dx,y,z+dz);m.scale.set(sx,sy,sz);m.rotation.y=rotation;return m;};
    switch(tile.terrain){
     case 'forest': {
@@ -88,6 +89,8 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
       detail(new THREE.ConeGeometry(.23,.42,6),'#315d45',dx,.32+h*.12,dz,h,h,h);
       detail(new THREE.ConeGeometry(.17,.34,6),'#497458',dx,.51+h*.12,dz,h,h,h);
      }
+     const log=detail(new THREE.CylinderGeometry(.038,.053,.22,5),'#76553b',-.43,.155,.33,1,1.45,1);log.rotation.z=Math.PI/2;
+     for(const [dx,dz] of [[-.58,-.07],[.56,.12]])detail(new THREE.IcosahedronGeometry(.10,0),'#d69a71',dx,.145,dz,.85,.38,.65);
      break;
     }
     case 'pasture': {
@@ -95,7 +98,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
       detail(new THREE.IcosahedronGeometry(.13,0),'#e0d9bd',dx,.24,dz,1.4*scale,.8*scale,scale);
       detail(new THREE.IcosahedronGeometry(.055,0),'#665e50',dx+.14*scale,.24,dz,scale,scale,scale);
      }
-     for(const [dx,dz] of [[-.45,.03],[.18,.34],[.42,-.3]])detail(new THREE.ConeGeometry(.09,.12,4),'#7d9460',dx,.16,dz,1,.7,1);
+     for(const [dx,dz] of [[-.45,.03],[.18,.34],[.42,-.3],[-.52,.25],[.50,.18]])detail(new THREE.ConeGeometry(.09,.12,4),'#7d9460',dx,.16,dz,1,.7,1);
      break;
     }
     case 'field': {
@@ -103,7 +106,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
       const dx=(i-2)*.18;
       detail(new THREE.BoxGeometry(.13,.035,.78),'#8f713e',dx,.14,-.12).rotation.y=0;
       for(let j=0;j<5;j++){
-       const plant=detail(new THREE.ConeGeometry(.055,.15,4),'#e3bf65',dx,.22,(j-2)*.15-.12,1,.85+((i+j)%3)*.15,1);
+       const plant=detail(new THREE.ConeGeometry(.055,.15,4),'#e3bf65',dx,.22,(j-2)*.15-.12,1,.78+((i+j+variation)%4)*.14,1);
        vegetation.push({mesh:plant,phase:x+z+i*.3+j*.2});
       }
      }
@@ -113,7 +116,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
      for(const [dx,dz,h] of [[-.34,-.18,.28],[.18,-.22,.36],[.36,.17,.24],[-.16,.23,.18]]){
       detail(new THREE.IcosahedronGeometry(.35,0),'#b67d55',dx,.12+h*.3,dz,.9,h/.35,.85);
      }
-     for(const [dx,dz] of [[-.34,.05],[.12,.15],[.43,-.14]])detail(new THREE.IcosahedronGeometry(.10,0),'#d69a71',dx,.17,dz,1,.55,.85);
+     for(const [dx,dz] of [[-.34,.05],[.12,.15],[.43,-.14],[-.48,.29],[.45,.31]])detail(new THREE.IcosahedronGeometry(.10,0),'#d69a71',dx,.17,dz,1,.55,.85);
      break;
     }
     case 'mountain': {
@@ -121,11 +124,13 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
       const peak=detail(new THREE.ConeGeometry(1,1,5),'#697b85',dx,.12+h/2,dz,w,h,w);
       const snow=detail(new THREE.ConeGeometry(1,1,5),'#e2e6df',dx,.12+h*.825,dz,w*.35,h*.35,w*.35);snow.rotation.y=peak.rotation.y;
      }
+     for(const [dx,dz] of [[-.49,.17],[.43,.24],[-.13,.33]])detail(new THREE.ConeGeometry(1,1,5),'#697b85',dx,.20,dz,.13,.16,.11);
      break;
     }
     case 'desert': {
      detail(new THREE.SphereGeometry(.5,6,3),'#e2c18a',-.18,-.01,-.13,1,.36,.65);
      detail(new THREE.SphereGeometry(.5,6,3),'#e2c18a',.32,-.025,.13,.65,.33,.45);
+     detail(new THREE.SphereGeometry(.5,6,3),'#e2c18a',-.43,-.028,.23,.48,.33,.32);
      break;
     }
    }
