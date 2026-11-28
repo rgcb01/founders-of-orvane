@@ -1,3 +1,4 @@
+import {placementPose} from './placementMotion';
 import {useEffect,useRef,useState,type RefObject} from 'react';
 import * as THREE from 'three';
 import {loadDicePhysics,createPhysicalDice,type DiceObstacle,type DiceImpulse} from './PhysicalDice';
@@ -217,7 +218,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const entries=pieceCache.current.entries;
   const activeKeys=new Set([...display.roads.map(r=>'road:'+r.edgeId+':'+r.color),...display.buildings.map(b=>b.kind+':'+b.vertexId+':'+b.color)]);
   for(const key of entries.keys())if(!activeKeys.has(key))entries.delete(key);
-  const reuse=(key:string)=>{const entry=entries.get(key);if(!entry)return false;for(const object of entry.objects){object.scale.y=object instanceof THREE.Group?1:object.scale.y;include(object);}selectable.push(entry.pick);return true;};
+  const reuse=(key:string)=>{const entry=entries.get(key);if(!entry)return false;for(const object of entry.objects){if(object instanceof THREE.Group){object.scale.y=1;object.position.y=.12;}include(object);}selectable.push(entry.pick);return true;};
   const animated:THREE.Group[]=[];
   const groupNew=(key:string,start:number,x:number,z:number)=>{if(!animate||prior?.keys.has(key))return;const group=new THREE.Group();group.position.set(x,.12,z);groupSince(group,start);animated.push(group);};
   const settledRoads:{id:string;color:string;length:number;x:number;z:number;angle:number}[]=[];
@@ -699,7 +700,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
   const observer=new ResizeObserver(draw);observer.observe(el);const started=performance.now();
   const robberTargets=robberMeshes.map(mesh=>mesh.position.clone());
   const movingRobber=!!origin&&!!robber&&robberMeshes.length>0;
-  const tick=(now:number)=>{frame=0;lastAnimationTime=now;const begin=performance.now(),elapsed=document.hidden?Infinity:now-started,t=Math.min(1,elapsed/380),ease=1-Math.pow(1-t,3);for(const group of animated)group.scale.set(1,Math.max(.05,ease),1);
+  const tick=(now:number)=>{frame=0;lastAnimationTime=now;const begin=performance.now(),elapsed=document.hidden?Infinity:now-started,t=Math.min(1,elapsed/380);for(const group of animated){const pose=placementPose(t);group.position.y=.12+pose.lift;group.scale.set(1,pose.scaleY,1);}
    const u=Math.min(1,elapsed/520),smooth=u*u*(3-2*u);
    if(movingRobber&&origin&&robber){robberMeshes.forEach((mesh,i)=>{const dest=robberTargets[i];mesh.position.set(dest.x+(origin.p.x-robber.p.x)*(1-smooth),dest.y+Math.sin(Math.PI*u)*.48,dest.z+(origin.p.y-robber.p.y)*(1-smooth));});}
    const pulse=Math.min(1,elapsed/650);for(const ring of productionRings)ring.scale.setScalar(.85+.15*Math.sin(Math.PI*pulse));productionMaterial.opacity=.85*(1-pulse);
@@ -713,7 +714,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
    if(pending)frame=requestAnimationFrame(tick);
   };
   // One initial layout draw, then lightweight animation-only renders.
-  for(const group of animated)group.scale.y=.05;
+  for(const group of animated){const pose=placementPose(0);group.position.y=.12+pose.lift;group.scale.y=pose.scaleY;}
   draw();if(animated.length||movingRobber||productionRings.length)frame=requestAnimationFrame(tick);
   let diceFrame=0,diceCompleteTimer=0,diceCancelled=false,diceSimulation:ReturnType<typeof createPhysicalDice>|undefined;
   if(diceRoll&&diceRoll.duration>0&&!motion.matches){
