@@ -108,7 +108,7 @@ function App(){
  const [experimental3D,setExperimental3D]=useState(()=>new URLSearchParams(window.location.search).get('renderer')!=='2d');
  const [webglFailed,setWebglFailed]=useState(false);
  const camera3D=useRef<BoardCameraControls|null>(null);
- const throwImpulse=useRef<{values:[number,number];impulse:{x:number;z:number}}|null>(null);
+ const throwImpulse=useRef<{values:[number,number];impulse:{x:number;z:number;origin?:{x:number;z:number}}}|null>(null);
  const diceGesture=useRef<{id:number;x:number;y:number;time:number}|null>(null);
  const [diceDrag,setDiceDrag]=useState<{x:number;y:number}|null>(null);
 
@@ -321,11 +321,12 @@ function App(){
  };
  const setBoard=(s:BoardSize,seed:string)=>{setSize(s);setGame(null);setSetup(null);setBotError('');setActivity([]);setVisualQueue([]);setPaused(false);setStepRequested(false);attempts.current={turn:0,count:0};setSeed(seed);setDraft(seed);setSelection(null);setPan({x:0,y:0});setZoom(1);setRevealedSeat(null);previousDecision.current=null;};
  const select=(kind:Selection['kind'],id:string)=>setSelection({kind,id});
- const rollFromTray=(dx?:number,dy?:number)=>{
+ const rollFromTray=(dx?:number,dy?:number,releaseX?:number,releaseY?:number)=>{
   if(!game||!humanActive||game.phase!=='roll')return;
   const values=rollDice();
-  throwImpulse.current=dx!==undefined&&dy!==undefined?{values,impulse:camera3D.current?.throwVector(dx,dy)??{x:dx,z:dy}}:null;
-  setGame(applyGame(board,game,{kind:'roll',playerId:game.active,dice:values}));setSelection(null);
+  const next=applyGame(board,game,{kind:'roll',playerId:game.active,dice:values});
+  throwImpulse.current=next.dice&&dx!==undefined&&dy!==undefined?{values:next.dice,impulse:camera3D.current?.throwVector(dx,dy,releaseX,releaseY)??{x:dx,z:dy}}:null;
+  setGame(next);setSelection(null);
  };
 
  const constructionSites=(kind:BuildKind):string[]=>{
@@ -475,7 +476,7 @@ function App(){
       {visual&&duration>0&&!reduced&&<BoardEffects key={visualQueue.length+":"+visual.kind+":"+(game?.turn??setup?.step)} event={visual} loadout={humans===1&&visual.playerId===0?loadout:{...DEFAULT_LOADOUT,robber:loadout.robber}} board={board} points={points} r={R} duration={duration} color={view?.players.find(p=>p.id===visual.playerId)?.color??"#ffe39b"}/>}
     </svg></>}
 
-    {game&&humanActive&&game.phase==='roll'&&active3D&&<button type="button" className="dice-flick-tray" aria-label="Drag to throw dice or click to roll" onPointerDown={e=>{if(e.button!==0)return;e.currentTarget.setPointerCapture(e.pointerId);diceGesture.current={id:e.pointerId,x:e.clientX,y:e.clientY,time:performance.now()};}} onPointerMove={e=>{const g=diceGesture.current;if(g?.id!==e.pointerId)return;if(Math.hypot(e.clientX-g.x,e.clientY-g.y)>6)setDiceDrag({x:e.clientX-g.x,y:e.clientY-g.y});}} onPointerUp={e=>{const g=diceGesture.current;diceGesture.current=null;setDiceDrag(null);if(!g||g.id!==e.pointerId)return;const dx=e.clientX-g.x,dy=e.clientY-g.y;if(Math.hypot(dx,dy)<8){rollFromTray();return;}const seconds=Math.max(.08,(performance.now()-g.time)/1000),scale=.012/seconds;rollFromTray(dx*scale,dy*scale);}} onPointerCancel={()=>{diceGesture.current=null;setDiceDrag(null);}} onLostPointerCapture={()=>{diceGesture.current=null;setDiceDrag(null);}} onClick={e=>{if(e.detail===0)rollFromTray();}}><span style={{transform:diceDrag?'translate('+diceDrag.x+'px,'+diceDrag.y+'px)':undefined}}><Die3D value={5} index={0} rolling={false}/><Die3D value={3} index={1} rolling={false}/></span><small>Drag to throw</small></button>}
+    {game&&humanActive&&game.phase==='roll'&&active3D&&<button type="button" className="dice-flick-tray" aria-label="Drag to throw dice or click to roll" onPointerDown={e=>{if(e.button!==0)return;e.currentTarget.setPointerCapture(e.pointerId);diceGesture.current={id:e.pointerId,x:e.clientX,y:e.clientY,time:performance.now()};}} onPointerMove={e=>{const g=diceGesture.current;if(g?.id!==e.pointerId)return;if(Math.hypot(e.clientX-g.x,e.clientY-g.y)>6)setDiceDrag({x:e.clientX-g.x,y:e.clientY-g.y});}} onPointerUp={e=>{const g=diceGesture.current;diceGesture.current=null;setDiceDrag(null);if(!g||g.id!==e.pointerId)return;const dx=e.clientX-g.x,dy=e.clientY-g.y;if(Math.hypot(dx,dy)<8){rollFromTray();return;}const seconds=Math.max(.08,(performance.now()-g.time)/1000),scale=.012/seconds;rollFromTray(dx*scale,dy*scale,e.clientX,e.clientY);}} onPointerCancel={()=>{diceGesture.current=null;setDiceDrag(null);}} onLostPointerCapture={()=>{diceGesture.current=null;setDiceDrag(null);}} onClick={e=>{if(e.detail===0)rollFromTray();}}><span style={{transform:diceDrag?'translate('+diceDrag.x+'px,'+diceDrag.y+'px)':undefined}}><Die3D value={5} index={0} rolling={false}/><Die3D value={3} index={1} rolling={false}/></span><small>Drag to throw</small></button>}
     {game?.dice&&<div className={"dice-display"+(visual?.kind==="dice"&&duration>0&&!reduced&&!active3D?" board-dice-throw":"")} style={visual?.kind==="dice"?{animationDuration:`${duration}ms`}:undefined} aria-label={'Dice total '+(game.dice[0]+game.dice[1])}>{game.dice.map((n,i)=><Die3D key={i+':'+(game.turn??0)+':'+(visual?.kind==='dice'?'roll':'rest')} value={n} index={i} rolling={visual?.kind==='dice'&&duration>0&&!reduced&&!active3D}/>)}<strong>{game.dice[0]+game.dice[1]}</strong><span className="muted">{game.paired?'Paired action':'Last roll'}</span></div>}
     <p className="map-help">{setup&&!game&&humanDecision&&setup.phase!=='complete'?(setup.phase==='settlement'?'🏠 Tap a highlighted junction':'🛤️ Tap a highlighted road'):game&&humanActive&&game.phase==='action'?(legal.length?'Tap a highlighted site to build':'Not enough resources or no legal sites for '+build):'Drag to move · pinch to zoom · tap a highlighted site'}</p>
     {setup&&!game&&humanDecision&&setup.phase!=='complete'&&<div className="map-confirm"><button disabled={!selectionLegal} onClick={confirmPlacement}>{selectionLegal?'✓ Confirm '+setup.phase:'Select a highlighted '+(setup.phase==='road'?'road':'junction')}</button></div>}
