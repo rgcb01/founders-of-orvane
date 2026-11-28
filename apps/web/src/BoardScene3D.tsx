@@ -13,7 +13,7 @@ export type BoardCameraControls={zoomBy:(delta:number)=>void;reset:()=>void;proj
 type BoardSelection={kind:'tile'|'vertex'|'edge';id:string};
 type BoatBatch={mesh:THREE.InstancedMesh;parts:{boat:THREE.Group;local:THREE.Matrix4}[]};
 type Pieces={roads:{edgeId:string;color:string}[];buildings:{vertexId:string;color:string;kind:'settlement'|'city'}[]};
-export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges,robberTile,producingTiles,cameraControls,ambientPaused=false,graphicsQuality,onGraphicsQualityChange,diceRoll}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[];robberTile?:string;producingTiles?:readonly string[];cameraControls?:RefObject<BoardCameraControls|null>;ambientPaused?:boolean;graphicsQuality?:GraphicsQuality;onGraphicsQualityChange?:(q:GraphicsQuality)=>void;diceRoll?:{values:[number,number];duration:number;impulse?:DiceImpulse;onComplete?:()=>void}}){
+export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,legalEdges,robberTile,producingTiles,cameraControls,ambientPaused=false,graphicsQuality,onGraphicsQualityChange,diceRoll}:{board:Board;onUnavailable:()=>void;pieces?:Pieces;onSelect?:(selection:BoardSelection)=>void;legalVertices?:readonly string[];legalEdges?:readonly string[];robberTile?:string;producingTiles?:readonly string[];cameraControls?:RefObject<BoardCameraControls|null>;ambientPaused?:boolean;graphicsQuality?:GraphicsQuality;onGraphicsQualityChange?:(q:GraphicsQuality)=>void;diceRoll?:{values:[number,number];duration:number;impulse?:DiceImpulse;onImpact?:(strength:number)=>void;onComplete?:()=>void}}){
  const [localQuality,setLocalQuality]=useState<GraphicsQuality>(readGraphicsQuality);
  const quality=graphicsQuality??localQuality;
  const changeQuality=(q:GraphicsQuality)=>{if(onGraphicsQualityChange)onGraphicsQualityChange(q);else{setLocalQuality(q);persistGraphicsQuality(q);}};
@@ -705,7 +705,7 @@ export function BoardScene3D({board,onUnavailable,pieces,onSelect,legalVertices,
     if(diceCancelled)return;
     const obstacles:DiceObstacle[]=positions.map(({p})=>({x:p.x,y:.06,z:p.y,hx:.78,hy:.06,hz:.78}));
     for(const building of display.buildings){const p=vertices.get(building.vertexId);if(p){const h=building.kind==='city'?.8:.55;obstacles.push({x:p.x,y:.12+h/2,z:p.y,hx:.24,hy:h/2,hz:.23});}}
-    diceSimulation=createPhysicalDice(R,scene,center,{x:size.x/2+1,z:size.z/2+1},diceRoll.values,obstacles,Math.max(200,diceRoll.duration-(performance.now()-diceStarted)),diceRoll.impulse);
+    diceSimulation=createPhysicalDice(R,scene,center,{x:size.x/2+1,z:size.z/2+1},diceRoll.values,obstacles,Math.max(200,diceRoll.duration-(performance.now()-diceStarted)),diceRoll.impulse,diceRoll.onImpact);
     let previous=performance.now();
     const rollTick=(now:number)=>{diceFrame=0;if(diceCancelled||!diceSimulation)return;const running=diceSimulation.step(document.hidden?0:Math.min((now-previous)/1000,.1));previous=now;lastAnimationTime=now;if(!document.hidden)render();if(running)diceFrame=requestAnimationFrame(rollTick);else diceCompleteTimer=window.setTimeout(()=>{if(!diceCancelled)diceRoll.onComplete?.();},450);};
     diceFrame=requestAnimationFrame(rollTick);

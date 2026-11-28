@@ -49,7 +49,7 @@ function load():{enabled:boolean;volume:number;bots:boolean;music:boolean;musicV
 export function useGameAudio(musicId='classic-music'){
  const [settings,setSettings]=useState(load);
  const [ready,setReady]=useState(false);
- const context=useRef<AudioContext|null>(null),master=useRef<GainNode|null>(null),musicGain=useRef<GainNode|null>(null),last=useRef(-Infinity);
+ const context=useRef<AudioContext|null>(null),master=useRef<GainNode|null>(null),musicGain=useRef<GainNode|null>(null),last=useRef(-Infinity),lastImpact=useRef(-Infinity);
  const config=useRef(settings);config.current=settings;
  async function unlock(){
    if(!config.current.enabled)return;
@@ -100,10 +100,21 @@ export function useGameAudio(musicId='classic-music'){
      osc.connect(gain);gain.connect(out);osc.onended=()=>{osc.disconnect();gain.disconnect();};osc.start(t);osc.stop(t+duration+.015);
    }
  }
+ function playDiceImpact(strength:number,bot=false){
+   const ctx=context.current,out=master.current,s=config.current;
+   if(!s.enabled||!ctx||!out||ctx.state!=='running'||document.hidden||(bot&&!s.bots))return;
+   const now=ctx.currentTime;if(now-lastImpact.current<.075)return;lastImpact.current=now;
+   const power=Math.max(0,Math.min(1,strength));if(power<.1)return;
+   const length=.035+power*.035,buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*length),ctx.sampleRate),samples=buffer.getChannelData(0);
+   for(let i=0;i<samples.length;i++)samples[i]=(Math.random()*2-1)*Math.exp(-7*i/samples.length);
+   const source=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+   source.buffer=buffer;filter.type='bandpass';filter.frequency.value=650+power*1150+Math.random()*180;filter.Q.value=.9;gain.gain.value=.035+power*.19;
+   source.connect(filter);filter.connect(gain);gain.connect(out);source.onended=()=>{source.disconnect();filter.disconnect();gain.disconnect();};source.start(now);
+ }
  function toggle(){
    const enabled=!config.current.enabled;
    config.current={...config.current,enabled};setSettings(config.current);
    if(enabled)void unlock();
  }
- return {settings,ready,unlock,play,toggle,toggleMusic:()=>setSettings(s=>({...s,music:!s.music})),setMusicVolume:(musicVolume:number)=>setSettings(s=>({...s,musicVolume})),toggleHaptic:()=>setSettings(s=>({...s,haptic:!s.haptic})),setVolume:(volume:number)=>setSettings(s=>({...s,volume})),toggleBots:()=>setSettings(s=>({...s,bots:!s.bots}))};
+ return {settings,ready,unlock,play,playDiceImpact,toggle,toggleMusic:()=>setSettings(s=>({...s,music:!s.music})),setMusicVolume:(musicVolume:number)=>setSettings(s=>({...s,musicVolume})),toggleHaptic:()=>setSettings(s=>({...s,haptic:!s.haptic})),setVolume:(volume:number)=>setSettings(s=>({...s,volume})),toggleBots:()=>setSettings(s=>({...s,bots:!s.bots}))};
 }
